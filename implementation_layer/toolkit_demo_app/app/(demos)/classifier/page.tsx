@@ -62,6 +62,7 @@ import {
   type ClassifierExample,
   type ClassifierParser,
 } from "./classifier-data";
+import { UploadReminder } from "@/components/upload-reminder";
 
 const GUIDE_STEPS: GuideStep[] = [
   {
@@ -560,6 +561,7 @@ export default function ClassifierPage() {
                   className="sr-only"
                 />
               </label>
+              <UploadReminder />
 
               {isLoadingExample && (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">

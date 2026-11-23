@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { UploadReminder } from "@/components/upload-reminder";
 import { apiFetch, RateLimitError } from "@/lib/api-client";
 import { downloadBlob as download } from "@/lib/download";
 import { putKnowledgeHandoff } from "@/lib/knowledge-curator/handoff";
@@ -604,6 +605,7 @@ export default function KnowledgeCuratorPage() {
                     }}
                   />
                 </label>
+                <UploadReminder />
               </CardContent>
             </Card>
 

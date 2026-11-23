@@ -26,6 +26,7 @@ import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
 import { WizardHelpDialog } from "@/components/demo/wizard-help-dialog";
 import { WizardStartScreen } from "@/components/demo/wizard-start-screen";
+import { UploadReminder } from "@/components/upload-reminder";
 import { deriveWizardStage, WizardProgress } from "@/components/demo/wizard-progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -456,37 +457,41 @@ export default function SolutionWizardPage() {
   const stage = deriveWizardStage(files);
 
   // One composer instance, rendered either centered on the start screen or
-  // pinned under the conversation.
+  // pinned under the conversation. It takes attachments, so the upload
+  // reminder sits under it, outside the form.
   const composer = (
-    <PromptInput
-      accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac"
-      multiple
-      onSubmit={({ text, files: attached }) => {
-        if (text || attached.length > 0) void sendMessage(text, attached);
-      }}
-    >
-      <AttachedFileChips />
-      <PromptInputBody>
-        <PromptInputTextarea
-          className="min-h-11"
-          placeholder={
-            !sessionId
-              ? "Connecting to the wizard…"
-              : hasConversation
-                ? "Reply to the wizard…"
-                : "Describe your use case…"
-          }
-          disabled={!sessionId || busy}
-        />
-      </PromptInputBody>
-      <PromptInputFooter>
-        <AttachButton disabled={!sessionId || busy} />
-        <PromptInputSubmit
-          status={busy ? "streaming" : "ready"}
-          disabled={!sessionId || busy}
-        />
-      </PromptInputFooter>
-    </PromptInput>
+    <>
+      <PromptInput
+        accept=".txt,.md,.docx,.pdf,.csv,.xlsx,.jpg,.jpeg,.png,.webp,.tiff,.gif,.mp3,.mp4,.wav,.m4a,.ogg,.webm,.flac"
+        multiple
+        onSubmit={({ text, files: attached }) => {
+          if (text || attached.length > 0) void sendMessage(text, attached);
+        }}
+      >
+        <AttachedFileChips />
+        <PromptInputBody>
+          <PromptInputTextarea
+            className="min-h-11"
+            placeholder={
+              !sessionId
+                ? "Connecting to the wizard…"
+                : hasConversation
+                  ? "Reply to the wizard…"
+                  : "Describe your use case…"
+            }
+            disabled={!sessionId || busy}
+          />
+        </PromptInputBody>
+        <PromptInputFooter>
+          <AttachButton disabled={!sessionId || busy} />
+          <PromptInputSubmit
+            status={busy ? "streaming" : "ready"}
+            disabled={!sessionId || busy}
+          />
+        </PromptInputFooter>
+      </PromptInput>
+      <UploadReminder className="px-1" />
+    </>
   );
 
   return (

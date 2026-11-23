@@ -7,6 +7,7 @@ import { cn, formatFileSize } from "@/lib/utils";
 import { Download, FileText, Upload, X } from "lucide-react";
 
 import { downloadBlob } from "./artifact-browser";
+import { UploadReminder } from "@/components/upload-reminder";
 
 /** A file named by the spec; `file` is null until the user supplies it. */
 export interface SourceRow {
@@ -178,6 +179,7 @@ export function SourceList({
           disabled={disabled}
           onPick={addFiles}
         />
+        <UploadReminder />
       </div>
 
       <div className="space-y-1">

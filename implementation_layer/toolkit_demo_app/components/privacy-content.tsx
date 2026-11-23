@@ -6,19 +6,28 @@ import {
   Mail,
   Building2,
   BarChart3,
+  Cpu,
+  ScrollText,
+  Upload,
+  Monitor,
 } from "lucide-react";
+import { UPLOAD_REMINDER_TEXT } from "@/components/upload-reminder";
+
+export const PRIVACY_LAST_UPDATED = "November 2026";
 
 function Section({
+  id,
   icon: Icon,
   title,
   children,
 }: {
+  id?: string;
   icon: React.ElementType;
   title: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-2">
+    <section id={id} className="scroll-mt-24 space-y-2">
       <h3 className="flex items-center gap-2 text-sm font-semibold tracking-wide text-slate-900 dark:text-slate-100">
         <Icon className="h-4 w-4 text-teal-600 dark:text-teal-400" />
         {title}
@@ -30,12 +39,24 @@ function Section({
   );
 }
 
+/** A fact the project owner has yet to state. Shown as such, never as a value. */
+function ToBeFilled({ what }: { what: string }) {
+  return (
+    <mark
+      data-placeholder=""
+      className="rounded bg-amber-100 px-1 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+    >
+      [To be filled in by the project owner: {what}]
+    </mark>
+  );
+}
+
 export function PrivacyContent() {
   return (
     <div className="space-y-5">
       <p className="text-muted-foreground text-sm leading-relaxed">
-        This privacy policy explains how the GAIK Toolkit Demo application
-        collects and processes your personal data.
+        This privacy notice explains what personal data the GAIK Toolkit Demo
+        processes, who processes it and how long it is kept.
       </p>
 
       <Section icon={Building2} title="About GAIK Project">
@@ -48,7 +69,18 @@ export function PrivacyContent() {
         </p>
       </Section>
 
-      <Section icon={Eye} title="Data We Collect">
+      <Section icon={Scale} title="Controller and legal basis">
+        <p>
+          Controller:{" "}
+          <ToBeFilled what="the controller of this demo and its contact details" />
+        </p>
+        <p className="mt-2">
+          Legal basis:{" "}
+          <ToBeFilled what="the legal basis for each kind of processing below" />
+        </p>
+      </Section>
+
+      <Section icon={Eye} title="Account details and feedback">
         <ul className="list-inside list-disc space-y-1">
           <li>
             <strong className="text-foreground">Contact information</strong> —
@@ -62,28 +94,105 @@ export function PrivacyContent() {
             <strong className="text-foreground">Account credentials</strong> —
             password (stored securely hashed)
           </li>
-        </ul>
-      </Section>
-
-      <Section icon={Shield} title="How We Use Your Data">
-        <ul className="list-inside list-disc space-y-1">
-          <li>Process and respond to your access request</li>
-          <li>Provide you access to the GAIK Toolkit demo</li>
-          <li>Improve the toolkit based on usage patterns (anonymized)</li>
           <li>
-            Keep a log line of each demo run: your account id, the feature, the
-            time and whether it succeeded, never what you uploaded or asked. It
-            is used to look into misuse and to answer your requests about your
-            data, and kept as long as the service&apos;s logs are kept.
+            <strong className="text-foreground">Access record</strong> — the
+            status of your access request, whether you may use the first
+            Solution Wizard or write more reports than usual, and how many
+            reports you have written, the model tokens they used and when you
+            wrote the last one
+          </li>
+          <li>
+            <strong className="text-foreground">Demo feedback</strong> — the
+            rating and comment you give a demo
           </li>
         </ul>
+        <p className="mt-2">
+          They are used to handle your access request, give you access to the
+          demo and, for feedback, improve the demos. They are stored with your
+          account in Supabase, hosted on AWS in the EU (Stockholm, Sweden), for
+          the duration of the GAIK project (until January 2027) or until you
+          request deletion.
+        </p>
       </Section>
 
-      <Section icon={Database} title="Data Storage">
+      <Section id="uploads" icon={Upload} title="Uploads and demo inputs">
         <p>
-          Your data is stored securely using Supabase, hosted on AWS in the EU
-          (Stockholm, Sweden). We retain your data only for the duration of the
-          GAIK project (until January 2027) or until you request deletion.
+          The files you upload and the text, questions, web addresses and
+          recordings you enter go to the demo&apos;s server on CSC&apos;s Rahti
+          service, which checks each file for malware, and from there to the
+          services below. The server reads each file in memory or in a temporary
+          file, and most demos drop it when the request ends. Some keep what you
+          enter or what they produce for a while, so you can go on working with
+          it. The longest the server keeps them:
+        </p>
+        <ul className="mt-1 list-inside list-disc space-y-1">
+          <li>
+            documents indexed in RAG Builder: until you clear them, or 70
+            minutes after you last use them
+          </li>
+          <li>tables in Tabular Agent: 35 minutes after you last use them</li>
+          <li>PDF reports: 70 minutes after they are made</li>
+          <li>generated subtitles: two hours after they are made</li>
+          <li>
+            Luvata order drafts: you can download them for an hour, and they are
+            kept until the next order is processed or the server restarts
+          </li>
+          <li>
+            the extraction prompts and field descriptions you write, and the
+            schemas made from them: until the server restarts
+          </li>
+          <li>
+            a note of which account made each result: two days, and then until
+            the next run or the server restarts
+          </li>
+        </ul>
+        <p className="mt-2">
+          What the first Solution Wizard keeps is described below.
+        </p>
+        <p className="mt-2">{UPLOAD_REMINDER_TEXT}</p>
+      </Section>
+
+      <Section icon={Cpu} title="AI model and processing services">
+        <p>
+          Uploads and inputs are processed by the provider of the model in use:
+          Microsoft Azure (OpenAI&apos;s and Anthropic&apos;s models), Google
+          Vertex AI (Gemini models) or CSC&apos;s Aitta service in Finland (open
+          models such as Gemma and gpt-oss). With an Aitta model picked, audio
+          is also transcribed and RAG Builder documents are indexed on Aitta.
+          Documents read with HH Parser go to Haaga-Helia&apos;s document
+          parsing service, and audio transcribed with Haaga-Helia&apos;s Whisper
+          server to that server. If you enter your own model key, they go to the
+          provider of that key, on its terms.
+        </p>
+        <p className="mt-2">
+          How long these services keep them:{" "}
+          <ToBeFilled what="each service's retention period for prompts and files" />
+        </p>
+      </Section>
+
+      <Section icon={ScrollText} title="Logs and usage limits">
+        <p>
+          The server logs each request: its time, path and outcome, and for some
+          requests a file name or an error message. Each demo run also leaves
+          one line with your account id, the feature, the time and whether it
+          succeeded, never what you uploaded or asked; it is used to look into
+          misuse and to answer your requests about your data. Helpdesk Chatbot
+          and EU AI Act Screening run in the web app and leave no such line.
+        </p>
+        <p className="mt-2">
+          The usage limits count admin sign-in attempts and requests per IP
+          address, and runs per account, in Upstash Redis; each count expires
+          when its window ends, at the latest after a day. Upstash Redis also
+          keeps, for each account that uses the first Solution Wizard, how many
+          sessions it started, how many messages it sent and when it last used
+          the wizard. These counts do not expire.
+        </p>
+        <p className="mt-2">
+          Where Upstash Redis is hosted:{" "}
+          <ToBeFilled what="the Upstash Redis region" />
+        </p>
+        <p className="mt-2">
+          How long logs are kept: <ToBeFilled what="the log retention period" />
         </p>
       </Section>
 
@@ -100,30 +209,51 @@ export function PrivacyContent() {
           Analytics data is used solely to improve the demo application. You can
           opt out by enabling Do Not Track in your browser settings.
         </p>
+        <p className="mt-2">
+          How long analytics data is kept:{" "}
+          <ToBeFilled what="the analytics retention period" />
+        </p>
       </Section>
 
-      <Section icon={Eye} title="Solution Wizard Sessions">
+      <Section icon={Database} title="Solution Wizard">
         <p>
-          The first Solution Wizard in the browser keeps your conversation and
-          the files it generates only while the session runs: they are removed
-          when you leave the page or restart, or after about 30 minutes without
-          activity.
+          The first Solution Wizard in the browser keeps your conversation, with
+          the text of the files you attach, and the files it generates only
+          while the session runs: they are removed when you leave the page or
+          restart, or after about 30 minutes without activity. Its use is
+          counted per account (see Logs and usage limits), but what you write is
+          not recorded: the optional diagnostics pilot that recorded sessions
+          was switched off on 4 November 2026, and the sessions it stored are
+          being deleted. Contact the project team below with any questions about
+          them.
         </p>
         <p className="mt-2">
-          Solution Wizard no longer records sessions. The optional diagnostics
-          pilot was switched off on 4 November 2026, and the sessions it stored
-          are being deleted. Contact the project team below with any questions
-          about them.
+          Solution Wizard V2, which this demo links to, is a separate service.
         </p>
       </Section>
 
-      <Section icon={Scale} title="Your Rights">
+      <Section icon={Monitor} title="In your browser">
+        <p>
+          Your browser keeps, until you clear them: the model and reasoning
+          effort you picked, the rating and comment you gave each demo, the
+          names of the documents you indexed in RAG Builder, and whether you
+          have seen the tour. A Source Normalizer or Knowledge Curator result
+          you pass on to the next page waits in that browser tab until the next
+          page opens it or the tab is closed.
+        </p>
+      </Section>
+
+      <Section icon={Shield} title="Your Rights">
         <p className="mb-1">Under GDPR, you have the right to:</p>
         <ul className="list-inside list-disc space-y-1">
           <li>Access your personal data</li>
           <li>Correct inaccurate data</li>
           <li>Request deletion of your data</li>
-          <li>Withdraw consent at any time</li>
+          <li>Withdraw consent, where the processing is based on it</li>
+          <li>
+            Lodge a complaint with a data protection authority; in Finland, the
+            Data Protection Ombudsman
+          </li>
         </ul>
       </Section>
 

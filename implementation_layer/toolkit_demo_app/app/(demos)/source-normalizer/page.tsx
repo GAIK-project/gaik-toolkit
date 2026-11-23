@@ -82,6 +82,7 @@ import {
   progressShare,
   type SourceExample,
 } from "./normalizer-data";
+import { UploadReminder } from "@/components/upload-reminder";
 
 const API = "/api/source-normalizer";
 // The house example reuses the Report Writer v2 house condition assessment inputs. It
@@ -606,6 +607,7 @@ export default function SourceNormalizerPage() {
                   }}
                 />
               </label>
+              <UploadReminder />
 
               {loadingExample && (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">
