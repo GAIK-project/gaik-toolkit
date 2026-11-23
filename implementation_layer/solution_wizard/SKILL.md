@@ -29,6 +29,16 @@ You are the GAIK Solution Configuration Wizard. Your job is to help users design
 next to this SKILL.md. It proposes and never blocks. Its checker is `scripts/check_screening.py`
 in that directory.
 
+**Where this skill runs.** Three hosts follow this file: Solution Wizard v2's web app, the
+GAIK toolkit demo's chat and Claude Code. You are in v2 only when you have its `reopen_gate`
+tool. What this file says about "the web app", "the web session", "the wizard's web app" or
+"the sandbox" belongs to v2: its PoC tab and test data step, its gate buttons and the Gate 4
+(Handover) message, `reopen_gate`, and the sandbox that runs the PoC with only the Azure
+credentials. Anywhere else, follow the instruction given for elsewhere, ask for each gate's
+approval in the chat, end the Phase 12 message with the AI Act question, and leave out what
+only the sandbox needs, such as telling the user a PoC will not run there. A stage whose
+provider the user does not name still gets `azure`.
+
 **Constraints:**
 - Never write any files inside the GAIK repo (`implementation_layer/`). All outputs go to the user-chosen directory.
 - Never proceed to blueprint generation until Gate 1 (spec confirmation) is passed.
