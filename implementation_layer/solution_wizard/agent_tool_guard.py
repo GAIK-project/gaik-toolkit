@@ -299,6 +299,10 @@ def odd_path_form(path: str) -> bool:
     return any(p[-1] in ". " for p in parts)
 
 
+#: A junction's reparse tag. ``stat`` names it only on Windows, where junctions exist.
+_MOUNT_POINT_TAG = getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003)
+
+
 def _is_link(path: str) -> bool:
     """A symlink, or a Windows junction, which any user can make without the
     symlink right. ``os.path.isjunction`` is Python 3.12+; on 3.11 the junction
@@ -308,11 +312,13 @@ def _is_link(path: str) -> bool:
     isjunction = getattr(os.path, "isjunction", None)
     if isjunction is not None:
         return isjunction(path)
+    if sys.platform != "win32":
+        return False
     try:
         tag = getattr(os.lstat(path), "st_reparse_tag", 0)
     except OSError:
         return False
-    return tag == stat.IO_REPARSE_TAG_MOUNT_POINT
+    return tag == _MOUNT_POINT_TAG
 
 
 def find_link(folders: list[Path]) -> Path | None:
