@@ -37,6 +37,7 @@ def session(client, db_session, tmp_path, monkeypatch) -> dict:
         **row.session_metadata,
         "messages": [{"role": "user", "content": "hello"}],
         "agent_sdk_session_id": "11111111-1111-4111-8111-111111111111",
+        "agent_sdk_session_ids": ["11111111-1111-4111-8111-111111111111"],
     }
     db_session.commit()
     return body
@@ -71,6 +72,7 @@ def test_service_files_and_links_stay_out(client, session) -> None:
     res = client.get(f"/sessions/{session['id']}/export", headers=ALICE)
     record, names = _read(res.content)
     assert "agent_sdk_session_id" not in record["metadata"]
+    assert "agent_sdk_session_ids" not in record["metadata"]
     assert "output_dir" not in record
     assert not [n for n in names if ".env" in n or "__pycache__" in n or "link.txt" in n]
 
