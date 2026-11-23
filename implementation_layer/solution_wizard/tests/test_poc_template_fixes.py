@@ -212,9 +212,10 @@ def _needs_keys(provider_config):
     provider_config._ns["get_llm_config"] = get_llm_config
 
 
-def test_a_stage_on_a_provider_without_a_key_runs_on_azure_when_azure_is_there(
+def test_in_the_sandbox_a_stage_on_a_provider_without_a_key_runs_on_azure(
     provider_config, monkeypatch, capsys
 ):
+    monkeypatch.setenv("WIZARD_RUN_ID", "run-1")  # set by the sandbox Job
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("AZURE_API_KEY", "k")
     monkeypatch.setenv("AZURE_ENDPOINT", "https://azure.invalid/")
@@ -238,9 +239,26 @@ def test_a_stage_on_a_provider_without_a_key_runs_on_azure_when_azure_is_there(
     assert "WARNING" in out and "Azure" in out and "dropped" in out
 
 
+def test_outside_the_sandbox_a_missing_key_is_an_error_even_with_azure_set_up(
+    provider_config, monkeypatch
+):
+    """A Claude Code or demo user chose the provider: their data does not go to Azure
+    because they forgot that provider's key."""
+    monkeypatch.delenv("WIZARD_RUN_ID", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("AZURE_API_KEY", "k")
+    monkeypatch.setenv("AZURE_ENDPOINT", "https://azure.invalid/")
+    _needs_keys(provider_config)
+    config = {"stages": {"extraction": {"provider": "openai", "model": "gpt-6-luna"}}}
+
+    with pytest.raises(ValueError, match="OPENAI_API_KEY"):
+        provider_config.get_stage_config(config, "extraction")
+
+
 def test_a_missing_key_is_still_an_error_when_azure_is_not_there_either(
     provider_config, monkeypatch
 ):
+    monkeypatch.setenv("WIZARD_RUN_ID", "run-1")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.delenv("AZURE_API_KEY", raising=False)
     monkeypatch.delenv("AZURE_ENDPOINT", raising=False)
@@ -264,6 +282,7 @@ def test_a_provider_that_has_its_key_is_left_alone(provider_config, monkeypatch)
 
 
 def test_other_errors_are_not_turned_into_azure(provider_config, monkeypatch):
+    monkeypatch.setenv("WIZARD_RUN_ID", "run-1")
     monkeypatch.setenv("AZURE_API_KEY", "k")
     monkeypatch.setenv("AZURE_ENDPOINT", "https://azure.invalid/")
 
@@ -278,6 +297,7 @@ def test_other_errors_are_not_turned_into_azure(provider_config, monkeypatch):
 
 
 def test_self_hosted_whisper_keeps_its_own_path(provider_config, monkeypatch):
+    monkeypatch.setenv("WIZARD_RUN_ID", "run-1")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("AZURE_API_KEY", "k")
     monkeypatch.setenv("AZURE_ENDPOINT", "https://azure.invalid/")

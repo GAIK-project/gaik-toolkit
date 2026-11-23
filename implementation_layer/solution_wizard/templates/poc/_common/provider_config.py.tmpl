@@ -156,10 +156,13 @@ _PROVIDER_SPECIFIC = (
 def _azure_instead(config: dict, provider: str, error: Exception) -> bool:
     """The sandbox holds only the Azure credentials. A stage whose provider has no key
     there (the agent often records ``openai`` for a case that names no provider) cannot
-    run; when Azure is available it can run on Azure instead. Never when the blueprint
-    allows no external model API: Azure is one."""
+    run; when Azure is available it can run on Azure instead. Only in the sandbox, whose
+    Job sets WIZARD_RUN_ID: anywhere else the user chose the provider, and a missing key
+    is theirs to set, not a reason to send the data to another one. Never when the
+    blueprint allows no external model API: Azure is one."""
     return (
-        provider != "azure"
+        bool(os.environ.get("WIZARD_RUN_ID"))
+        and provider != "azure"
         and not external_model_forbidden(config)
         and "not found in environment" in str(error)
         and bool(os.environ.get("AZURE_API_KEY") and os.environ.get("AZURE_ENDPOINT"))
