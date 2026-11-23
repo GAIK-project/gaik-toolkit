@@ -33,9 +33,17 @@ def _find_repo_root(start: Path) -> Path | None:
     absolute output dir then looked like it was inside the repo, so the guard
     below refused all of them (#180). A marker walk cannot resolve to "/" unless
     "/" really is a checkout, which the caller treats as no repo either way.
+
+    The repository's layout counts as a marker too: the demo's image copies the
+    wizard to /app/implementation_layer/solution_wizard without .git, and its
+    output still must not land inside /app (outside .wizard_workspaces).
     """
     for candidate in (start, *start.parents):
-        if (candidate / ".git").exists() and candidate != Path(candidate.anchor):
+        if candidate == Path(candidate.anchor):
+            continue
+        if (candidate / ".git").exists():
+            return candidate
+        if (candidate / "implementation_layer" / "solution_wizard").is_dir():
             return candidate
     return None
 

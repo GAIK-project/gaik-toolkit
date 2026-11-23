@@ -49,6 +49,16 @@ def test_a_git_worktree_counts_as_a_checkout(cli, tmp_path):
     assert cli._find_repo_root(wizard) == repo
 
 
+def test_the_demo_images_layout_counts_as_a_checkout_without_git(cli, tmp_path):
+    """The demo's image has /app/implementation_layer/solution_wizard and no .git;
+    its root stays /app, as it was before the marker walk."""
+    app = tmp_path / "app"
+    wizard = app / "implementation_layer" / "solution_wizard"
+    wizard.mkdir(parents=True)
+
+    assert cli._find_repo_root(wizard) == app
+
+
 def test_an_installed_package_has_no_repo_root(cli, tmp_path):
     """The container case: no marker above the package, so nothing to protect."""
     wizard = tmp_path / "solution_wizard"
