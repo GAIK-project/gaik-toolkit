@@ -1,7 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { loginAsDev } from "./helpers/auth";
 import { resetMockSessions } from "./helpers/mock";
-import { openBlueprintEditor, openBpmnView, selectWorkspaceTab, setChatOpen } from "./helpers/workspace";
+import { openBlueprintEditor, selectWorkspaceTab, setChatOpen } from "./helpers/workspace";
 
 /**
  * The Blueprint form: one page the tab scrolls, with the control that closes
@@ -399,6 +399,36 @@ test.describe("Blueprint form", () => {
     await expect(page.getByTestId("solution-plan-view")).toContainText("Shorter handling time");
   });
 
+  test("saves again by itself after a refusal over a newer version with the same content", async ({ page }) => {
+    // A version written since the form read the blueprint, with the same
+    // content (a step forward writes one): the save made on the older version
+    // is refused, the page reads the new one, and as nothing in the blueprint
+    // changed there is nothing to choose between: the draft goes out again on
+    // the version now shown, without a further edit.
+    await openForm(page, "ses_ui_basics");
+    await page.getByTestId("blueprint-json-toggle").click();
+    const current = JSON.parse(await page.getByTestId("blueprint-json-editor").inputValue()) as unknown;
+    await page.getByTestId("blueprint-json-toggle").click();
+    const same = await page.request.patch("/api/sessions/ses_ui_basics/blueprint", {
+      data: { content: current, note: "e2e: the same content, a new version" },
+    });
+    expect(same.status()).toBe(200);
+
+    const statuses: number[] = [];
+    page.on("response", (r) => {
+      if (/\/api\/sessions\/[^/]+\/blueprint$/.test(r.url()) && r.request().method() === "PATCH") {
+        statuses.push(r.status());
+      }
+    });
+    await page.getByTestId("blueprint-field-goal").fill("Shorter handling time");
+    await page.getByTestId("blueprint-field-name").focus();
+    await expect.poll(() => statuses, { timeout: 15_000 }).toEqual([409, 200]);
+    await expect(status(page)).toHaveText("Tallennettu");
+    await expect(page.getByTestId("blueprint-changed-elsewhere")).toHaveCount(0);
+    await page.reload();
+    await expect(page.getByTestId("solution-plan-view")).toContainText("Shorter handling time");
+  });
+
   test("a save made on an older version that reaches the server after a newer one is refused, and Ota uudempi keeps the newer one", async ({ page }) => {
     const { release, patches, warning } = await conflictDuringSave(page);
     // The held save started by itself on the version before the agent's: it
@@ -422,7 +452,6 @@ test.describe("Blueprint form", () => {
   });
 
   test("asks which version stays when the blueprint changes under an unsaved draft", async ({ page }) => {
-    // The Workflow tab's save lints, syncs and regenerates the diagram in child processes.
     test.setTimeout(150_000);
     await openForm(page, "ses_laskut");
 
@@ -431,17 +460,22 @@ test.describe("Blueprint form", () => {
     await page.getByTestId("blueprint-step-0-name").fill("");
     await expect(status(page)).toHaveText("Ei tallennettu: anna vaiheelle nimi");
 
-    // Meanwhile the diagram saves a rename of another step. The session waits
-    // on a gate, so the chat is open: collapsed, the tab has room for the step list.
+    // Meanwhile the simple flow beside it saves a rename of another step (the
+    // BPMN canvas sends its edits to wizard_api, which the mock store has not).
+    // The session waits on a gate, so the chat is open: collapsed, the tab has room.
     await setChatOpen(page, false);
     await selectWorkspaceTab(page, "Työnkulku");
-    await openBpmnView(page);
-    await expect(page.locator(".bpmn-editable")).toHaveAttribute("aria-busy", "false", { timeout: 45_000 });
-    await page.getByTestId("flow-step-list").locator("li").nth(4).getByRole("button").first().click();
-    const sync = page.waitForResponse((r) => r.url().includes("/bpmn/sync") && r.request().method() === "POST");
-    await page.getByTestId("bpmn-property-name").fill("Send to finance");
-    expect((await sync).status()).toBe(200);
-    await expect(page.getByTestId("bpmn-status")).toContainText("Tallennettu", { timeout: 15_000 });
+    await expect(page.getByTestId("simple-flow")).toBeVisible({ timeout: 45_000 });
+    const flowLocked = page.getByTestId("simple-flow-locked");
+    if (await flowLocked.count()) await flowLocked.getByRole("button", { name: "Muokkaa kaaviota" }).click();
+    await page.getByTestId("simple-flow-node-4").click();
+    const flowName = page.getByTestId("simple-flow-name");
+    await expect(flowName).toHaveValue("Export to finance system");
+    const saved = page.waitForResponse((r) => /\/blueprint$/.test(r.url()) && r.request().method() === "PATCH");
+    await flowName.fill("Send to finance");
+    await flowName.press("Enter");
+    expect((await saved).status()).toBe(200);
+    await expect(page.getByTestId("simple-flow-status")).toHaveText("Tallennettu", { timeout: 15_000 });
 
     await page.getByRole("tab", { name: "Blueprint" }).click();
     const warning = page.getByTestId("blueprint-changed-elsewhere");

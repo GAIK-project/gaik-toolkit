@@ -22,6 +22,8 @@ export const LOGIN_MESSAGE_CODES = ["signed-up"] as const;
 export type LoginMessageCode = (typeof LOGIN_MESSAGE_CODES)[number];
 
 export type Dict = {
+  /** The dictionary's own language. */
+  locale: Locale;
   appName: string;
   signOut: string;
 
@@ -181,20 +183,116 @@ export type Dict = {
   /** The diagram at the size of the window, and back. */
   flowFullView: string;
   flowFullViewExit: string;
+  /** The minimap over the BPMN canvas, for a screen reader. */
+  bpmnMinimap: string;
+  /** Toggle on the BPMN canvas: draw the data objects, or a compact diagram without them. */
+  bpmnShowData: string;
   bpmnPaletteAddTask: string;
   bpmnPaletteConnect: string;
   bpmnPadRename: string;
   bpmnPadDelete: string;
-  bpmnUnsaved: string;
-  /** "{names}": the tasks no flow from the start reaches. */
-  bpmnUnconnected: string;
-  bpmnUnnamed: string;
-  /** What the unconnected-task line calls a task that has no name yet. */
-  bpmnUnnamedTask: string;
-  /** Puts the canvas back to the diagram last saved. */
-  bpmnDiscard: string;
-  /** Under an editable canvas, on one line: what saves by itself, what waits for the button, and the undo. */
+  /** A step's context pad: a new step right after it. */
+  bpmnPadAppend: string;
+  /** A step's context pad: one place earlier or later in the process. */
+  bpmnPadMoveEarlier: string;
+  bpmnPadMoveLater: string;
+  /** A step's context pad: draw a line from it to another step. */
+  bpmnPadConnect: string;
+  /** Over an element the blueprint draws from elsewhere (start, gateway, lane, data): why it is not edited here. */
+  bpmnDerivedElement: string;
+  /** Under the canvas when there is no wizard_api to send edits to: read only. */
+  bpmnNeedsWizardApi: string;
+  /** Under the canvas while the agent has not written its blueprint yet: read only until then. */
+  bpmnNeedsDraft: string;
+  /** Refused edits: the undo's version is no valid blueprint any more; the edit is too large. */
+  bpmnCannotUndo: string;
+  bpmnTooLarge: string;
+  /** A kept rename whose step was removed elsewhere meanwhile: "{name}" is the typed name. */
+  bpmnRenameStepGone: string;
+  /** The same for a kept description: the step it was typed for was removed elsewhere. */
+  bpmnEditStepGone: string;
+  /** A type kept for a step that is a decision on the newer version: it is not sent. */
+  bpmnTypeStepIsDecision: string;
+  /** A step's context pad, and the title of the menu of step types it opens. */
+  bpmnPadChangeType: string;
+  /** The step panel: the description field, its count ("{n}" of "{max}" characters), and how a field saves. */
+  bpmnStepDescription: string;
+  bpmnStepDescriptionCount: string;
+  bpmnStepSaveHint: string;
+  /** The step panel: an AI step without a component. */
+  bpmnStepNeedsComponent: string;
+  /** Lanes: the palette's "Add lane", the name a new lane starts with, a lane's context pad. */
+  bpmnPaletteAddLane: string;
+  bpmnNewLaneName: string;
+  bpmnPadRenameLane: string;
+  bpmnPadRemoveLane: string;
+  /** A lane that steps are in is not removed. */
+  bpmnLaneInUse: string;
+  /** Business decisions: a step's pad ("a decision after it"), a decision gateway's pad (edit, remove). */
+  bpmnPadAddDecision: string;
+  bpmnPadEditDecision: string;
+  bpmnPadRemoveDecision: string;
+  /** The branch dialog (components/bpmn-branch-dialog): its titles, fields and buttons. */
+  bpmnDecisionAddTitle: string;
+  bpmnDecisionEditTitle: string;
+  /** Under the title: what a decision is, and how many branches it has ("{min}" to "{max}"). */
+  bpmnDecisionHelp: string;
+  bpmnDecisionName: string;
+  /** "Branch {n}": a branch's group of fields. */
+  bpmnDecisionBranch: string;
+  bpmnDecisionCondition: string;
+  bpmnDecisionTarget: string;
+  /** The target that ends the process. */
+  bpmnDecisionEnd: string;
+  bpmnDecisionAddBranch: string;
+  bpmnDecisionRemoveBranch: string;
+  /** Every branch leads to one place: the decision decides nothing. */
+  bpmnDecisionSameTarget: string;
+  bpmnDecisionSave: string;
+  bpmnDecisionCancel: string;
+  /** An edit refused because it would make the process loop back to an earlier step. */
+  bpmnLoopRefused: string;
+  /** Rework and rejection paths: a step's pad ("add one"), a path's pad (edit, remove). */
+  bpmnPadAddRework: string;
+  bpmnPadEditRework: string;
+  bpmnPadRemoveRework: string;
+  /** The path dialog (BpmnReworkDialog in components/bpmn-branch-dialog): its titles, fields and buttons. */
+  bpmnReworkAddTitle: string;
+  bpmnReworkEditTitle: string;
+  /** Under the title: what a rework or rejection path is. */
+  bpmnReworkHelp: string;
+  bpmnReworkName: string;
+  bpmnReworkCondition: string;
+  /** The outcome select: back to a step ("{step}"), or the end. */
+  bpmnReworkOutcome: string;
+  bpmnReworkBackTo: string;
+  bpmnReworkEnd: string;
+  bpmnReworkSave: string;
+  /** Data objects: a data object's pad (rename it in place, draw a line to a step). */
+  bpmnPadRenameDataObject: string;
+  bpmnPadConnectData: string;
+  /** Refused data object edits: another step makes it; the only step that makes a used one; a link the step has. */
+  bpmnDataSecondProducer: string;
+  bpmnDataStillUsed: string;
+  bpmnDataAlreadyLinked: string;
+  /** Refused: the link's removal would leave a generated data object no step that makes it. */
+  bpmnDataOnlyProducer: string;
+  /** The step panel's lane select, and its entry for the lane of the step's type. */
+  bpmnStepLane: string;
+  bpmnStepLaneDefault: string;
+  /** Takes back the last change to the blueprint (wizard_api's undo). */
+  bpmnUndo: string;
+  bpmnUndone: string;
+  bpmnNothingToUndo: string;
+  /** An edit refused while the wizard writes its reply. */
+  bpmnAgentBusy: string;
+  /** An edit refused for one field: "{field}" in plain words (blueprintFieldNames). */
+  bpmnOpRefusedField: string;
+  bpmnOpRefused: string;
+  /** Under an editable canvas, on one line: each change saves at once, and Undo. */
   bpmnEditHelp: string;
+  /** A refused edit's field in plain words, keyed by its last name (lib/blueprint-field-names). */
+  blueprintFieldNames: Record<string, string>;
   /** After a save of the diagram: saved, and when the wizard hears of it. */
   bpmnSaved: string;
   /** "{n}": the step's number in the process. */
@@ -361,12 +459,9 @@ export type Dict = {
   wsBpmnLoading: string;
   wsBpmnError: string;
   wsStepList: string;
-  wsBpmnSave: string;
   wsBpmnSaving: string;
   wsBpmnSaveError: string;
   wsBpmnSaved: string;
-  wsBpmnLintBlocked: string;
-  wsBpmnLintWarnings: string;
   wsBpmnZoomIn: string;
   wsBpmnZoomOut: string;
   wsBpmnToolbar: string;
@@ -382,6 +477,48 @@ export type Dict = {
   wsJsonSaved: string;
   wsJsonInvalid: string;
   wsJsonChangedElsewhere: string;
+  /** A full save refused as no valid blueprint (invalid_draft): "{field}" is where. */
+  wsJsonInvalidDraft: string;
+  /** A full save refused for a section only the wizard writes (readonly_section): "{field}". */
+  wsJsonReadonlySection: string;
+  // ==== full blueprint view (components/full-blueprint-view) ====
+  bpViewLabel: string;
+  /** The Blueprint tab's two views: the form and its read view of the steps, and the whole draft. */
+  bpViewSteps: string;
+  bpViewFull: string;
+  fullBpLoading: string;
+  /** Without wizard_api (mock mode) there is no full draft to show. */
+  fullBpNeedsApi: string;
+  fullBpNoDraft: string;
+  fullBpLoadError: string;
+  fullBpDownload: string;
+  fullBpAdvanced: string;
+  fullBpEditorLabel: string;
+  /** Beside a section only the wizard writes. */
+  fullBpReadonly: string;
+  fullBpEditHelp: string;
+  fullBpSave: string;
+  fullBpCancel: string;
+  /** "{line}", "{column}": where the JSON goes wrong. */
+  fullBpParseError: string;
+  fullBpNotObject: string;
+  /** "{field}" in plain words (fieldName), "{message}" the server's. */
+  fullBpRefused: string;
+  fullBpChangedElsewhere: string;
+  fullBpReload: string;
+  fullBpKeepEditing: string;
+  /** After "keep editing" over a newer draft: what the next save does. */
+  fullBpKeptEditing: string;
+  fullBpAgentBusy: string;
+  /** "{sections}": the sections both the newer draft and the user's text changed, in plain words. */
+  fullBpConflict: string;
+  /** Leaving "Full blueprint" with text not saved in its editor: asked first. */
+  bpViewLeaveAsk: string;
+  bpViewLeaveStay: string;
+  bpViewLeaveDiscard: string;
+  fullBpUnchanged: string;
+  /** Over the server's warnings and what the wizard completes after a save. */
+  fullBpAttention: string;
   wsFormName: string;
   wsFormDescription: string;
   wsFormSteps: string;
@@ -884,6 +1021,7 @@ export type Dict = {
 };
 
 const fi: Dict = {
+  locale: "fi",
   appName: "GAIK Solution Wizard",
   signOut: "Kirjaudu ulos",
 
@@ -1032,16 +1170,106 @@ const fi: Dict = {
   bpmnFitView: "Sovita näkymään",
   flowFullView: "Suurenna kaavio",
   flowFullViewExit: "Pienennä kaavio",
-  bpmnPaletteAddTask: "Lisää tehtävä: pudota se nuolen päälle, niin se liitetään prosessiin",
+  bpmnMinimap: "Kaavion pienoiskartta",
+  bpmnShowData: "Näytä data",
+  bpmnPaletteAddTask: "Lisää vaihe prosessin loppuun",
   bpmnPaletteConnect: "Yhdistä vaiheet: vedä vaiheesta toiseen",
   bpmnPadRename: "Nimeä uudelleen",
   bpmnPadDelete: "Poista",
-  bpmnUnsaved: "Muutoksia ei ole tallennettu",
-  bpmnUnconnected: "Yhdistä nuolella prosessiin ennen tallennusta: {names}",
-  bpmnUnnamed: "Anna tehtävälle nimi ennen tallennusta.",
-  bpmnUnnamedTask: "nimetön tehtävä",
-  bpmnDiscard: "Hylkää muutokset",
-  bpmnEditHelp: "Nimi tallentuu itsestään, muut muutokset Tallenna-napista. Ctrl+Z peruu.",
+  bpmnPadAppend: "Lisää vaihe tämän jälkeen",
+  bpmnPadMoveEarlier: "Siirrä aiemmaksi",
+  bpmnPadMoveLater: "Siirrä myöhemmäksi",
+  bpmnPadConnect: "Yhdistä toiseen vaiheeseen",
+  bpmnDerivedElement:
+    "Tämä osa piirretään blueprintin muista tiedoista, joten sitä ei muokata kaaviossa. Pyydä muutosta wizardilta.",
+  bpmnNeedsWizardApi: "Vain luku: kaavion muokkaus tarvitsee wizardin palvelun, joka ei ole nyt käytössä.",
+  bpmnNeedsDraft:
+    "Vain luku: kaaviota voi muokata, kun wizard on kirjoittanut ensimmäisen blueprintin. Sitä ennen muutokset tehdään yksinkertaisessa kaaviossa.",
+  bpmnCannotUndo: "Viimeisintä muutosta ei voi kumota.",
+  bpmnTooLarge: "Muutos on liian suuri tallennettavaksi.",
+  bpmnRenameStepGone: "Nimeä ”{name}” ei tallennettu: vaihe poistettiin muualla.",
+  bpmnEditStepGone: "Vaiheen muutosta ei tallennettu: vaihe poistettiin muualla.",
+  bpmnTypeStepIsDecision: "Vaiheen ”{name}” tyyppiä ei vaihdettu: se on muualla tehdyn muutoksen jälkeen päätös.",
+  bpmnPadChangeType: "Vaihda vaiheen tyyppi",
+  bpmnStepDescription: "Kuvaus",
+  bpmnStepDescriptionCount: "{n} / {max} merkkiä",
+  bpmnStepSaveHint: "Enter tai kentästä poistuminen tallentaa, Esc peruu.",
+  bpmnStepNeedsComponent: "Tekoälyvaihe tarvitsee komponentin: pyydä wizardia valitsemaan se.",
+  bpmnPaletteAddLane: "Lisää kaista",
+  bpmnNewLaneName: "Uusi kaista",
+  bpmnPadRenameLane: "Nimeä kaista uudelleen",
+  bpmnPadRemoveLane: "Poista kaista",
+  bpmnLaneInUse: "Kaistaa ei poistettu: siinä on vaiheita. Siirrä ne ensin toiseen kaistaan.",
+  bpmnPadAddDecision: "Lisää päätös tämän jälkeen",
+  bpmnPadEditDecision: "Muokkaa päätöstä",
+  bpmnPadRemoveDecision: "Poista päätös",
+  bpmnDecisionAddTitle: "Lisää päätös",
+  bpmnDecisionEditTitle: "Muokkaa päätöstä",
+  bpmnDecisionHelp:
+    "Päätös jakaa prosessin haaroihin. Anna kullekin haaralle ehto ja vaihe, johon se johtaa. Haaroja on {min}–{max}.",
+  bpmnDecisionName: "Päätöksen nimi",
+  bpmnDecisionBranch: "Haara {n}",
+  bpmnDecisionCondition: "Ehto",
+  bpmnDecisionTarget: "Johtaa vaiheeseen",
+  bpmnDecisionEnd: "Loppu",
+  bpmnDecisionAddBranch: "Lisää haara",
+  bpmnDecisionRemoveBranch: "Poista haara {n}",
+  bpmnDecisionSameTarget: "Kaikki haarat johtavat samaan paikkaan: valitse ainakin yhdelle toinen vaihe.",
+  bpmnDecisionSave: "Tallenna päätös",
+  bpmnDecisionCancel: "Peruuta",
+  bpmnLoopRefused:
+    "Muutosta ei tehty: prosessi palaisi sen jälkeen aiempaan vaiheeseen. Haara ei voi johtaa taaksepäin; lisää vaiheelle korjauspolku.",
+  bpmnPadAddRework: "Lisää korjauspolku",
+  bpmnPadEditRework: "Muokkaa polkua",
+  bpmnPadRemoveRework: "Poista polku",
+  bpmnReworkAddTitle: "Lisää korjauspolku",
+  bpmnReworkEditTitle: "Muokkaa polkua",
+  bpmnReworkHelp:
+    "Kun ehto täyttyy, työ palaa korjattavaksi tähän tai aiempaan vaiheeseen, tai prosessi päättyy (hylkäys).",
+  bpmnReworkName: "Polun nimi",
+  bpmnReworkCondition: "Ehto",
+  bpmnReworkOutcome: "Mitä sitten",
+  bpmnReworkBackTo: "Takaisin vaiheeseen: {step}",
+  bpmnReworkEnd: "Prosessi päättyy",
+  bpmnReworkSave: "Tallenna polku",
+  bpmnPadRenameDataObject: "Nimeä dataobjekti uudelleen",
+  bpmnPadConnectData: "Yhdistä vaiheeseen: vaihe käyttää dataobjektia",
+  bpmnDataSecondProducer:
+    "Muutosta ei tehty: toinen vaihe tuottaa jo tämän dataobjektin. Dataobjektin tuottaa yksi vaihe.",
+  bpmnDataStillUsed:
+    "Yhteyttä ei poistettu: vaihe on ainoa, joka tuottaa tämän dataobjektin, ja toinen vaihe käyttää sitä. Poista ensin se käyttö.",
+  bpmnDataAlreadyLinked: "Muutosta ei tehty: vaihe on jo yhdistetty tähän dataobjektiin.",
+  bpmnDataOnlyProducer:
+    "Yhteyttä ei poistettu: vaihe on ainoa, joka tuottaa tämän dataobjektin, joten yhteys pysyy.",
+  bpmnStepLane: "Kaista (kuka tekee)",
+  bpmnStepLaneDefault: "Tyypin oletuskaista",
+  bpmnUndo: "Kumoa",
+  bpmnUndone: "Viimeisin muutos kumottu.",
+  bpmnNothingToUndo: "Ei kumottavaa.",
+  bpmnAgentBusy: "Wizard vastaa juuri. Tee muutos uudelleen, kun vastaus on valmis.",
+  bpmnOpRefusedField: "Muutosta ei tehty: tarkista {field}.",
+  bpmnOpRefused: "Muutosta ei voitu tehdä.",
+  bpmnEditHelp: "Jokainen muutos tallentuu heti. Kumoa peruu viimeisimmän.",
+  blueprintFieldNames: {
+    step_id: "vaihe",
+    name: "vaiheen nimi",
+    after: "edeltävä vaihe",
+    before: "seuraava vaihe",
+    source: "vaihe, josta nuoli lähtee",
+    target: "vaihe, johon nuoli päättyy",
+    type: "vaiheen tyyppi",
+    description: "vaiheen kuvaus",
+    lane_id: "kaista",
+    decision_id: "päätös",
+    branches: "päätöksen haarat",
+    condition: "haaran ehto",
+    attached_to: "vaihe, jolla polku on",
+    outcome: "polun jatko",
+    exception_id: "polku",
+    artifact_id: "dataobjekti",
+    label: "dataobjektin nimi",
+    role: "dataobjektin käyttö",
+  },
   bpmnSaved: "Tallennettu. Wizard näkee muutoksen seuraavasta chat-viestistäsi.",
   bpmnStepTitle: "Vaihe {n}",
   editorRetry: "Yritä uudelleen",
@@ -1179,12 +1407,9 @@ const fi: Dict = {
   wsBpmnLoading: "Ladataan kaaviota…",
   wsBpmnError: "Kaaviota ei saatu ladattua.",
   wsStepList: "Prosessin vaiheet",
-  wsBpmnSave: "Tallenna muutokset",
   wsBpmnSaving: "Tallennetaan…",
   wsBpmnSaveError: "Tallennus epäonnistui",
   wsBpmnSaved: "Tallennettu",
-  wsBpmnLintBlocked: "Ei tallennettu: kaaviossa on virheitä",
-  wsBpmnLintWarnings: "Huomioita kaaviosta",
   wsBpmnZoomIn: "Lähennä",
   wsBpmnZoomOut: "Loitonna",
   wsBpmnToolbar: "Näkymä ja zoomaus",
@@ -1216,6 +1441,36 @@ const fi: Dict = {
   wsJsonSaved: "Tallennettu",
   wsJsonInvalid: "Ei tallennettu: JSON ei ole kelvollinen",
   wsJsonChangedElsewhere: "Blueprint muuttui muualla, kun muutoksesi olivat vielä tallentamatta.",
+  wsJsonInvalidDraft: "Ei tallennettu: blueprint ei ole kelvollinen kohdassa {field}.",
+  wsJsonReadonlySection: "Ei tallennettu: osiota {field} ylläpitää wizard, eikä sitä voi muokata täällä.",
+  bpViewLabel: "Blueprintin näkymä",
+  bpViewSteps: "Työnkulun vaiheet",
+  bpViewFull: "Koko blueprint",
+  fullBpLoading: "Ladataan blueprintia…",
+  fullBpNeedsApi: "Koko blueprint näkyy, kun wizardin palvelin on käytössä. Tässä tilassa sitä ei ole.",
+  fullBpNoDraft: "Blueprintia ei ole vielä. Se näkyy täällä, kun wizard on kirjoittanut sen.",
+  fullBpLoadError: "Blueprintia ei saatu ladattua.",
+  fullBpDownload: "Lataa JSON",
+  fullBpAdvanced: "Edistynyt: muokkaa JSONia",
+  fullBpEditorLabel: "Blueprint JSON-muodossa",
+  fullBpReadonly: "vain luku",
+  fullBpEditHelp: "Varjostettuja osioita ylläpitää wizard, eikä niitä voi muokata. Muutos tallentuu, kun painat Tallenna.",
+  fullBpSave: "Tallenna",
+  fullBpCancel: "Peruuta",
+  fullBpParseError: "Ei tallennettu: JSON ei ole kelvollinen rivillä {line}, sarakkeessa {column}.",
+  fullBpNotObject: "Ei tallennettu: blueprintin pitää olla JSON-olio ({ … }).",
+  fullBpRefused: "Ei tallennettu: {field}: {message}",
+  fullBpChangedElsewhere: "Blueprint muuttui muualla, eikä muutostasi tallennettu. Tekstisi on yhä editorissa.",
+  fullBpReload: "Lataa uudempi versio (hylkää muutokseni)",
+  fullBpKeepEditing: "Jatka muokkausta",
+  fullBpKeptEditing: "Seuraava tallennus yhdistää muutoksesi uudempaan versioon. Jos wizard muutti samaa osiota, tallennus estetään.",
+  fullBpAgentBusy: "Wizard kirjoittaa vastausta. Tallenna uudelleen, kun se on valmis; tekstisi on tallessa.",
+  fullBpConflict: "Ei tallennettu: myös wizard muutti näitä osioita: {sections}. Lataa uudempi versio ja tee muutoksesi siihen.",
+  bpViewLeaveAsk: "Koko blueprintin editorissa on tallentamattomia muutoksia.",
+  bpViewLeaveStay: "Palaa editoriin",
+  bpViewLeaveDiscard: "Hylkää muutokset",
+  fullBpUnchanged: "Ei muutoksia tallennettavaksi.",
+  fullBpAttention: "Wizard täydentää nämä seuraavassa vastauksessaan:",
   wsFormName: "Nimi",
   wsFormDescription: "Kuvaus",
   wsFormSteps: "Prosessin vaiheet",
@@ -1758,6 +2013,7 @@ const fi: Dict = {
 };
 
 const en: Dict = {
+  locale: "en",
   appName: "GAIK Solution Wizard",
   signOut: "Sign out",
 
@@ -1906,16 +2162,106 @@ const en: Dict = {
   bpmnFitView: "Fit to view",
   flowFullView: "Enlarge the diagram",
   flowFullViewExit: "Shrink the diagram",
-  bpmnPaletteAddTask: "Add a task: drop it on an arrow to put it into the process",
+  bpmnMinimap: "Diagram minimap",
+  bpmnShowData: "Show data",
+  bpmnPaletteAddTask: "Add a step at the end of the process",
   bpmnPaletteConnect: "Connect steps: drag from one step to another",
   bpmnPadRename: "Rename",
   bpmnPadDelete: "Delete",
-  bpmnUnsaved: "Unsaved changes",
-  bpmnUnconnected: "Connect to the process with an arrow before saving: {names}",
-  bpmnUnnamed: "Name the task before saving.",
-  bpmnUnnamedTask: "unnamed task",
-  bpmnDiscard: "Discard changes",
-  bpmnEditHelp: "A name saves by itself, other changes with Save changes. Ctrl+Z undoes.",
+  bpmnPadAppend: "Add a step after this one",
+  bpmnPadMoveEarlier: "Move earlier",
+  bpmnPadMoveLater: "Move later",
+  bpmnPadConnect: "Connect to another step",
+  bpmnDerivedElement:
+    "This part is drawn from other parts of the blueprint, so it is not edited on the diagram. Ask the wizard to change it.",
+  bpmnNeedsWizardApi: "Read only: editing the diagram needs the wizard service, which is not running now.",
+  bpmnNeedsDraft:
+    "Read only: the diagram can be edited once the wizard has written the first blueprint. Until then, make changes in the simple diagram.",
+  bpmnCannotUndo: "The last change cannot be undone.",
+  bpmnTooLarge: "The change is too large to save.",
+  bpmnRenameStepGone: "The name “{name}” was not saved: the step was removed elsewhere.",
+  bpmnEditStepGone: "The change to the step was not saved: the step was removed elsewhere.",
+  bpmnTypeStepIsDecision: "The type of “{name}” was not changed: a change made elsewhere made it a decision.",
+  bpmnPadChangeType: "Change the step's type",
+  bpmnStepDescription: "Description",
+  bpmnStepDescriptionCount: "{n} / {max} characters",
+  bpmnStepSaveHint: "Enter or leaving the field saves, Esc cancels.",
+  bpmnStepNeedsComponent: "This AI step needs a component: ask the wizard to choose one.",
+  bpmnPaletteAddLane: "Add a lane",
+  bpmnNewLaneName: "New lane",
+  bpmnPadRenameLane: "Rename the lane",
+  bpmnPadRemoveLane: "Remove the lane",
+  bpmnLaneInUse: "The lane was not removed: it has steps in it. Move them to another lane first.",
+  bpmnPadAddDecision: "Add a decision after this",
+  bpmnPadEditDecision: "Edit the decision",
+  bpmnPadRemoveDecision: "Remove the decision",
+  bpmnDecisionAddTitle: "Add a decision",
+  bpmnDecisionEditTitle: "Edit the decision",
+  bpmnDecisionHelp:
+    "A decision splits the process into branches. Give each branch a condition and the step it leads to. A decision has {min} to {max} branches.",
+  bpmnDecisionName: "Name of the decision",
+  bpmnDecisionBranch: "Branch {n}",
+  bpmnDecisionCondition: "Condition",
+  bpmnDecisionTarget: "Leads to",
+  bpmnDecisionEnd: "End",
+  bpmnDecisionAddBranch: "Add a branch",
+  bpmnDecisionRemoveBranch: "Remove branch {n}",
+  bpmnDecisionSameTarget: "Every branch leads to the same place: pick another step for at least one.",
+  bpmnDecisionSave: "Save the decision",
+  bpmnDecisionCancel: "Cancel",
+  bpmnLoopRefused:
+    "The change was not made: the process would then loop back to an earlier step. A branch cannot lead back; add a rework path to the step instead.",
+  bpmnPadAddRework: "Add a rework path",
+  bpmnPadEditRework: "Edit the path",
+  bpmnPadRemoveRework: "Remove the path",
+  bpmnReworkAddTitle: "Add a rework path",
+  bpmnReworkEditTitle: "Edit the path",
+  bpmnReworkHelp:
+    "When the condition holds, the work goes back to this step or an earlier one to be fixed, or the process ends (a rejection).",
+  bpmnReworkName: "Name of the path",
+  bpmnReworkCondition: "Condition",
+  bpmnReworkOutcome: "Then",
+  bpmnReworkBackTo: "Back to step: {step}",
+  bpmnReworkEnd: "The process ends",
+  bpmnReworkSave: "Save the path",
+  bpmnPadRenameDataObject: "Rename the data object",
+  bpmnPadConnectData: "Connect to a step: the step uses the data object",
+  bpmnDataSecondProducer:
+    "The change was not made: another step already makes this data object. One step makes a data object.",
+  bpmnDataStillUsed:
+    "The link was not removed: this step is the only one that makes the data object, and another step uses it. Remove that use first.",
+  bpmnDataAlreadyLinked: "The change was not made: the step is already linked to this data object.",
+  bpmnDataOnlyProducer:
+    "The link was not removed: this step is the only one that makes this data object, so the link stays.",
+  bpmnStepLane: "Lane (who does it)",
+  bpmnStepLaneDefault: "Default for its type",
+  bpmnUndo: "Undo",
+  bpmnUndone: "The last change was undone.",
+  bpmnNothingToUndo: "Nothing to undo.",
+  bpmnAgentBusy: "The wizard is replying. Make the change again once the reply is done.",
+  bpmnOpRefusedField: "The change was not made: check the {field}.",
+  bpmnOpRefused: "The change could not be made.",
+  bpmnEditHelp: "Each change saves at once. Undo takes back the last one.",
+  blueprintFieldNames: {
+    step_id: "step",
+    name: "step name",
+    after: "previous step",
+    before: "next step",
+    source: "step the arrow starts from",
+    target: "step the arrow ends at",
+    type: "step type",
+    description: "step description",
+    lane_id: "lane",
+    decision_id: "decision",
+    branches: "decision's branches",
+    condition: "branch condition",
+    attached_to: "step the path is on",
+    outcome: "where the path leads",
+    exception_id: "path",
+    artifact_id: "data object",
+    label: "data object's name",
+    role: "how the step uses the data object",
+  },
   bpmnSaved: "Saved. The wizard sees the change from your next chat message.",
   bpmnStepTitle: "Step {n}",
   editorRetry: "Try again",
@@ -2053,12 +2399,9 @@ const en: Dict = {
   wsBpmnLoading: "Loading the diagram…",
   wsBpmnError: "The diagram could not be loaded.",
   wsStepList: "Process steps",
-  wsBpmnSave: "Save changes",
   wsBpmnSaving: "Saving…",
   wsBpmnSaveError: "Save failed",
   wsBpmnSaved: "Saved",
-  wsBpmnLintBlocked: "Not saved: the diagram has errors",
-  wsBpmnLintWarnings: "Notes on the diagram",
   wsBpmnZoomIn: "Zoom in",
   wsBpmnZoomOut: "Zoom out",
   wsBpmnToolbar: "View and zoom",
@@ -2090,6 +2433,36 @@ const en: Dict = {
   wsJsonSaved: "Saved",
   wsJsonInvalid: "Not saved: the JSON is not valid",
   wsJsonChangedElsewhere: "The blueprint changed elsewhere while your changes were not saved yet.",
+  wsJsonInvalidDraft: "Not saved: the blueprint is not valid at {field}.",
+  wsJsonReadonlySection: "Not saved: the {field} section is kept by the wizard and cannot be edited here.",
+  bpViewLabel: "Blueprint view",
+  bpViewSteps: "Workflow steps",
+  bpViewFull: "Full blueprint",
+  fullBpLoading: "Loading the blueprint…",
+  fullBpNeedsApi: "The full blueprint is shown when the wizard's server is in use. It is not in this mode.",
+  fullBpNoDraft: "There is no blueprint yet. It is shown here once the wizard has written it.",
+  fullBpLoadError: "The blueprint could not be loaded.",
+  fullBpDownload: "Download JSON",
+  fullBpAdvanced: "Advanced: edit JSON",
+  fullBpEditorLabel: "The blueprint as JSON",
+  fullBpReadonly: "read-only",
+  fullBpEditHelp: "The shaded sections are kept by the wizard and cannot be edited. Your change is saved when you press Save.",
+  fullBpSave: "Save",
+  fullBpCancel: "Cancel",
+  fullBpParseError: "Not saved: the JSON is not valid at line {line}, column {column}.",
+  fullBpNotObject: "Not saved: the blueprint must be a JSON object ({ … }).",
+  fullBpRefused: "Not saved: {field}: {message}",
+  fullBpChangedElsewhere: "The blueprint changed elsewhere, so your change was not saved. Your text is still in the editor.",
+  fullBpReload: "Load the newer version (discard my changes)",
+  fullBpKeepEditing: "Keep editing",
+  fullBpKeptEditing: "Your next save merges your changes into the newer version. If the wizard changed the same section, the save is refused.",
+  fullBpAgentBusy: "The wizard is replying. Save again once it is done; your text is kept.",
+  fullBpConflict: "Not saved: the wizard also changed these sections: {sections}. Load the newer version and make your change there.",
+  bpViewLeaveAsk: "The full blueprint editor has changes that are not saved.",
+  bpViewLeaveStay: "Back to the editor",
+  bpViewLeaveDiscard: "Discard changes",
+  fullBpUnchanged: "Nothing changed to save.",
+  fullBpAttention: "The wizard completes these in its next reply:",
   wsFormName: "Name",
   wsFormDescription: "Description",
   wsFormSteps: "Process steps",

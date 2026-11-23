@@ -17,7 +17,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.blueprint import Blueprint
-from solution_wizard.bpmn_generator import generate_bpmn, write_bpmn
+from solution_wizard.bpmn_generator import generate_bpmn, route_edge, write_bpmn
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples"
 
@@ -492,6 +492,51 @@ def test_integration_target_makes_send_task_and_data_store():
     assert any(s.startswith("Activity_submit_") for s in end_in)
 
 
+def _pool_height(root) -> float:
+    plane = root.find(".//bpmndi:BPMNPlane", NS)
+    for shape in plane.findall("bpmndi:BPMNShape", NS):
+        if shape.get("bpmnElement") == "Participant_main":
+            return float(shape.find("omgdc:Bounds", NS).get("height"))
+    raise AssertionError("no shape for the main pool")
+
+
+@pytest.mark.parametrize("make", [_simple_blueprint, _hospital_blueprint])
+def test_without_data_objects_the_diagram_has_none_and_is_lower(make):
+    full = ET.fromstring(generate_bpmn(make()))
+    bp = make()
+    compact = ET.fromstring(generate_bpmn(bp, include_data_objects=False))
+    proc = compact.find("bpmn:process", NS)
+    tags = {_local(e) for e in proc.iter()}
+    assert "dataObjectReference" not in tags
+    assert "dataObject" not in tags
+    assert "dataInputAssociation" not in tags
+    # the only data output left is the send task's link to its data store
+    stores = {e.get("id") for e in proc if _local(e) == "dataStoreReference"}
+    for out in proc.iter(f"{{{NS['bpmn']}}}dataOutputAssociation"):
+        assert out.find("bpmn:targetRef", NS).text in stores
+    if make is _simple_blueprint:
+        assert "dataOutputAssociation" not in tags
+    assert _pool_height(compact) < _pool_height(full)
+    # the mapping names no data object that was not drawn
+    kinds = {info["kind"] for info in bp.visualizations["bpmn_mapping"].values()}
+    assert "data_object" not in kinds
+    # every drawn element still has a shape or an edge
+    plane = compact.find(".//bpmndi:BPMNPlane", NS)
+    drawn = {s.get("bpmnElement") for s in plane}
+    for e in proc:
+        if _local(e) in FLOW_NODE_TAGS or _local(e) == "dataStoreReference":
+            assert e.get("id") in drawn
+
+
+def test_data_objects_are_drawn_by_default():
+    bp = _hospital_blueprint()
+    root = ET.fromstring(generate_bpmn(bp))
+    proc = root.find("bpmn:process", NS)
+    assert any(_local(e) == "dataObjectReference" for e in proc)
+    kinds = {info["kind"] for info in bp.visualizations["bpmn_mapping"].values()}
+    assert "data_object" in kinds
+
+
 def test_no_approval_gateway_without_human_review():
     xml, root = _parse(_simple_blueprint())
     proc = root.find("bpmn:process", NS)
@@ -536,6 +581,76 @@ def test_example_blueprints_generate_valid_bpmn(name):
     shapes = {s.get("bpmnElement") for s in plane.findall("bpmndi:BPMNShape", NS)}
     for nid in flow_nodes:
         assert nid in shapes
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "incident_reporting_blueprint.json",
+        "rag_workflow_blueprint.json",
+        "document_extraction_blueprint.json",
+    ],
+)
+def test_every_flow_is_drawn_with_right_angles(name):
+    bp = Blueprint.from_file(EXAMPLES_DIR / name)
+    root = ET.fromstring(generate_bpmn(bp))
+    plane = root.find(".//bpmndi:BPMNPlane", NS)
+    edges = plane.findall("bpmndi:BPMNEdge", NS)
+    assert edges
+    for edge in edges:
+        points = [(int(p.get("x")), int(p.get("y"))) for p in edge.findall("omgdi:waypoint", NS)]
+        assert len(points) >= 2, edge.get("id")
+        for a, b in zip(points, points[1:]):
+            assert a[0] == b[0] or a[1] == b[1], f"{edge.get('id')}: {a} -> {b}"
+
+
+def _on_border(point, rect) -> bool:
+    px, py = point
+    x, y, w, h = rect
+    inside = x <= px <= x + w and y <= py <= y + h
+    return inside and (px in (x, x + w) or py in (y, y + h))
+
+
+def test_route_edge_starts_and_ends_on_the_shapes():
+    src, tgt = (0, 0, 100, 80), (300, 200, 100, 80)
+    points = route_edge(src, tgt)
+    assert len(points) >= 2
+    assert _on_border(points[0], src)
+    assert _on_border(points[-1], tgt)
+    for a, b in zip(points, points[1:]):
+        assert a[0] == b[0] or a[1] == b[1]
+
+
+@pytest.mark.parametrize(
+    ("src", "tgt"),
+    [
+        ((0, 300, 100, 80), (0, 0, 100, 80)),  # above, same column
+        ((0, 300, 100, 80), (300, 0, 100, 80)),  # above and to the right
+        ((0, 0, 100, 80), (0, 200, 100, 80)),  # below, same column
+        ((0, 0, 100, 80), (40, 200, 36, 36)),  # below, narrower, overlapping column
+        ((400, 0, 100, 80), (0, 0, 100, 80)),  # to the left, same row
+        ((400, 0, 100, 80), (0, 200, 100, 80)),  # to the left and below
+        ((50, 50, 0, 0), (300, 200, 100, 80)),  # zero-size source, target right
+        ((50, 50, 0, 0), (0, 200, 100, 80)),  # zero-size source, target below
+    ],
+    ids=[
+        "above",
+        "above-right",
+        "below-same-column",
+        "below-overlapping",
+        "left",
+        "left-below",
+        "zero-size-source-right",
+        "zero-size-source-below",
+    ],
+)
+def test_route_edge_keeps_its_contract(src, tgt):
+    points = route_edge(src, tgt)
+    assert len(points) >= 2
+    assert _on_border(points[0], src), points
+    assert _on_border(points[-1], tgt), points
+    for a, b in zip(points, points[1:]):
+        assert a[0] == b[0] or a[1] == b[1], points
 
 
 def _pdf_blueprint(has_pdf: bool) -> Blueprint:

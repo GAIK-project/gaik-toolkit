@@ -5,6 +5,9 @@ import type { Blueprint } from "@/lib/mock-sessions";
 
 const SCRIPTS_DIR = path.join(process.cwd(), "scripts");
 
+/** How the diagram is drawn: `dataObjects: false` leaves the data objects out (compact). */
+export type BpmnDrawOptions = { dataObjects?: boolean };
+
 /** Prefer project venv so `npm run dev` works without system pydantic. */
 function resolvePythonBin(): string {
   if (process.env.WIZARD_BPMN_PYTHON) {
@@ -61,10 +64,11 @@ function runPythonScript(
 export async function generateBpmnXmlFromBlueprint(
   blueprint: Blueprint,
   sessionId: string,
+  { dataObjects = true }: BpmnDrawOptions = {},
 ): Promise<string> {
   return runPythonScript(
     "generate_bpmn_from_v2.py",
-    [sessionId],
+    dataObjects ? [sessionId] : [sessionId, "--no-data-objects"],
     JSON.stringify(blueprint),
   );
 }

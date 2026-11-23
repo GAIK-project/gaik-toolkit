@@ -43,6 +43,58 @@ describe("safeErrorDetail", () => {
     ).toEqual(["README.md is missing"]);
   });
 
+  it.each([
+    "no_draft",
+    "changed_elsewhere",
+    "invalid_operation",
+    "unsupported_edit",
+    "too_large",
+    "invalid_layout",
+    "nothing_to_undo",
+    "cannot_undo",
+    "readonly_section",
+    "invalid_draft",
+    "needs_wizard_api",
+  ])("passes the blueprint edit refusal %s with its own words", (code) => {
+    expect(safeErrorDetail({ detail: { error: code, message: "the api's own words" } }, TRACE, en)).toMatchObject({
+      error: code,
+      message: "the api's own words",
+    });
+  });
+
+  it("keeps the field, index and reason of a refused operation, and the fields of an unsupported edit", () => {
+    expect(
+      safeErrorDetail(
+        {
+          detail: {
+            error: "invalid_operation",
+            message: "No step s9.",
+            field: "operations[2].step_id",
+            index: 2,
+            code: "not_found",
+            trace_id: "api-trace-1234",
+          },
+        },
+        TRACE,
+        en,
+      ),
+    ).toEqual({
+      error: "invalid_operation",
+      message: "No step s9.",
+      field: "operations[2].step_id",
+      index: 2,
+      code: "not_found",
+      trace_id: "api-trace-1234",
+    });
+    expect(
+      safeErrorDetail(
+        { detail: { error: "unsupported_edit", message: "x", fields: ["steps[0].x"] } },
+        TRACE,
+        en,
+      ).fields,
+    ).toEqual(["steps[0].x"]);
+  });
+
   it("drops the keys a known refusal has that are not on the list", () => {
     const detail = safeErrorDetail(
       { detail: { error: "case_state", message: "the case is approved", path: "/srv/x", errors: [LEAK] } },

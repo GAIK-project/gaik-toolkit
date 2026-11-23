@@ -29,8 +29,8 @@ import { BpmnZoomControls } from "@/components/bpmn-viewer-toolbar";
 import { FlowEditingNote, FlowLockedNote, FlowUpdatedLine } from "@/components/flow-status";
 import { Icon, type IconName } from "@/components/icons";
 import { STEP_TYPE_ICON, STEP_TYPE_TEXT, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
+import { saveRefusal } from "@/lib/blueprint-ops";
 import {
-  BLUEPRINT_CHANGED_ELSEWHERE,
   blueprintBaseTag,
   blueprintPayload,
   blueprintPayloadKey,
@@ -207,7 +207,8 @@ type Status =
   | { kind: "idle" }
   | { kind: "saving" }
   | { kind: "saved" }
-  | { kind: "error"; retry: () => void }
+  // `message`: the server's own words for a save it refused; without it the generic line.
+  | { kind: "error"; retry: () => void; message?: string }
   | { kind: "removed"; step: BlueprintStep; index: number }
   | { kind: "changed" };
 
@@ -299,6 +300,7 @@ function NameField({
 export function WorkflowFlowView({
   sessionId,
   blueprint,
+  baseVersion = null,
   bpmnXml,
   locked,
   onUnlock,
@@ -313,6 +315,8 @@ export function WorkflowFlowView({
 }: {
   sessionId: string;
   blueprint: Blueprint;
+  /** The session's active version as the page read it: an edit is made on it. */
+  baseVersion?: number | null;
   /** The diagram at the size of the window, and the control that takes it there and back. */
   fullView?: { on: boolean; toggle: () => void };
   /** The diagram the server generated from the blueprint; null until it has loaded, or when it cannot be. */
@@ -330,7 +334,7 @@ export function WorkflowFlowView({
   selectedStepId: string | null;
   onSelectedStepChange: (stepId: string | null) => void;
   /** After a save: the blueprint as the server has it now. */
-  onSaved: (blueprint: Blueprint, via: "save" | "undo") => void;
+  onSaved: (blueprint: Blueprint, via: "save" | "undo", version?: number) => void;
   t: Dict;
 }) {
   const router = useRouter();
@@ -355,6 +359,11 @@ export function WorkflowFlowView({
     shown.current = blueprint;
     latest.current = blueprint;
   }
+  // Its version, the same way: the page's, or the one the last save wrote.
+  const latestVersion = useRef(baseVersion);
+  useEffect(() => {
+    latestVersion.current = baseVersion;
+  }, [baseVersion]);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
 
@@ -490,6 +499,7 @@ export function WorkflowFlowView({
   ) {
     const run = async () => {
       const base = latest.current;
+      const baseVersion = latestVersion.current;
       const next = edit(base);
       if (blueprintPayloadKey(next) === blueprintPayloadKey(base)) return;
       setStatus({ kind: "saving" });
@@ -497,23 +507,33 @@ export function WorkflowFlowView({
         const res = await fetch(`/api/sessions/${sessionId}/blueprint`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content: blueprintPayload(next), note: t.flowSaveNote, base: blueprintBaseTag(base) }),
+          body: JSON.stringify({
+            content: blueprintPayload(next),
+            note: t.flowSaveNote,
+            base: blueprintBaseTag(base),
+            ...(typeof baseVersion === "number" ? { base_version: baseVersion } : {}),
+          }),
         });
-        if (res.status === 409) {
-          const refused = (await res.json().catch(() => null)) as { error?: string } | null;
-          if (refused?.error === BLUEPRINT_CHANGED_ELSEWHERE) {
+        if (res.status === 409 || res.status === 422) {
+          const refused = saveRefusal(res.status, await res.json().catch(() => null));
+          if (refused?.kind === "changed") {
             // The page reads the newer version, and the flow is drawn from it.
             setStatus({ kind: "changed" });
             router.refresh();
             return;
           }
+          if (refused?.kind === "refused") {
+            setStatus({ kind: "error", retry: () => save(edit, { via, then }), message: refused.message });
+            return;
+          }
         }
         if (!res.ok) throw new Error("save failed");
-        const data = (await res.json()) as { blueprint?: Blueprint };
+        const data = (await res.json()) as { blueprint?: Blueprint; version?: number };
         if (!data.blueprint) throw new Error("save failed");
         latest.current = data.blueprint;
+        if (typeof data.version === "number") latestVersion.current = data.version;
         setStatus({ kind: "saved" });
-        onSavedRef.current(data.blueprint, via);
+        onSavedRef.current(data.blueprint, via, data.version);
         then?.();
       } catch {
         setStatus({ kind: "error", retry: () => save(edit, { via, then }) });
@@ -687,7 +707,7 @@ export function WorkflowFlowView({
   } else if (status.kind === "error") {
     statusLine = (
       <span className="inline-flex items-center gap-2 text-danger-text">
-        {t.wsBpmnSaveError}
+        {status.message ?? t.wsBpmnSaveError}
         <button type="button" className="font-medium underline underline-offset-2" onClick={status.retry}>
           {t.editorRetry}
         </button>

@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 
 from wizard_api import config, errors, telemetry
+from wizard_api.routers.blueprint_edit import router as blueprint_edit_router
 from wizard_api.routers.cases import router as cases_router
 from wizard_api.routers.owners import router as owners_router
 from wizard_api.routers.sessions import router as sessions_router
@@ -74,6 +75,7 @@ async def case_not_found(request: Request, _: CaseNotFoundError) -> JSONResponse
 
 
 app.include_router(sessions_router)
+app.include_router(blueprint_edit_router)
 app.include_router(cases_router)
 app.include_router(owners_router)
 

@@ -26,6 +26,10 @@ class BlueprintVersion(Base):
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     note: Mapped[str] = mapped_column(String(512), nullable=False, default="")
     content: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+    # The agent's full draft (use_case.blueprint.json) this version was made
+    # from; SQL NULL (not a JSON null, hence none_as_null) for a version made
+    # from the reduced blueprint alone.
+    draft: Mapped[dict | None] = mapped_column(JSONB(none_as_null=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

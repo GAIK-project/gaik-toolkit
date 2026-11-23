@@ -140,8 +140,9 @@ test.describe("Local agent chat → BPMN + JSON save", () => {
     const nameInput = workspace.getByTestId("bpmn-property-name");
     await expect(nameInput).toBeVisible({ timeout: 15_000 });
     const bpmnName = `Assess risk ${marker}`;
-    // A rename in the name field saves by itself.
+    // A rename in the name field saves on Enter.
     await nameInput.fill(bpmnName);
+    await nameInput.press("Enter");
 
     const status = workspace.getByTestId("bpmn-status");
     const saved = status.getByText(/Tallennettu|Saved/i);

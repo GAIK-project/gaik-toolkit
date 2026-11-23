@@ -7,7 +7,7 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/session-access", () => ({
   requireOwnedSession: vi.fn(async () => ({
     user: { email: "dev@gaik.local" },
-    session: { step: 10, blueprint: { name: "b", steps: [] } },
+    session: { step: 10, blueprint: { name: "b", steps: [] }, activeVersion: 4 },
   })),
 }));
 vi.mock("@/lib/bpmn-spike", () => ({
@@ -29,24 +29,34 @@ vi.mock("@/lib/sessions", () => ({
   saveBlueprintAfterBpmnSync: vi.fn(async () => undefined),
 }));
 const apiState = vi.hoisted(() => ({ enabled: false }));
-vi.mock("@/lib/wizard-api-client", () => ({
+vi.mock("@/lib/wizard-api-client", async (original) => ({
+  // The real error class: wizard_api's refusals reach the route as it.
+  WizardApiError: (await original<typeof import("@/lib/wizard-api-client")>()).WizardApiError,
   wizardApiEnabled: () => apiState.enabled,
 }));
 vi.mock("@/lib/audit", () => ({ audit: vi.fn() }));
+vi.mock("@/lib/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/i18n")>();
+  return { ...actual, getI18n: async () => ({ locale: "en", t: actual.dictionary("en") }) };
+});
 
 import { POST } from "@/app/api/sessions/[id]/bpmn/sync/route";
 import { lintBpmnXml } from "@/lib/bpmn-lint";
 import { syncSessionBpmn } from "@/lib/bpmn-generate";
 import { saveBlueprintAfterBpmnSync } from "@/lib/sessions";
+import { WizardApiError } from "@/lib/wizard-api-client";
 
-function post(xml: string, headers: Record<string, string> = {}) {
-  const body = JSON.stringify({ xml });
+const TRACE = "trace-sync-0001";
+
+function post(xml: string, headers: Record<string, string> = {}, query = "", extra: Record<string, unknown> = {}) {
+  const body = JSON.stringify({ xml, ...extra });
   // A browser's fetch always says the length of a string body.
-  const req = new NextRequest("http://localhost/api/sessions/s1/bpmn/sync", {
+  const req = new NextRequest(`http://localhost/api/sessions/s1/bpmn/sync${query}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "content-length": String(Buffer.byteLength(body, "utf8")),
+      "x-trace-id": TRACE,
       ...headers,
     },
     body,
@@ -113,6 +123,20 @@ describe("POST /sessions/[id]/bpmn/sync — size cap (T3)", () => {
     expect(body.lint.ok).toBe(true);
   });
 
+  it("returns the diagram drawn as it was shown, with or without data objects", async () => {
+    await post("<bpmn:definitions/>");
+    expect(vi.mocked(syncSessionBpmn).mock.calls[0][3]).toEqual({ dataObjects: true });
+    await post("<bpmn:definitions/>", {}, "?data_objects=0");
+    expect(vi.mocked(syncSessionBpmn).mock.calls[1][3]).toEqual({ dataObjects: false });
+  });
+
+  it("refuses a data_objects value other than 0 or 1 before linting", async () => {
+    const res = await post("<bpmn:definitions/>", {}, "?data_objects=2");
+    expect(res.status).toBe(400);
+    expect(lintBpmnXml).not.toHaveBeenCalled();
+    expect(syncSessionBpmn).not.toHaveBeenCalled();
+  });
+
   it("asks to retry, and saves nothing, when the linter is busy", async () => {
     const { BpmnLintBusyError } = await import("@/lib/bpmn-lint");
     vi.mocked(lintBpmnXml).mockRejectedValueOnce(new BpmnLintBusyError());
@@ -120,5 +144,60 @@ describe("POST /sessions/[id]/bpmn/sync — size cap (T3)", () => {
     expect(res.status).toBe(503);
     expect(res.headers.get("Retry-After")).toBe("2");
     expect(syncSessionBpmn).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /sessions/[id]/bpmn/sync — refusals", () => {
+  it("refuses a canvas drawn from an older version than the one the server holds", async () => {
+    const res = await post("<bpmn:definitions/>", {}, "", { base_version: 3 });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual({ error: "changed_elsewhere" });
+    expect(syncSessionBpmn).not.toHaveBeenCalled();
+  });
+
+  it("syncs a canvas drawn from the version the server holds", async () => {
+    const res = await post("<bpmn:definitions/>", {}, "", { base_version: 4 });
+    expect(res.status).toBe(200);
+    expect(syncSessionBpmn).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    [422, { error: "unsupported_edit", message: "Ask the wizard: Task_x", fields: ["Task_x"], trace_id: TRACE }],
+    [409, { error: "agent_busy", message: "The wizard is replying.", trace_id: TRACE }],
+    [409, { error: "changed_elsewhere", message: "The blueprint has changed.", trace_id: TRACE }],
+  ])("passes wizard_api's %i refusal through unchanged, not as a 500", async (status, detail) => {
+    apiState.enabled = true;
+    vi.mocked(syncSessionBpmn).mockRejectedValueOnce(
+      new WizardApiError(status, "/sessions/s1/bpmn/sync", JSON.stringify({ detail })),
+    );
+
+    const res = await post("<bpmn:definitions/>");
+
+    expect(res.status).toBe(status);
+    expect(await res.json()).toEqual({ detail });
+  });
+
+  it("keeps any other failure a 500, without its text", async () => {
+    vi.mocked(syncSessionBpmn).mockRejectedValueOnce(
+      new WizardApiError(500, "/sessions/s1/bpmn/sync", "Traceback /srv/x"),
+    );
+    const res = await post("<bpmn:definitions/>");
+    expect(res.status).toBe(500);
+    expect(await res.text()).not.toContain("/srv/x");
+  });
+});
+
+describe("POST /sessions/[id]/bpmn/sync — the version the save wrote", () => {
+  it("answers with wizard_api's new version, the base of the canvas's next save", async () => {
+    apiState.enabled = true;
+    vi.mocked(syncSessionBpmn).mockResolvedValueOnce({ blueprint: { name: "b", steps: [] } as never, xml: "<x/>", version: 5 });
+    const res = await post("<bpmn:definitions/>");
+    expect(((await res.json()) as { version?: number }).version).toBe(5);
+  });
+
+  it("answers with the mock store's new version in mock mode", async () => {
+    vi.mocked(saveBlueprintAfterBpmnSync).mockResolvedValueOnce({ activeVersion: 6 } as never);
+    const res = await post("<bpmn:definitions/>");
+    expect(((await res.json()) as { version?: number }).version).toBe(6);
   });
 });

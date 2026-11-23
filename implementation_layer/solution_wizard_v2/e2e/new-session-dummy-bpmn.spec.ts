@@ -86,16 +86,25 @@ test.describe("New session dummy BPMN + collapsed chat", () => {
       workspacePanel.locator(".bpmn-viewer-themed .djs-container"),
     ).toBeVisible({ timeout: 15_000 });
 
-    // Pick the second step from the list beside the diagram; a rename saves itself.
+    // Pick the second step from the list beside the diagram. Without wizard_api
+    // (the mock store) the canvas is read-only: its fields cannot be changed.
     await workspacePanel.getByTestId("flow-step-1").getByRole("button").first().click();
-    const nameInput = workspacePanel.getByTestId("bpmn-property-name");
+    await expect(workspacePanel.getByTestId("bpmn-property-name")).toBeVisible({ timeout: 10_000 });
+    await expect(workspacePanel.getByTestId("bpmn-property-name")).toBeDisabled();
+    await expect(workspacePanel.getByTestId("bpmn-readonly-editing")).toBeVisible();
+
+    // The rename is made in the simple flow beside it, which saves itself.
+    await workspacePanel.getByTestId("flow-view-diagram").click();
+    await workspacePanel.getByTestId("simple-flow-node-1").click();
+    const nameInput = workspacePanel.getByTestId("simple-flow-name");
     await expect(nameInput).toBeVisible({ timeout: 10_000 });
-    const sync = page.waitForResponse(
-      (r) => r.url().includes("/bpmn/sync") && r.request().method() === "POST",
+    const patch = page.waitForResponse(
+      (r) => /\/blueprint$/.test(r.url()) && r.request().method() === "PATCH",
     );
     await nameInput.fill("Assess factory risk");
-    expect((await sync).status()).toBe(200);
-    await expect(workspacePanel.getByTestId("bpmn-status")).toContainText("Tallennettu", {
+    await nameInput.press("Enter");
+    expect((await patch).status()).toBe(200);
+    await expect(workspacePanel.getByTestId("simple-flow-status")).toHaveText("Tallennettu", {
       timeout: 20_000,
     });
 

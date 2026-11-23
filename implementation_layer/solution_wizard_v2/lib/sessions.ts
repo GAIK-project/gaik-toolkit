@@ -504,18 +504,26 @@ export async function saveBlueprintAfterBpmnSync(
   return patchSessionBlueprint(id, blueprint, "BPMN canvas sync");
 }
 
+/**
+ * Undefined when the save failed. wizard_api's refusals (409 changed_elsewhere
+ * or agent_busy, 422 unsupported_edit) are thrown as the WizardApiError they
+ * are, for the route to pass on in the api's own words. `baseVersion`: the
+ * version the edit was made on (see apiPatchBlueprint).
+ */
 export async function patchSessionBlueprint(
   id: string,
   blueprint: Blueprint,
   note = "Blueprint päivitetty",
+  baseVersion?: number,
 ): Promise<WizardSession | undefined> {
   if (!wizardApiEnabled()) {
     return mock.updateBlueprint(id, blueprint, note);
   }
   try {
-    const detail = await apiPatchBlueprint(id, blueprint, note);
+    const detail = await apiPatchBlueprint(id, blueprint, note, baseVersion);
     return detailToWizardSession(detail);
-  } catch {
+  } catch (err) {
+    if (err instanceof WizardApiError && (err.status === 409 || err.status === 422)) throw err;
     return undefined;
   }
 }
