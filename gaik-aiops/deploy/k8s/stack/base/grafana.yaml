@@ -1,0 +1,118 @@
+# Grafana with file-provisioned Prometheus and Alertmanager datasources and the monitoring dashboards.
+# The "Security" organisation with the audit datasource is created through the API by grafana-setup.
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  labels: {app.kubernetes.io/name: grafana}
+spec:
+  selector: {app.kubernetes.io/name: grafana}
+  ports: [{name: http, port: 3000, targetPort: 3000}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  labels: {app.kubernetes.io/name: grafana}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: grafana}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: grafana}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.5.2
+          env:
+            - {name: GF_SECURITY_ADMIN_USER, value: admin}
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: aiops-grafana, key: admin-password}}
+            - {name: GF_AUTH_ANONYMOUS_ENABLED, value: "false"}
+            - {name: GF_USERS_ALLOW_SIGN_UP, value: "false"}
+            - {name: GF_ANALYTICS_REPORTING_ENABLED, value: "false"}
+            - {name: GF_ANALYTICS_CHECK_FOR_UPDATES, value: "false"}
+            - {name: GF_NEWS_NEWS_FEED_ENABLED, value: "false"}
+          ports: [{containerPort: 3000}]
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/grafana}
+            - {name: datasources, mountPath: /etc/grafana/provisioning/datasources}
+            - {name: dashboard-providers, mountPath: /etc/grafana/provisioning/dashboards}
+            - {name: dashboards-monitoring, mountPath: /var/lib/grafana/dashboards/monitoring}
+          readinessProbe:
+            httpGet: {path: /api/health, port: 3000}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: data
+          persistentVolumeClaim: {claimName: grafana-data}
+        - name: datasources
+          configMap: {name: grafana-datasources}
+        - name: dashboard-providers
+          configMap: {name: grafana-dashboard-providers}
+        - name: dashboards-monitoring
+          configMap: {name: grafana-dashboards-monitoring}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana-setup
+  labels: {app.kubernetes.io/name: grafana-setup}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: grafana-setup}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: grafana-setup}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: grafana-setup
+          image: python:3.12-alpine
+          command: ["python", "/setup/security_org.py"]
+          env:
+            - {name: GRAFANA_URL, value: "http://grafana:3000"}
+            - {name: GRAFANA_ADMIN_USER, value: admin}
+            - name: GRAFANA_ADMIN_PASSWORD
+              valueFrom: {secretKeyRef: {name: aiops-grafana, key: admin-password}}
+            - name: AUDIT_READER_PASSWORD
+              valueFrom: {secretKeyRef: {name: aiops-db, key: reader-password}}
+            - {name: DASHBOARDS_DIR, value: /dashboards/security}
+          volumeMounts:
+            - {name: setup, mountPath: /setup}
+            - {name: dashboards-security, mountPath: /dashboards/security}
+          readinessProbe:
+            exec: {command: ["test", "-f", "/tmp/ready"]}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 10m, memory: 32Mi}
+            limits: {cpu: 100m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: setup
+          configMap: {name: grafana-setup}
+        - name: dashboards-security
+          configMap: {name: grafana-dashboards-security}

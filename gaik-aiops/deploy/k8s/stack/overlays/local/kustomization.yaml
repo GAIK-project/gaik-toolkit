@@ -1,0 +1,33 @@
+# Local k3s: namespace, locally built images, local-only secrets, and the UID OpenShift would assign,
+# so containers are tested the way they run on Rahti (an arbitrary non-root UID in group 0).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: gaik-aiops
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+images:
+  - {name: gaik-aiops/collection-sink, newName: gaik-aiops/collection-sink, newTag: local}
+  - {name: gaik-aiops/mlflow, newName: gaik-aiops/mlflow, newTag: local}
+
+secretGenerator:
+  - name: aiops-db
+    literals:
+      - owner-password=wp45-local-only
+      - admin-password=admin-local-only
+      - writer-password=writer-local-only
+      - reader-password=reader-local-only
+      - mlflow-password=mlflow-local-only
+  - name: aiops-pseudonym
+    literals: [key=local-dev-key]
+  - name: aiops-grafana
+    literals: [admin-password=admin-local-only]
+
+patches:
+  - path: arbitrary-uid.yaml
+    target: {kind: Deployment}
+  - path: arbitrary-uid.yaml
+    target: {kind: StatefulSet}

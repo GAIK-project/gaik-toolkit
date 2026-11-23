@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: wizard
+      POSTGRES_PASSWORD: wizard
+      POSTGRES_DB: wizard
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - wizard_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wizard -d wizard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  wizard-api:
+    build:
+      context: ..
+      dockerfile: wizard_api/Dockerfile
+      target: production
+    ports:
+      - "8100:8100"
+    environment:
+      WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@postgres:5432/wizard
+      WIZARD_SESSION_OUTPUT_ROOT: /data/sessions
+    volumes:
+      - wizard_session_output:/data/sessions
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  wizard-ui:
+    build:
+      context: ../solution_wizard_v2
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      WIZARD_API_URL: http://wizard-api:8100
+      NEXT_PUBLIC_DEV_AUTH: "true"
+      # Local-only accounts; a deployed instance sets its own from a secret.
+      WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-dev-compose-encryption-key-32chars!!}
+    depends_on:
+      - wizard-api
+
+volumes:
+  wizard_pg_data:
+  wizard_session_output:

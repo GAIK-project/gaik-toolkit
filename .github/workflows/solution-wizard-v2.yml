@@ -1,0 +1,480 @@
+name: Solution Wizard V2
+
+on:
+  push:
+    branches: [main, dev, sync-v1, sprint4, release/wizard-v2, develop]
+    paths:
+      - "implementation_layer/solution_wizard_v2/**"
+      - "implementation_layer/wizard_api/**"
+      - "implementation_layer/solution_wizard/**"
+      - "implementation_layer/deploy/**"
+      - "implementation_layer/unit_tests/test_sandbox_job_manifest.py"
+      - "implementation_layer/unit_tests/test_deploy_instances.py"
+      - "implementation_layer/unit_tests/test_sandbox_network_policy.py"
+      - ".github/workflows/solution-wizard-v2.yml"
+      - ".github/security/**"
+      - ".github/scripts/**"
+      # The deploy gate reads this workflow's check runs; a change to the deploy
+      # workflow alone must still get them, or that commit cannot be deployed.
+      - ".github/workflows/wizard-v2-deploy.yml"
+  pull_request:
+    branches: [main, dev, sync-v1, sprint4, release/wizard-v2, develop]
+    paths:
+      - "implementation_layer/solution_wizard_v2/**"
+      - "implementation_layer/wizard_api/**"
+      - "implementation_layer/solution_wizard/**"
+      - "implementation_layer/deploy/**"
+      - "implementation_layer/unit_tests/test_sandbox_job_manifest.py"
+      - "implementation_layer/unit_tests/test_deploy_instances.py"
+      - "implementation_layer/unit_tests/test_sandbox_network_policy.py"
+      - ".github/workflows/solution-wizard-v2.yml"
+      - ".github/security/**"
+      - ".github/scripts/**"
+      # The deploy gate reads this workflow's check runs; a change to the deploy
+      # workflow alone must still get them, or that commit cannot be deployed.
+      - ".github/workflows/wizard-v2-deploy.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  wizard-api:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: wizard
+          POSTGRES_PASSWORD: wizard
+          POSTGRES_DB: wizard
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wizard -d wizard"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install wizard_api
+        working-directory: implementation_layer/wizard_api
+        run: pip install -e ".[dev]"
+      - name: Ruff (wizard_api)
+        run: |
+          pip install ruff==0.14.10
+          ruff format --check implementation_layer/wizard_api/
+          ruff check implementation_layer/wizard_api/
+      - name: Pytest wizard_api
+        working-directory: implementation_layer/wizard_api
+        env:
+          WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@localhost:5432/wizard
+          WIZARD_SESSION_OUTPUT_ROOT: /tmp/wizard-sessions-ci
+        run: pytest -v --junitxml="$RUNNER_TEMP/junit/wizard-api.xml"
+      - name: Test report (wizard_api)
+        if: always()
+        run: python .github/scripts/junit_summary.py "wizard_api unit tests" "$RUNNER_TEMP/junit/wizard-api.xml"
+      - name: Keep the test report (wizard-api)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-wizard-api
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
+
+  solution-wizard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install solution_wizard
+        working-directory: implementation_layer/solution_wizard
+        run: pip install -e . pytest pyyaml python-dotenv
+      # gaik is deliberately not installed: the reference-card structural tests
+      # skip without it, and checking cards against a released gaik is the
+      # gaik-sync skill's job, not this workflow's. The --ignore'd files
+      # are UPSTREAM's (GAIK-project/gaik-toolkit; see GITFLOW.md): they import
+      # gaik at module or fixture level and upstream runs them with gaik
+      # installed. test_provider_scaffolding needs gaik too (every case errors
+      # on `import gaik` once python-dotenv is present). Do not "fix" them here.
+      # Tests of the fork's own that need gaik use pytest.importorskip and skip.
+      # Upstream's test_source_tracing.py checks the scaffolder without gaik, so it
+      # runs here; only its three tests that compare the registry entry and the
+      # card with the installed gaik are deselected, and so are the five tests of
+      # upstream's test_cards_describe_current_gaik.py that import gaik, the five
+      # of upstream's test_governance_and_poc_output.py that load the generated
+      # provider_config.py or run_poc.py, which import gaik, and the two of
+      # upstream's test_hybrid_generic.py that import every generated import line.
+      # --deselect takes a node id, which starts at the repository root (pytest's
+      # rootdir), not at this folder.
+      - name: Pytest solution_wizard
+        working-directory: implementation_layer/solution_wizard
+        run: >-
+          pytest -q
+          --junitxml="$RUNNER_TEMP/junit/solution-wizard.xml"
+          --ignore=tests/test_decimal_schema_persistence.py
+          --ignore=tests/test_generate_schema_cli.py
+          --ignore=tests/test_pipeline_composite_loading.py
+          --ignore=tests/test_nullable_collection_schema_source.py
+          --ignore=tests/test_provider_scaffolding.py
+          --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_registry_entry_points_at_real_files_and_a_real_extra
+          --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_card_recipe_matches_the_real_api
+          --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_card_options_are_real_parameters
+          --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_answer_generator_prompt_card_matches_the_prompt_check
+          --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_spreadsheet_parser_entry_says_numbers_keep_their_format
+          --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_report_loaders_and_source_path_error_are_described
+          --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_card_imports_resolve
+          --deselect=implementation_layer/solution_wizard/tests/test_cards_describe_current_gaik.py::test_every_component_that_takes_input_limits_says_so_on_its_card_and_entry
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_a_stage_without_a_provider_stops_unless_the_blueprint_allows_the_fallback
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_run_time_refuses_an_external_provider_before_reading_credentials
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_transcript_enhancement_is_off_when_no_external_model_is_allowed
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_the_local_audio_poc_gives_the_transcriber_its_local_endpoint
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_without_credentials_only_an_unenhanced_local_whisper_run_goes_on
+          --deselect=implementation_layer/solution_wizard/tests/test_hybrid_generic.py::test_generic_imports_exist_in_gaik
+          --deselect=implementation_layer/solution_wizard/tests/test_hybrid_generic.py::test_every_registry_entry_imports_only_what_gaik_exports
+      - name: Test report (solution_wizard)
+        if: always()
+        run: python .github/scripts/junit_summary.py "solution_wizard unit tests" "$RUNNER_TEMP/junit/solution-wizard.xml"
+      - name: Keep the test report (solution-wizard)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-solution-wizard
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
+
+  solution-wizard-v2:
+    runs-on: ubuntu-latest
+    needs: wizard-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: implementation_layer/solution_wizard_v2/package-lock.json
+      - name: Install UI deps
+        working-directory: implementation_layer/solution_wizard_v2
+        run: npm ci
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Python deps for BPMN scripts
+        run: pip install "pydantic>=2.0"
+      - name: Acceptance matrix references
+        working-directory: implementation_layer/solution_wizard_v2
+        run: npm run acceptance:check
+
+      - name: Unit tests (vitest)
+        working-directory: implementation_layer/solution_wizard_v2
+        run: >-
+          npm run test --
+          --reporter=default --reporter=junit
+          --outputFile.junit="$RUNNER_TEMP/junit/web-app.xml"
+      - name: Test report (web app)
+        if: always()
+        run: python .github/scripts/junit_summary.py "Web app unit tests (vitest)" "$RUNNER_TEMP/junit/web-app.xml"
+      - name: Keep the test report (web-app)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-web-app
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
+      - name: ESLint
+        working-directory: implementation_layer/solution_wizard_v2
+        run: npm run lint
+      - name: Build
+        working-directory: implementation_layer/solution_wizard_v2
+        env:
+          NEXT_PUBLIC_DEV_AUTH: "true"
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+        run: npm run build
+      # The BPMN save route goes on without a linter it cannot start, so a build
+      # that leaves the linter out of the standalone output fails nowhere else.
+      # Its files are looked for by name: run from here, the script would find
+      # the packages in the project's own node_modules.
+      - name: Standalone output carries the BPMN linter
+        working-directory: implementation_layer/solution_wizard_v2/.next/standalone
+        run: |
+          test -f scripts/lint-bpmn.mjs
+          test -f .bpmnlintrc
+          test -f node_modules/bpmnlint/package.json
+          test -f node_modules/bpmn-moddle/package.json
+      - name: Install Playwright browsers
+        working-directory: implementation_layer/solution_wizard_v2
+        run: npx playwright install chromium --with-deps
+      - name: E2E tests
+        working-directory: implementation_layer/solution_wizard_v2
+        env:
+          CI: "true"
+          NEXT_PUBLIC_DEV_AUTH: "true"
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+          PLAYWRIGHT_REPORT_DIR: ${{ runner.temp }}/e2e
+        run: npm run test:e2e
+      - name: Test report (browser tests)
+        if: always()
+        run: python .github/scripts/junit_summary.py "Browser tests (Playwright)" "$RUNNER_TEMP/e2e/junit.xml"
+      - name: Keep the browser test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-e2e
+          path: ${{ runner.temp }}/e2e/junit.xml
+          retention-days: 90
+          if-no-files-found: ignore
+      - name: Keep the browser test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: ${{ runner.temp }}/e2e/html
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # The manifests under deploy/ are the sandbox's security boundary and the
+  # deploy recipe; the tests that assert them live in implementation_layer/
+  # unit_tests and are run by test.yml only for main and dev. Here they run on
+  # the branches the s4 stack is built from. Only the files that cover
+  # deploy/ and need nothing but pytest and PyYAML: the rest of unit_tests
+  # needs the full gaik install and stays with test.yml.
+  deploy-manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install test dependencies
+        run: pip install pytest pyyaml
+      # --noconftest: unit_tests/conftest.py imports gaik (to load .env for the
+      # live tests), and these files need neither gaik nor its fixtures.
+      - name: Pytest deploy manifests and scripts
+        run: >-
+          pytest -q --noconftest
+          --junitxml="$RUNNER_TEMP/junit/deploy-manifests.xml"
+          implementation_layer/unit_tests/test_sandbox_job_manifest.py
+          implementation_layer/unit_tests/test_deploy_instances.py
+          implementation_layer/unit_tests/test_sandbox_network_policy.py
+      - name: Test report (deploy manifests)
+        if: always()
+        run: python .github/scripts/junit_summary.py "Deploy manifest tests" "$RUNNER_TEMP/junit/deploy-manifests.xml"
+      - name: Keep the test report (deploy-manifests)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: junit-deploy-manifests
+          path: ${{ runner.temp }}/junit
+          retention-days: 90
+          if-no-files-found: ignore
+
+  # Known vulnerabilities in what the images install, and misconfigurations in
+  # the Dockerfiles and OpenShift manifests. The policy (fail on high/critical
+  # with a fix, report the rest) and the allowlist of accepted findings live in
+  # .github/security/. No credentials: pip-audit, npm audit, OSV and Trivy's
+  # databases are all public.
+  security:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      TRIVY_VERSION: "0.76.1"
+      TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
+      GITLEAKS_VERSION: "8.30.1"
+      GITLEAKS_SHA256: 551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+      REPORTS: ${{ github.workspace }}/security-reports
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install audit tools
+        run: |
+          pip install "uv==0.13.4" "pip-audit==2.10.1"
+          mkdir -p "$REPORTS"
+      # Installed from the release tarball against a pinned checksum rather
+      # than through an action: a moved tag cannot change what runs here.
+      - name: Install Trivy
+        run: |
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -sSfLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$tarball"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Install gitleaks
+        run: |
+          tarball="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/$tarball"
+          echo "$GITLEAKS_SHA256  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" gitleaks
+      # A credential in the tree fails the job. The checkout is shallow, so the
+      # files as they are on this commit are scanned, not the history; the
+      # report keeps the secret out of the log (--redact).
+      - name: Secrets in the tree
+        run: >-
+          gitleaks dir . --no-banner --redact --exit-code 1 --config .gitleaks.toml
+          --report-format json --report-path "$REPORTS/gitleaks.json"
+      # wizard_api has no lockfile and the image resolves at build time, so
+      # resolve the same inputs here (Python 3.11 on linux, as the image) and
+      # audit the pinned result.
+      - name: Resolve wizard_api dependencies
+        run: >-
+          uv pip compile -q --python-version 3.11
+          --python-platform x86_64-manylinux_2_28
+          implementation_layer/wizard_api/pyproject.toml --extra sandbox
+          -o "$REPORTS/wizard-api-requirements.txt"
+      # What the API image installs beside wizard_api: solution_wizard's own
+      # dependencies and the gaik line, read from the Dockerfile. The PoC runner
+      # image installs the same gaik line.
+      - name: Resolve solution_wizard and gaik dependencies of the API image
+        run: |
+          python .github/security/api_image_requirements.py \
+            implementation_layer/wizard_api/Dockerfile "$REPORTS/api-image.in"
+          uv pip compile -q --python-version 3.11 \
+            --python-platform x86_64-manylinux_2_28 \
+            implementation_layer/solution_wizard/pyproject.toml "$REPORTS/api-image.in" \
+            -o "$REPORTS/solution-wizard-requirements.txt"
+      # pip-audit and npm audit exit non-zero on any finding; the policy step
+      # decides, so their exit codes only matter when no report was written.
+      - name: pip-audit
+        run: |
+          for name in wizard-api solution-wizard; do
+            pip-audit -r "$REPORTS/$name-requirements.txt" --no-deps --disable-pip \
+              --progress-spinner off -f json -o "$REPORTS/pip-audit-$name.json" || true
+            test -s "$REPORTS/pip-audit-$name.json"
+          done
+      - name: npm audit (production dependencies)
+        working-directory: implementation_layer/solution_wizard_v2
+        run: |
+          npm audit --omit=dev --json > "$REPORTS/npm-audit.json" || true
+          test -s "$REPORTS/npm-audit.json"
+      - name: Trivy config scan (OpenShift manifests)
+        run: >-
+          trivy config --quiet --exit-code 0 --format json
+          --output "$REPORTS/trivy-config.json"
+          implementation_layer/deploy/openshift
+      - name: Trivy config scan (Dockerfiles)
+        run: |
+          for f in wizard_api/Dockerfile solution_wizard_v2/Dockerfile deploy/poc-runner/Dockerfile; do
+            out="$REPORTS/trivy-config-$(dirname "$f" | tr / -).json"
+            trivy config --quiet --exit-code 0 --format json --output "$out" \
+              "implementation_layer/$f"
+          done
+      - name: Apply policy
+        # Blocking: a high or critical finding with a fix fails the job unless
+        # .github/security/allowlist.toml accepts it for a while, with a reason.
+        run: >-
+          python .github/security/check_findings.py
+          --allowlist .github/security/allowlist.toml
+          --report "pip-audit:wizard-api=$REPORTS/pip-audit-wizard-api.json"
+          --report "pip-audit:solution-wizard+gaik=$REPORTS/pip-audit-solution-wizard.json"
+          --report "npm-audit:solution-wizard-v2=$REPORTS/npm-audit.json"
+          --report "trivy:openshift manifests=$REPORTS/trivy-config.json"
+          --report "trivy:wizard_api Dockerfile=$REPORTS/trivy-config-wizard_api.json"
+          --report "trivy:solution_wizard_v2 Dockerfile=$REPORTS/trivy-config-solution_wizard_v2.json"
+          --report "trivy:poc-runner Dockerfile=$REPORTS/trivy-config-deploy-poc-runner.json"
+      - name: Keep the raw reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: security-reports/
+          retention-days: 14
+
+  # The three images as deploy.sh builds them, scanned locally and never pushed.
+  security-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: wizard-api
+            context: implementation_layer
+            dockerfile: implementation_layer/wizard_api/Dockerfile
+            args: --target production
+          - image: solution-wizard-v2
+            context: implementation_layer/solution_wizard_v2
+            dockerfile: implementation_layer/solution_wizard_v2/Dockerfile
+            args: --build-arg NEXT_PUBLIC_DEV_AUTH=true
+          - image: poc-runner
+            context: implementation_layer/deploy/poc-runner
+            dockerfile: implementation_layer/deploy/poc-runner/Dockerfile
+            args: ""
+    env:
+      TRIVY_VERSION: "0.76.1"
+      TRIVY_SHA256: c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Trivy
+        run: |
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -sSfLo "$RUNNER_TEMP/$tarball" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$tarball"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$tarball" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP" trivy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Build ${{ matrix.image }} (local only)
+        run: >-
+          docker build ${{ matrix.args }}
+          -t "security-scan/${{ matrix.image }}:ci"
+          -f "${{ matrix.dockerfile }}" "${{ matrix.context }}"
+      - name: Trivy image scan
+        run: >-
+          trivy image --quiet --exit-code 0 --scanners vuln --timeout 20m
+          --format json --output "$RUNNER_TEMP/trivy-image.json"
+          "security-scan/${{ matrix.image }}:ci"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Apply policy
+        # Report-only still: what blocks here is in the base images and their
+        # package managers (zlib, setuptools, wheel, npm's own dependencies),
+        # fixed by rebuilding on patched bases. Remove this line once the
+        # images are rebuilt and the gate's first run is clean.
+        continue-on-error: true
+        run: >-
+          python .github/security/check_findings.py
+          --allowlist .github/security/allowlist.toml
+          --report "trivy:${{ matrix.image }} image=$RUNNER_TEMP/trivy-image.json"
+
+  # Traceability only — this tag does NOT match wizard-v2* so it never
+  # triggers wizard-v2-deploy.yml. deploy.sh (run manually) picks up the
+  # nearest tag via `git describe` and bakes it into both images, so anyone
+  # can match a running pod back to a commit without GitHub/oc access.
+  tag-dev:
+    runs-on: ubuntu-latest
+    needs: [wizard-api, solution-wizard, solution-wizard-v2]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Tag this commit
+        run: |
+          TAG="dev-$(date -u +%Y-%m-%d)-$(git rev-parse --short HEAD)"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists, skipping"
+          else
+            git tag "$TAG"
+            git push origin "$TAG"
+            echo "Tagged $TAG"
+          fi

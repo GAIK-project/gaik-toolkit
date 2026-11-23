@@ -1,0 +1,58 @@
+# Baseline alerts. Thresholds and durations are placeholders until the
+# customer sets service levels.
+groups:
+  - name: gaik-service-alerts
+    rules:
+      - alert: HighErrorRatio
+        expr: gaik:request_errors:ratio5m > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }}: {{ $value | humanizePercentage }} of requests fail"
+
+      - alert: HighLatencyP95
+        expr: gaik:request_latency_ms:p95_5m > 2000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service_name }}: p95 latency {{ $value | humanize }} ms"
+
+      - alert: ErrorLogs
+        expr: gaik:log_errors:rate5m > 0
+        for: 5m
+        labels:
+          severity: info
+        annotations:
+          summary: "{{ $labels.service_name }} keeps logging errors"
+
+  - name: gaik-pipeline-alerts
+    rules:
+      - alert: CollectorDown
+        expr: up{job="otel-collector"} == 0 or absent(up{job="otel-collector"})
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: The OpenTelemetry Collector is not reachable; no events are collected
+
+      # The store is not accepting records; the collector is queueing and
+      # retrying. Nothing is lost yet, but it will be if this persists.
+      - alert: EventDeliveryBacklog
+        expr: max by (exporter) (otelcol_exporter_queue_size) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.exporter }}: {{ $value }} batches waiting for delivery"
+
+      # Records dropped after retries ran out. Audit completeness depends on
+      # this staying at zero.
+      - alert: EventDeliveryFailing
+        expr: sum(rate(otelcol_exporter_send_failed_log_records_total[5m])) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: The collector fails to deliver log and audit records to storage

@@ -710,3 +710,83 @@ def test_rule14_a_panel_cannot_check_against_text():
 
     assert any(e.rule == 4 and e.step_id == "step_c" for e in result.errors)
     assert any(e.rule == 14 and e.step_id == "step_c" for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
+# Size limits
+# ---------------------------------------------------------------------------
+
+
+def _chain(n: int, close_loop: bool = False) -> list[WorkflowStep]:
+    steps = [
+        WorkflowStep(
+            id=f"s{i}",
+            name=f"S{i}",
+            type="automated_task",
+            depends_on=[f"s{i - 1}"] if i else ([f"s{n - 1}"] if close_loop else []),
+        )
+        for i in range(n)
+    ]
+    return steps
+
+
+def test_rule8_long_dependency_chain_does_not_exhaust_recursion():
+    """A chain longer than Python's recursion limit is checked without a crash."""
+    from solution_wizard import blueprint as bp_mod
+
+    n = sys.getrecursionlimit() + 50
+    steps = _chain(n, close_loop=True)
+    # Built without validation: the model itself would refuse this many steps.
+    workflow = Workflow.model_construct(steps=steps)
+    bp = Blueprint(use_case=UseCase(id="t", name="T", description="T", domain="t"))
+    bp.workflow = workflow
+    assert n > bp_mod.MAX_STEPS
+    result = validate(bp)
+    assert any(e.rule == 8 for e in result.errors)
+
+
+def test_blueprint_refuses_too_many_steps():
+    from pydantic import ValidationError
+
+    from solution_wizard.blueprint import MAX_STEPS
+
+    data = {
+        "use_case": {"id": "t", "name": "T", "description": "T", "domain": "t"},
+        "workflow": {"steps": [s.model_dump() for s in _chain(MAX_STEPS)]},
+    }
+    Blueprint.model_validate(data)
+    data["workflow"]["steps"].append(_chain(MAX_STEPS + 1)[-1].model_dump())
+    with pytest.raises(ValidationError):
+        Blueprint.model_validate(data)
+
+
+def test_blueprint_refuses_oversized_json():
+    from pydantic import ValidationError
+
+    from solution_wizard.blueprint import MAX_BLUEPRINT_CHARS
+
+    data = {
+        "use_case": {
+            "id": "t",
+            "name": "T",
+            "description": "x" * MAX_BLUEPRINT_CHARS,
+            "domain": "t",
+        },
+    }
+    with pytest.raises(ValidationError, match="the limit is"):
+        Blueprint.model_validate(data)
+
+
+def test_example_blueprints_fit_the_limits():
+    for path in sorted(EXAMPLES.glob("*blueprint*.json")):
+        Blueprint.from_file(path)
+
+
+def test_blueprint_size_counts_characters_not_escapes():
+    """Non-ASCII text counts once per character, as the limit says."""
+    from solution_wizard.blueprint import MAX_BLUEPRINT_CHARS
+
+    text = "ä" * (MAX_BLUEPRINT_CHARS // 2)
+    Blueprint.model_validate(
+        {"use_case": {"id": "t", "name": "T", "description": text, "domain": "t"}}
+    )

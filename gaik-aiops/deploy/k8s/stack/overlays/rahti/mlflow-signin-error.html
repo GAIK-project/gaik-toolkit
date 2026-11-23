@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+{{/* oauth2-proxy's error page in the GAIK look (--custom-templates-dir).
+     A signed-in user outside the admitted group gets 403: in GAIK that is an
+     account still waiting for approval, so the page says so, in Finnish and
+     English, and offers to sign out to try another account. Other errors keep
+     their status and message. Inline styles only: the page loads nothing.
+     oauth2-proxy gives its own message for each 403: an account outside the
+     admitted group gets the default "You do not have permission ..." (and the
+     waiting page); a sign-in that lost its CSRF cookie or token gets another
+     (and a page saying to start again).
+     The proxy holds no session for a user it turned away, so signing out has
+     to end the Keycloak session itself: https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/logout?client_id=aiops-mlflow&amp;post_logout_redirect_uri=https%3A%2F%2Fmlflow-gaik-aiops.2.rahtiapp.fi%2F is the stack's
+     Keycloak logout address, filled in by deploy.sh signin. */}}
+<html lang="fi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ if and (eq .StatusCode 403) (eq .Message "You do not have permission to access this resource.") }}Odottaa hyväksyntää · Awaiting approval{{ else if eq .StatusCode 403 }}Kirjautuminen ei onnistunut · Sign-in failed{{ else }}{{ .StatusCode }} {{ .Title }}{{ end }} · GAIK</title>
+  <style>
+    :root { --brand:#0277c0; --brand-hover:#016aad; --border:#e0e4ee; --border-strong:#c6ccdb;
+      --text:#111b28; --strong:#05080b; --secondary:#333d4f; --muted:#566076; }
+    * { box-sizing: border-box; }
+    body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+      padding:1rem; background:#fff; color:var(--text);
+      font-family:"Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif; }
+    body::before { content:""; position:fixed; inset:0; pointer-events:none;
+      background-image:radial-gradient(circle, rgb(26 104 182 / .3) 1px, transparent 1.5px); background-size:24px 24px;
+      -webkit-mask-image:radial-gradient(ellipse 64% 60% at 50% 42%, #000 0%, rgb(0 0 0 / .55) 45%, transparent 80%);
+      mask-image:radial-gradient(ellipse 64% 60% at 50% 42%, #000 0%, rgb(0 0 0 / .55) 45%, transparent 80%); }
+    body::after { content:""; position:fixed; left:50%; top:42%; width:min(64rem,140%); height:36rem;
+      translate:-50% -50%; pointer-events:none;
+      background:radial-gradient(ellipse 46% 48% at 43% 46%, rgb(2 119 192 / .13), transparent 72%),
+        radial-gradient(ellipse 40% 44% at 60% 58%, rgb(138 35 135 / .08), transparent 72%); }
+    main { position:relative; z-index:1; width:100%; max-width:26rem; background:#fff;
+      border:1px solid var(--border); border-radius:12px; padding:2rem;
+      box-shadow:0 4px 6px -1px rgb(17 27 40 / .06), 0 2px 4px -2px rgb(17 27 40 / .05); }
+    h1 { margin:1.5rem 0 .5rem; font-size:1.5rem; font-weight:600; letter-spacing:-.02em; color:var(--strong); }
+    p { margin:.5rem 0; font-size:.875rem; line-height:1.6; color:var(--secondary); }
+    .en { color:var(--muted); }
+    .actions { display:flex; gap:.5rem; margin-top:1.5rem; flex-wrap:wrap; }
+    a.btn { display:inline-flex; align-items:center; justify-content:center; min-height:2.5rem; padding:.5rem 1rem;
+      border-radius:6px; font-size:.875rem; font-weight:500; text-decoration:none; }
+    a.primary { background:var(--brand); color:#fff; }
+    a.primary:hover { background:var(--brand-hover); }
+    a.secondary { border:1px solid var(--border-strong); color:var(--text); }
+    a.secondary:hover { border-color:var(--muted); }
+    a:focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
+    .meta { margin-top:1.25rem; font-size:.75rem; color:var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <svg role="img" aria-label="GAIK" width="160" height="55" xmlns="http://www.w3.org/2000/svg" viewBox="96 70 882 303">
+  <defs>
+    <linearGradient id="gaik-g" x1="538.67" y1="-183.94" x2="532.75" y2="702.12" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0079c2"/>
+      <stop offset=".14" stop-color="#0277c0"/>
+      <stop offset=".23" stop-color="#0b71bd"/>
+      <stop offset=".31" stop-color="#1a68b6"/>
+      <stop offset=".38" stop-color="#305bad"/>
+      <stop offset=".45" stop-color="#4b49a1"/>
+      <stop offset=".51" stop-color="#6d3593"/>
+      <stop offset=".55" stop-color="#8a2387"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#gaik-g)" d="M170.02,150.27v105.68c0,4.46,5.4,6.7,8.55,3.54l51.08-51.08c1.95-1.95,1.96-5.11.01-7.07-6.26-6.3-19.5-19.61-28.24-28.41-3.14-3.16-.9-8.53,3.55-8.53,33.17,0,125.94,0,159.23,0,4.46,0,6.69,5.4,3.53,8.55l-43.27,43.27.13.13-153.12,153.12c-1.23.51-2.91,1.21-4.14,1.72h0c-21.69,0-43.38,0-65.07,0-2.77,0-5.01-2.24-5.01-5.01v-220.92s0-67.75,0-67.75c0-2.77,2.24-5.01,5.01-5.01h354.34c4.46,0,6.7,5.4,3.54,8.55-20.91,20.91-41.82,41.82-62.74,62.74-.94.94-2.21,1.47-3.54,1.47h-218.85c-2.77,0-5.01,2.24-5.01,5.01ZM543.54,106.49v259.69c0,2.77,2.24,5.01,5.01,5.01h62.74c2.77,0,5.01-2.24,5.01-5.01v-196.95c0-1.33-.53-2.6-1.47-3.54l-59.01-59.01-3.73-3.73c-3.16-3.16-8.55-.92-8.55,3.54ZM707.41,84.47l-59.01,59.01c-.94.94-1.47,2.21-1.47,3.54v219.16c0,2.77,2.24,5.01,5.01,5.01h62.74c2.77,0,5.01-2.24,5.01-5.01V84.28c0-4.46-5.4-6.7-8.55-3.54l-3.73,3.73ZM512.34,76.93c0-1.63-1.97-2.44-3.12-1.28l-69.64,70.23-216.87,216.87c-3.12,3.12-.91,8.45,3.5,8.45h88.86c1.33,0,2.6-.53,3.54-1.47l112.4-112.4c3.16-3.16,8.55-.92,8.55,3.54v105.32c0,2.77,2.24,5.01,5.01,5.01h62.74c2.77,0,5.01-2.24,5.01-5.01V76.93ZM615.53,127.38v-49.87c0-2.77-2.24-5.01-5.01-5.01h-49.87c-4.46,0-6.7,5.4-3.54,8.55l49.87,49.87c3.16,3.16,8.55.92,8.55-3.54ZM971.57,71.73h-88.72c-1.33,0-2.6.53-3.54,1.47l-159.98,159.98.02.02-.02.02,136.52,136.52c.94.94,2.21,1.47,3.54,1.47h88.72c4.46,0,6.7-5.4,3.54-8.55l-125.9-125.9c-1.96-1.96-1.96-5.13,0-7.09l149.36-149.36c3.16-3.16.92-8.55-3.54-8.55Z"/>
+</svg>
+  {{ if and (eq .StatusCode 403) (eq .Message "You do not have permission to access this resource.") }}
+  <h1>Tunnuksesi odottaa hyväksyntää</h1>
+  <p>Kirjautuminen onnistui, mutta tunnustasi ei ole vielä hyväksytty tähän palveluun. Ylläpito hyväksyy uudet tunnukset; pääset sisään, kun se on tehty. Lataa sivu silloin uudelleen.</p>
+  <p class="en" lang="en">You are signed in, but your account has not been approved for this service yet. Reload the page once an administrator has approved it.</p>
+  <div class="actions">
+    <a class="btn primary" href="/">Yritä uudelleen · Try again</a>
+    <a class="btn secondary" href="https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/logout?client_id=aiops-mlflow&amp;post_logout_redirect_uri=https%3A%2F%2Fmlflow-gaik-aiops.2.rahtiapp.fi%2F">Kirjaudu ulos · Sign out</a>
+  </div>
+  {{ else if eq .StatusCode 403 }}
+  <h1>Kirjautuminen ei onnistunut</h1>
+  <p>Kirjautuminen keskeytyi, esimerkiksi koska kirjautumissivu oli auki pitkään tai se avattiin vanhasta linkistä. Aloita alusta palvelun omasta osoitteesta.</p>
+  <p class="en" lang="en">The sign-in did not complete, for example because the sign-in page was open for a long time or was opened from an old link. Start again from the service's own address.</p>
+  <div class="actions">
+    <a class="btn primary" href="/">Kirjaudu uudelleen · Sign in again</a>
+  </div>
+  {{ else }}
+  <h1>{{ .StatusCode }} {{ .Title }}</h1>
+  {{ if .Message }}<p>{{ .Message }}</p>{{ end }}
+  <div class="actions">
+    <a class="btn primary" href="{{ .ProxyPrefix }}/sign_in{{ if .Redirect }}?rd={{ .Redirect }}{{ end }}">Kirjaudu sisään · Sign in</a>
+  </div>
+  {{ end }}
+  {{ if .RequestID }}<p class="meta">Tunniste · Request ID: {{ .RequestID }}</p>{{ end }}
+</main>
+</body>
+</html>

@@ -1,0 +1,284 @@
+# wizard_api (FastAPI) — GAIK Solution Wizard V2 backend.
+# Runs the live V1 agent via the Claude Agent SDK, routed to Azure Foundry in
+# production (see the project-wide secret gaik-demo-api-keys). Sessions +
+# blueprint versions live in Postgres (NAME_PLACEHOLDER-db); generated session
+# output persists on a PVC.
+#
+# Namespace is intentionally omitted — `oc apply -n <project>` / `oc project`
+# controls placement so the same manifests work in the staging project.
+# NAME_PLACEHOLDER is the instance prefix deploy.sh substitutes (wizard-v2 for
+# the staging stack, wizard-v2-<instance> for a second stack in the project).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: NAME_PLACEHOLDER-api
+  labels:
+    app: NAME_PLACEHOLDER-api
+    app.kubernetes.io/part-of: gaik-wizard-v2
+spec:
+  replicas: 1
+  # Recreate: the sessions PVC is ReadWriteOnce, so a second (rolling) pod could
+  # not mount it. One pod at a time also keeps the per-session agent state (one
+  # live claude subprocess per session) on a single node.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: NAME_PLACEHOLDER-api
+  template:
+    metadata:
+      labels:
+        app: NAME_PLACEHOLDER-api
+    spec:
+      # The ServiceAccount from rbac.yaml: Jobs, pods and pod logs, nothing else.
+      serviceAccountName: NAME_PLACEHOLDER-api
+      # Not mounted into every container: the api gets its token through the
+      # cluster-token volume below, and the agent container gets none.
+      automountServiceAccountToken: false
+      containers:
+        - name: NAME_PLACEHOLDER-api
+          # Per-instance image repository: two stacks sharing one `:latest` tag
+          # would pull each other's build on the next pod restart.
+          image: image-registry.apps.2.rahti.csc.fi/PROJECT_PLACEHOLDER/NAME_PLACEHOLDER-api:latest
+          ports:
+            - containerPort: 8100
+          env:
+            # --- Persistence -------------------------------------------------
+            - name: WIZARD_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: NAME_PLACEHOLDER-db
+                  key: database-url
+            - name: WIZARD_SESSION_OUTPUT_ROOT
+              value: /data/sessions
+            # What one session's cases may hold on that volume, which every
+            # session shares: sized to pvc-sessions.yaml (5Gi). These are the
+            # api's defaults, set here so a resize changes them in one place.
+            - name: WIZARD_MAX_CASES_PER_SESSION
+              value: "100"
+            - name: WIZARD_MAX_SESSION_INPUT_MB
+              value: "1024"
+            # Every upload is checked by the scanner (deployment-scanner.yaml)
+            # before it is stored; while it does not answer, uploads are
+            # refused (wizard_api/services/malware_scan.py).
+            - name: WIZARD_MALWARE_SCANNER
+              value: NAME_PLACEHOLDER-scanner:3310
+            # Service token (#135): every endpoint except /health requires the
+            # X-Wizard-Service-Token header. Same value must be set on the web
+            # deployment so its server-side proxy can present it.
+            - name: WIZARD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: NAME_PLACEHOLDER-token
+                  key: WIZARD_API_TOKEN
+            # --- Live agent auth: Claude Agent SDK via Azure Foundry ----------
+            # Project-wide Secret shared with the demo app and every instance.
+            # optional:true so the pod still starts before the secret is filled;
+            # the agent chat endpoint just won't work until these are set.
+            - name: CLAUDE_CODE_USE_FOUNDRY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: CLAUDE_CODE_USE_FOUNDRY
+                  optional: true
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_FOUNDRY_API_KEY
+                  optional: true
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_FOUNDRY_RESOURCE
+                  optional: true
+            - name: ANTHROPIC_DEFAULT_SONNET_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_DEFAULT_SONNET_MODEL
+                  optional: true
+            # --- Model provider for the agent's own tool calls ----------------
+            # Phase 4 (generate_schema.py → GAIK SchemaGenerator) calls Azure
+            # OpenAI from inside this container, exactly as the demo app does.
+            # The agent inherits the process environment, so these have to be
+            # here, not only in the sandbox Job (sandbox-job.yaml gives the run
+            # container the same four). Same shared Secret, optional for the
+            # same reason; AZURE_DEPLOYMENT may be absent, gaik then uses its
+            # default deployment.
+            - name: AZURE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_KEY
+                  optional: true
+            - name: AZURE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_ENDPOINT
+                  optional: true
+            - name: AZURE_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_VERSION
+                  optional: true
+            - name: AZURE_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_DEPLOYMENT
+                  optional: true
+            # --- Instance ----------------------------------------------------
+            # Resource-name prefix of this stack. The sandbox runner needs it to
+            # address this api (not the staging one) and this instance's token
+            # Secret from a Job it creates (#91 follow-up).
+            - name: WIZARD_INSTANCE_NAME
+              value: NAME_PLACEHOLDER
+            # The image a sandbox run executes the PoC in. Set here so it is not
+            # hand state on the Deployment, and per instance so an s4 run does not
+            # use staging's runner (and staging's gaik version). Built and pushed
+            # by `deploy.sh poc-runner`.
+            - name: WIZARD_POC_RUNNER_IMAGE
+              value: image-registry.apps.2.rahti.csc.fi/PROJECT_PLACEHOLDER/NAME_PLACEHOLDER-poc-runner:latest
+            # The agent runs in the agent container below; the SDK reaches it
+            # through this socket (wizard_api/agent_bridge.py).
+            - name: WIZARD_AGENT_BRIDGE_SOCKET
+              value: /run/wizard-agent/agent.sock
+          volumeMounts:
+            - name: session-output
+              mountPath: /data/sessions
+            - name: agent-socket
+              mountPath: /run/wizard-agent
+            # Where the Kubernetes client looks for the in-cluster credentials.
+            - name: cluster-token
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1536Mi
+          # Probes are loose: each turn spawns a claude subprocess and can block
+          # briefly. failureThreshold 5 + 10s timeout tolerates a slow turn
+          # instead of SIGKILLing the pod mid-request.
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8100
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8100
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 5
+        # The wizard's agent and every command it runs (T9). Same image, the
+        # bridge as its command: it starts the agent CLI when the api's SDK asks
+        # through the socket. It has the model settings and the sessions volume,
+        # and not the database address, the service token or a cluster token.
+        - name: agent
+          image: image-registry.apps.2.rahti.csc.fi/PROJECT_PLACEHOLDER/NAME_PLACEHOLDER-api:latest
+          command: ["wizard-agent-bridge", "--socket", "/run/wizard-agent/agent.sock"]
+          env:
+            - name: WIZARD_SESSION_OUTPUT_ROOT
+              value: /data/sessions
+            - name: CLAUDE_CODE_USE_FOUNDRY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: CLAUDE_CODE_USE_FOUNDRY
+                  optional: true
+            - name: ANTHROPIC_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_FOUNDRY_API_KEY
+                  optional: true
+            - name: ANTHROPIC_FOUNDRY_RESOURCE
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_FOUNDRY_RESOURCE
+                  optional: true
+            - name: ANTHROPIC_DEFAULT_SONNET_MODEL
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: ANTHROPIC_DEFAULT_SONNET_MODEL
+                  optional: true
+            # generate_schema.py, which the agent runs, calls Azure OpenAI.
+            - name: AZURE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_KEY
+                  optional: true
+            - name: AZURE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_ENDPOINT
+                  optional: true
+            - name: AZURE_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_VERSION
+                  optional: true
+            - name: AZURE_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_DEPLOYMENT
+                  optional: true
+          volumeMounts:
+            - name: session-output
+              mountPath: /data/sessions
+            - name: agent-socket
+              mountPath: /run/wizard-agent
+          # Every live agent is a CLI process in this container (up to
+          # WIZARD_MAX_LIVE_AGENTS, 20 unless set), so it takes most of the
+          # pod's memory; with the api container the pod asks for what the
+          # single container did before (3Gi, at most 8Gi).
+          resources:
+            requests:
+              cpu: 750m
+              memory: 2560Mi
+            limits:
+              cpu: "3"
+              memory: 6656Mi
+      volumes:
+        - name: session-output
+          persistentVolumeClaim:
+            claimName: NAME_PLACEHOLDER-sessions
+        - name: agent-socket
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        # The ServiceAccount token, CA and namespace, for the api container only.
+        - name: cluster-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3607
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        fieldPath: metadata.namespace

@@ -1,0 +1,106 @@
+# Collector overlay for the OpenBao stack.
+#
+# 1. The pseudonymisation key comes from the vault (rendered to a file by the collector's OpenBao agent)
+#    instead of an environment variable. The statements are the base config's with only the key source
+#    changed; keep both in step. The sink no longer pseudonymises.
+# 2. The OpenBao audit device (a JSON file) becomes audit events in the collection layer. Only selected
+#    request fields are kept; request and response data are never forwarded.
+extensions:
+  file_storage/openbao:
+    directory: /var/lib/otelcol/openbao
+
+receivers:
+  filelog/openbao:
+    include: [/bao/audit/audit.log]
+    start_at: beginning
+    storage: file_storage/openbao
+    operators:
+      - type: json_parser
+        parse_to: body
+        timestamp:
+          parse_from: body.time
+          layout_type: gotime
+          layout: "2006-01-02T15:04:05.999999999Z07:00"
+
+processors:
+  transform/privacy:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(log.attributes["enduser.pseudo.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", log.attributes["enduser.id"]], ""))) where log.attributes["enduser.id"] != nil
+          - delete_key(log.attributes, "enduser.id")
+          - set(log.attributes["gaik.session.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", "session:", log.attributes["gaik.session.id"]], ""))) where log.attributes["gaik.session.id"] != nil
+          - set(log.attributes["session.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", "session:", log.attributes["session.id"]], ""))) where log.attributes["session.id"] != nil
+          - set(log.attributes["gen_ai.conversation.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", "session:", log.attributes["gen_ai.conversation.id"]], ""))) where log.attributes["gen_ai.conversation.id"] != nil
+          - replace_pattern(log.attributes["client.address"], "^(\\d+\\.\\d+\\.\\d+)\\.\\d+$$", "$${1}.0")
+          - replace_pattern(log.attributes["client.address"], "^([0-9a-fA-F]*:[0-9a-fA-F]*:[0-9a-fA-F]*):.*$$", "$${1}::")
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["enduser.pseudo.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", span.attributes["enduser.id"]], ""))) where span.attributes["enduser.id"] != nil
+          - delete_key(span.attributes, "enduser.id")
+          - replace_pattern(span.attributes["client.address"], "^(\\d+\\.\\d+\\.\\d+)\\.\\d+$$", "$${1}.0")
+          - replace_pattern(span.attributes["client.address"], "^([0-9a-fA-F]*:[0-9a-fA-F]*:[0-9a-fA-F]*):.*$$", "$${1}::")
+          - delete_matching_keys(span.attributes, "^gen_ai\\.(input|output)\\.messages$$")
+          - delete_matching_keys(span.attributes, "^gen_ai\\.(prompt|completion)")
+          - delete_matching_keys(span.attributes, "^mlflow\\.span(Inputs|Outputs)$$")
+          # A session id leads to its owner (the wizard's to a row in its database), so it is
+          # pseudonymised too: same key, its own "session:" prefix. Once a session is deleted, its
+          # traces lead nowhere. MLflow names sessions by session.id, else gen_ai.conversation.id.
+          - set(span.attributes["gaik.session.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", "session:", span.attributes["gaik.session.id"]], ""))) where span.attributes["gaik.session.id"] != nil
+          - set(span.attributes["session.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", "session:", span.attributes["session.id"]], ""))) where span.attributes["session.id"] != nil
+          - set(span.attributes["gen_ai.conversation.id"], SHA256(Concat(["${file:/run/bao/pseudonym_key}", "session:", span.attributes["gen_ai.conversation.id"]], ""))) where span.attributes["gen_ai.conversation.id"] != nil
+      - context: spanevent
+        statements:
+          - delete_matching_keys(spanevent.attributes, "^gen_ai\\.(input|output)\\.messages$$")
+          - delete_matching_keys(spanevent.attributes, "^gen_ai\\.(prompt|completion)")
+
+  # Keep one entry per request (the response entry carries the request and the outcome).
+  filter/openbao:
+    error_mode: ignore
+    logs:
+      log_record:
+        - body["type"] != "response"
+
+  transform/openbao:
+    error_mode: ignore
+    log_statements:
+      - context: resource
+        statements:
+          - set(resource.attributes["service.name"], "openbao")
+      - context: log
+        statements:
+          - set(log.attributes["gaik.event.class"], "audit")
+          # Event names; later statements win.
+          - set(log.attributes["event.name"], "vault.request")
+          - set(log.attributes["event.name"], "secret.accessed") where log.body["request"]["mount_type"] == "kv"
+          - set(log.attributes["event.name"], "key.used") where log.body["request"]["mount_type"] == "transit"
+          - set(log.attributes["event.name"], "secret.rotated") where IsMatch(log.body["request"]["path"], "^transit/keys/[^/]+/rotate$$")
+          - set(log.attributes["event.name"], "auth.login") where IsMatch(log.body["request"]["path"], "^auth/[^/]+/login")
+          - set(log.attributes["event.name"], "auth.token_renewed") where IsMatch(log.body["request"]["path"], "^auth/token/renew")
+          - set(log.attributes["event.name"], "config.changed") where (IsMatch(log.body["request"]["path"], "^sys/(policies|policy|audit|auth|mounts)") or IsMatch(log.body["request"]["path"], "^auth/[^/]+/role/") or IsMatch(log.body["request"]["path"], "^transit/keys/[^/]+(/config)?$$")) and log.body["request"]["operation"] != "read" and log.body["request"]["operation"] != "list"
+          - set(log.attributes["event.name"], "credential.issued") where IsMatch(log.body["request"]["path"], "^auth/[^/]+/role/[^/]+/secret-id$$") and log.body["request"]["operation"] == "update"
+          - set(log.attributes["gaik.audit.outcome"], "success")
+          - set(log.attributes["gaik.audit.outcome"], "error") where log.body["error"] != nil
+          - set(log.attributes["gaik.audit.outcome"], "denied") where log.body["error"] != nil and IsMatch(log.body["error"], "permission denied")
+          - set(log.attributes["gaik.audit.resource.type"], "vault.path")
+          - set(log.attributes["gaik.audit.resource.id"], log.body["request"]["path"])
+          - set(log.attributes["client.address"], log.body["request"]["remote_address"])
+          # The identity is pseudonymised like any other actor; the role name is not personal.
+          - set(log.attributes["enduser.id"], log.body["auth"]["display_name"]) where log.body["auth"]["display_name"] != nil
+          - set(log.attributes["enduser.id"], log.body["auth"]["entity_id"]) where log.body["auth"]["entity_id"] != nil and log.body["auth"]["entity_id"] != ""
+          - set(log.attributes["vault.auth.role"], log.body["auth"]["metadata"]["role_name"]) where log.body["auth"]["metadata"]["role_name"] != nil
+          - set(log.attributes["vault.operation"], log.body["request"]["operation"])
+          - set(log.attributes["vault.mount_type"], log.body["request"]["mount_type"])
+          - set(log.attributes["vault.request.id"], log.body["request"]["id"])
+          - set(log.attributes["vault.token.accessor"], log.body["auth"]["accessor"]) where log.body["auth"]["accessor"] != nil
+          - set(log.body, "")
+
+service:
+  extensions: [file_storage/openbao]
+  pipelines:
+    logs/openbao:
+      receivers: [filelog/openbao]
+      processors: [filter/openbao, transform/openbao, transform/privacy, batch]
+      exporters: [otlphttp/sink, count]

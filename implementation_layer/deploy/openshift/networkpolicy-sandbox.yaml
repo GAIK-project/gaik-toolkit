@@ -1,0 +1,67 @@
+# Network access of the sandbox PoC runs (sandbox-job.yaml).
+#
+# A run is code the agent generated from a user's description. Without a
+# policy its pod can open a connection to anything the project network
+# reaches: the database, the other stack's api, other services in the shared
+# project, the cloud metadata address. This policy selects this stack's run
+# pods (by the label sandbox-job.yaml sets) and allows only what a run needs:
+#
+#   - DNS (OpenShift serves it on 5353, plain Kubernetes on 53)
+#   - this stack's api on 8100, where the init container fetches the package
+#   - TCP 443 to public addresses, for the model provider
+#
+# Nothing may connect to a run pod. Private, shared-address, link-local and
+# loopback ranges are excluded from the 443 rule, so cluster pods, services and
+# node addresses are not reachable on 443 either. NetworkPolicy works on
+# addresses, not names: any public host on 443 stays reachable. Limiting it to
+# the provider's domain needs an egress firewall or proxy.
+#
+# Policies add up: one that selects these pods and allows more would widen
+# this. `oc get networkpolicy` before applying.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: NAME_PLACEHOLDER-poc-run
+  labels:
+    app: NAME_PLACEHOLDER-api
+spec:
+  podSelector:
+    matchLabels:
+      app: wizard-v2-poc-run
+      wizard-v2/instance: NAME_PLACEHOLDER
+  policyTypes: [Ingress, Egress]
+  ingress: []
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: openshift-dns
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - {protocol: UDP, port: 53}
+        - {protocol: TCP, port: 53}
+        - {protocol: UDP, port: 5353}
+        - {protocol: TCP, port: 5353}
+    - to:
+        - podSelector:
+            matchLabels:
+              app: NAME_PLACEHOLDER-api
+      ports:
+        - {protocol: TCP, port: 8100}
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+              - 100.64.0.0/10
+              - 169.254.0.0/16
+              - 127.0.0.0/8
+      ports:
+        - {protocol: TCP, port: 443}

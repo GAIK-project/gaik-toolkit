@@ -1,0 +1,601 @@
+{
+  "sprint": "Sprint 3 — 24 Aug – 21 Sep 2026",
+  "scopeSource": "GAIK_Wizard_V2_Sprint3-4_plan_20260907_v2.pdf — the Sprint 3 table agreed with the customer on 7 Sep 2026",
+  "definitionOfDone": "For the use cases the customer provides, 5 of 5 generate a PoC that runs in the sandbox and produces the correct output. The sandbox half is Sprint 4; Sprint 3 owns 'a runnable PoC package is generated and downloadable'.",
+  "levels": {
+    "unit": {
+      "label": "Unit (vitest)",
+      "command": "npm run test",
+      "runs": "pr"
+    },
+    "api": {
+      "label": "wizard_api (pytest + Postgres)",
+      "command": "cd ../wizard_api && pytest",
+      "runs": "pr"
+    },
+    "wizard": {
+      "label": "solution_wizard (pytest)",
+      "command": "cd ../solution_wizard && pytest -q",
+      "runs": "pr"
+    },
+    "e2e": {
+      "label": "E2E against the mock store (Playwright)",
+      "command": "npm run test:e2e",
+      "runs": "pr"
+    },
+    "stack": {
+      "label": "E2E against the real stack (Playwright + wizard_api + Postgres)",
+      "command": "npm run test:stack",
+      "runs": "nightly"
+    },
+    "agent": {
+      "label": "E2E against the live agent (Playwright + Claude login)",
+      "command": "npm run test:e2e:agent",
+      "runs": "manual"
+    },
+    "uc": {
+      "label": "Use-case acceptance run",
+      "command": "npm run test:e2e:uc",
+      "runs": "manual"
+    },
+    "record": {
+      "label": "Recorded fact (git history, deploy, review)",
+      "command": null,
+      "runs": "manual"
+    }
+  },
+  "tickets": [
+    {
+      "id": 93,
+      "title": "PoC package generation wired through to Gate 3",
+      "days": 2.5,
+      "criteria": [
+        {
+          "text": "POST route generates a PoC scaffold from the session's active blueprint",
+          "source": "issue #93 acceptance criteria",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_generate_produces_the_v1_scaffolder_file_set"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_generated_schema_uses_the_agreed_output_fields"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/poc-generate-stack.spec.ts",
+              "name": "generating scaffolds the package, and an unfinished one is not handed out"
+            }
+          ]
+        },
+        {
+          "text": "Generated files match the V1 scaffolder.py output (same file set)",
+          "source": "issue #93 acceptance criteria",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_generate_produces_the_v1_scaffolder_file_set"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_scaffolder.py",
+              "name": "test_pattern_audio_to_structured"
+            }
+          ]
+        },
+        {
+          "text": "Regenerating after a blueprint change produces an updated scaffold, not a silent no-op",
+          "source": "issue #93 acceptance criteria",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_regenerating_after_a_blueprint_change_is_not_a_silent_no_op"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_regenerating_keeps_sample_inputs_and_earlier_results"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/poc-generate-stack.spec.ts",
+              "name": "running it again rewrites the package instead of doing nothing"
+            }
+          ]
+        },
+        {
+          "text": "Regeneration never overwrites the agent's own package or wiring",
+          "source": "issue #93 discussion — added while building",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_generate_never_overwrites_the_agents_own_package"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_regenerating_never_overwrites_the_agents_wiring"
+            }
+          ]
+        },
+        {
+          "text": "The generated package is downloadable from the session (Gate 3 needs the zip, not just the files on disk)",
+          "source": "7 Sep plan — 'a runnable PoC package is generated and downloadable'",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_poc_files_and_zip_expose_the_generated_package"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_poc_endpoints.py",
+              "name": "test_poc_files_reports_nothing_until_the_scaffolder_has_run"
+            },
+            {
+              "level": "unit",
+              "file": "app/api/sessions/[id]/poc/download/route.test.ts",
+              "name": "relays the zip"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 138,
+      "title": "Workspace panel stays in sync with the chat",
+      "days": 1.5,
+      "criteria": [
+        {
+          "text": "The active workspace tab follows forward automatically when the session crosses the BPMN or PoC milestone via the chat",
+          "source": "issue #138 acceptance criteria",
+          "evidence": [
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "switches to flow when crossing into the BPMN-visual step"
+            },
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "switches to poc when crossing into the PoC step"
+            },
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "switches straight to poc when a jump skips past several steps at once"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/workspace-tab-follow-stack.spec.ts",
+              "name": "crossing into the BPMN step pulls the panel to the workflow tab"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/workspace-tab-follow-stack.spec.ts",
+              "name": "crossing into the PoC step pulls the panel to the PoC tab"
+            }
+          ]
+        },
+        {
+          "text": "Never switches backwards, and a page load opens the tab of the session's phase (since the Nov 2026 UX pass; before it a load always opened Työnkulku, whatever the phase)",
+          "source": "issue #138 acceptance criteria",
+          "evidence": [
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "does nothing when the step regresses (e.g. a gate rejection)"
+            },
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "does nothing when the step doesn't move"
+            },
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "does not re-trigger poc once already at/past the PoC step"
+            },
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "opens the PoC from the PoC step to the end"
+            },
+            {
+              "level": "e2e",
+              "file": "e2e/workspace-tabs.spec.ts",
+              "name": "a session opens on the tab of its phase, and the now mark shows only when another tab is open"
+            },
+            {
+              "level": "e2e",
+              "file": "e2e/workspace-tabs.spec.ts",
+              "name": "a ?tab= in the address wins over the phase"
+            }
+          ]
+        },
+        {
+          "text": "Unit tests for the pure logic in lib/",
+          "source": "issue #138 acceptance criteria",
+          "evidence": [
+            {
+              "level": "unit",
+              "file": "lib/workspace-tab-follow.test.ts",
+              "name": "nextTabForStepChange"
+            }
+          ]
+        },
+        {
+          "text": "Browser verification: a manually chosen tab is replaced by the right one when the milestone is crossed",
+          "source": "issue #138 acceptance criteria",
+          "evidence": [
+            {
+              "level": "stack",
+              "file": "e2e/workspace-tab-follow-stack.spec.ts",
+              "name": "crossing into the BPMN step pulls the panel to the workflow tab"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/workspace-tab-follow-stack.spec.ts",
+              "name": "crossing into the PoC step pulls the panel to the PoC tab"
+            },
+            {
+              "level": "e2e",
+              "file": "e2e/workspace-tabs.spec.ts",
+              "name": "reaching the diagram step adds Työnkulku and moves to it"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 141,
+      "title": "Demo parity — blueprint, schema and BPMN generate as the forward flow progresses",
+      "days": 1.0,
+      "criteria": [
+        {
+          "text": "Blueprint is generated and visible as the flow advances",
+          "source": "issue #141 acceptance criteria",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_artifact_sync.py",
+              "name": "test_chat_turn_adopts_the_draft_blueprint"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_artifact_sync.py",
+              "name": "test_reads_the_draft_and_maps_it_to_the_v2_blueprint"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_artifact_sync.py",
+              "name": "test_a_draft_without_a_workflow_does_not_replace_the_blueprint"
+            },
+            {
+              "level": "agent",
+              "file": "e2e/local-agent-chat-bpmn.spec.ts",
+              "name": "agent answers questions, then BPMN and JSON can be saved"
+            }
+          ]
+        },
+        {
+          "text": "Schema is generated and visible",
+          "source": "issue #141 acceptance criteria",
+          "evidence": [
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_artifact_sync.py",
+              "name": "test_target_output_spec_comes_from_the_draft"
+            },
+            {
+              "level": "unit",
+              "file": "lib/target-output-spec.test.ts",
+              "name": "maps declared types and marks required fields"
+            },
+            {
+              "level": "e2e",
+              "file": "e2e/ui-basics.spec.ts",
+              "name": "Gate 1 and the steps before it have no previous button"
+            }
+          ]
+        },
+        {
+          "text": "BPMN is generated and rendered",
+          "source": "issue #141 acceptance criteria",
+          "evidence": [
+            {
+              "level": "unit",
+              "file": "lib/bpmn-generate.test.ts",
+              "name": "fetches from wizard_api when enabled"
+            },
+            {
+              "level": "e2e",
+              "file": "e2e/new-session-dummy-bpmn.spec.ts",
+              "name": "create session → advance to BPMN → canvas + chat rail"
+            },
+            {
+              "level": "agent",
+              "file": "e2e/local-agent-chat-bpmn.spec.ts",
+              "name": "agent answers questions, then BPMN and JSON can be saved"
+            }
+          ]
+        },
+        {
+          "text": "Verified end to end from the first prompt through to Gate 3",
+          "source": "issue #141 acceptance criteria",
+          "evidence": [
+            {
+              "level": "uc",
+              "file": "e2e/uc-acceptance.spec.ts",
+              "name": "description to a runnable PoC package"
+            }
+          ],
+          "gapNote": "Covered by the use-case acceptance run, which drives one session from the case description to a generated PoC package. It needs a live agent and the customer's case files, so it stays a manual run — not something a green CI can stand in for."
+        }
+      ]
+    },
+    {
+      "id": 142,
+      "title": "Language consistency — generated artifacts stay in one language",
+      "days": 0.75,
+      "criteria": [
+        {
+          "text": "Generated artifacts do not mix Finnish and English",
+          "source": "issue #142 acceptance criteria",
+          "evidence": [
+            {
+              "level": "agent",
+              "file": "e2e/local-agent-blueprint-language.spec.ts",
+              "name": "workflow.steps ids/names/components have no Finnish leaking in"
+            }
+          ],
+          "gapNote": "Single evidence, live-agent level only — nothing deterministic guards this. A blueprint-level lint over the identifiers would make it a PR-level check."
+        },
+        {
+          "text": "The UI language switch still works",
+          "source": "issue #142 acceptance criteria",
+          "evidence": [
+            {
+              "level": "e2e",
+              "file": "e2e/ui-basics.spec.ts",
+              "name": "locale switcher changes the visible language"
+            },
+            {
+              "level": "unit",
+              "file": "lib/i18n.test.ts",
+              "name": "every locale's dict exposes the exact same key set (no missing translations)"
+            },
+            {
+              "level": "unit",
+              "file": "lib/i18n.test.ts",
+              "name": "every locale's phases array has the same length (13 wizard steps)"
+            }
+          ]
+        },
+        {
+          "text": "PR #137 merged",
+          "source": "issue #142 acceptance criteria",
+          "evidence": [
+            {
+              "level": "record",
+              "note": "git log --oneline --grep='#137' — merged before the sprint-3 language work landed"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 126,
+      "title": "Gate 1 reject / request-changes feedback",
+      "days": 0.5,
+      "criteria": [
+        {
+          "text": "Request changes reaches the agent with the user's reason: it opens the chat with the gate as a reference, and the reason is the chat turn (since the Nov 2026 UX pass; the earlier form stored the reason where the live agent never read it)",
+          "source": "issue #126 'Proposed fix' (the issue has no checkbox list)",
+          "evidence": [
+            {
+              "level": "unit",
+              "file": "lib/chat-reference.test.ts",
+              "name": "starts with the reference's line, then a blank line, then what the user wrote"
+            },
+            {
+              "level": "e2e",
+              "file": "e2e/gate-review.spec.ts",
+              "name": "request changes takes the gate to the chat as a reference, with no form"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/gate1-feedback-stack.spec.ts",
+              "name": "request changes stays on the gate and hands it to the chat"
+            }
+          ]
+        },
+        {
+          "text": "Request changes no longer jumps back to the Specification step",
+          "source": "issue #126 title — the reported defect",
+          "evidence": [
+            {
+              "level": "e2e",
+              "file": "e2e/gate-review.spec.ts",
+              "name": "request changes takes the gate to the chat as a reference, with no form"
+            },
+            {
+              "level": "stack",
+              "file": "e2e/gate1-feedback-stack.spec.ts",
+              "name": "request changes stays on the gate and hands it to the chat"
+            }
+          ]
+        },
+        {
+          "text": "A rejection cannot be submitted without a reason (the empty message used to be dropped silently); a change request is a chat message, which cannot be sent empty (the rejection half no longer applies since pull request 140 of this repository removed Reject from the web app)",
+          "source": "issue #126 root cause",
+          "evidence": [
+            {
+              "level": "unit",
+              "file": "lib/chat-reference.test.ts",
+              "name": "is empty when the user wrote nothing, so a chip alone sends nothing"
+            }
+          ],
+          "gapNote": "The web app's Reject and its reason form were removed by the product owner's decision in pull request 140 of this repository (the chat-style shell), and with them the two browser tests that pinned the reason. What remains is the change-request half: Request changes sends the user's own words to the wizard as a chat turn, and a reference with nothing written sends nothing (the unit test above)."
+        },
+        {
+          "text": "Reject marks the gate rejected, visibly at the gate, and sends the reason to the agent as a chat turn (no longer applies as written since pull request 140 of this repository removed Reject from the web app: a gate that already stands rejected is still shown as rejected and can still be approved or sent back with Request changes)",
+          "source": "issue #126 'Proposed fix'",
+          "withdrawn": true,
+          "evidence": [
+            {
+              "level": "e2e",
+              "file": "e2e/session-layout.spec.ts",
+              "name": "a rejected gate says so beside its stage, without a press"
+            },
+            {
+              "level": "unit",
+              "file": "lib/gate-decision.test.ts",
+              "name": "is the gate the session stands on, until it is approved"
+            },
+            {
+              "level": "api",
+              "file": "../wizard_api/tests/test_gate_enforcement.py",
+              "name": "test_a_rejected_gate_does_not_let_the_session_past"
+            }
+          ],
+          "gapNote": "Reject was removed from the web app by the product owner's decision in pull request 140 of this repository, together with the web app's reject action, rejectGate and their tests. The reason for a change now goes as Request changes, which sends the user's words to the wizard as a chat turn (the first criterion of this ticket). wizard_api still accepts a rejected gate status. The evidence covers only what remains: a gate that stands rejected says so at the gate, still offers its decision, and does not let the session past it at the API."
+        },
+        {
+          "text": "A reject straight after a change request still records (no longer applies since pull request 140 of this repository removed Reject from the web app)",
+          "source": "issue #126 discussion — added while fixing",
+          "withdrawn": true,
+          "evidence": [],
+          "gapNote": "Since the product owner's decision in pull request 140 of this repository the web app has no Reject, so there is no reject to record after a change request, and its stack test went with it. The criterion stays here, with no evidence, as the record of what Sprint 3 accepted; Request changes, which replaces it, is covered by the first criterion of this ticket."
+        }
+      ]
+    },
+    {
+      "id": 144,
+      "title": "Buffer — review / deploy / unknowns",
+      "days": 0.75,
+      "criteria": []
+    }
+  ],
+  "alsoShippedInSprint3": [
+    {
+      "id": 145,
+      "title": "audio_to_structured_data registry entry omits its transcript outputs",
+      "criteria": [
+        {
+          "text": "The registry declares the artifact types the module actually produces, so a workflow handing the reviewer both the record and its transcript validates",
+          "source": "issue #145",
+          "evidence": [
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_selector.py",
+              "name": "test_audio_module_declares_the_transcript_it_returns"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 146,
+      "title": "Declared hallucination check validates silently when the grounding artifact is missing",
+      "criteria": [
+        {
+          "text": "A declared hallucination check with no grounding input on the validator step is an error, not silence",
+          "source": "issue #146",
+          "evidence": [
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_validator.py",
+              "name": "test_rule14_judge_without_grounding_input_is_an_error"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_validator.py",
+              "name": "test_rule14_judge_with_grounding_input_passes"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_validator.py",
+              "name": "test_rule14_not_applied_when_hallucination_check_is_off"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_validator.py",
+              "name": "test_rule14_warns_when_check_declared_but_no_validator_step"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 157,
+      "title": "Pattern classification can silently drop inputs a case declared (UC05)",
+      "criteria": [
+        {
+          "text": "A mixed-source case is not classified as a single-input pattern that would drop the other inputs",
+          "source": "issue #157",
+          "evidence": [
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_selector.py",
+              "name": "test_audio_only_module_is_not_offered_for_a_mixed_case"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_selector.py",
+              "name": "test_no_single_module_covers_a_mixed_source_case"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_selector.py",
+              "name": "test_multi_source_chain_ends_in_structured_output"
+            },
+            {
+              "level": "wizard",
+              "file": "../solution_wizard/tests/test_selector.py",
+              "name": "test_input_coverage_is_case_insensitive_and_ignores_blanks"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "useCases": [
+    {
+      "id": "UC01",
+      "title": "Finnish voice fault reports → maintenance tickets",
+      "fixtures": "fixtures/UC01",
+      "run": "runs/UC01"
+    },
+    {
+      "id": "UC02",
+      "title": "Purchase order PDFs → ERP records (VisionExtractor)",
+      "fixtures": "fixtures/UC02",
+      "run": "runs/UC02"
+    },
+    {
+      "id": "UC03",
+      "title": "Role-aware RAG assistant with citations",
+      "fixtures": "fixtures/UC03",
+      "run": "runs/UC03"
+    },
+    {
+      "id": "UC04",
+      "title": "Multi-source report generation",
+      "fixtures": "fixtures/UC04",
+      "run": "runs/UC04"
+    },
+    {
+      "id": "UC05",
+      "title": "Meeting: audio + agenda PDF + participant JSON",
+      "fixtures": "fixtures/UC05",
+      "run": "runs/UC05"
+    }
+  ]
+}

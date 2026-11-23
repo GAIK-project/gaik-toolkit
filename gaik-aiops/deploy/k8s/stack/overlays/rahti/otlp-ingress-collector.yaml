@@ -1,0 +1,29 @@
+# The way in for producers in other Rahti projects, such as the wizard in `gaik`: a second OTLP/HTTP
+# receiver on port 4320 that accepts only requests with the bearer token from the aiops-otlp-ingress
+# Secret. The collector reads this file after the shared configuration and the generated MLflow routes.
+# Maps merge, lists are replaced, so each pipeline's receiver list is given in full: the in-project
+# receiver (otlp) stays, and everything from this receiver goes through the same privacy processors.
+extensions:
+  bearertokenauth/ingress:
+    scheme: Bearer
+    token: ${env:OTLP_INGRESS_TOKEN}
+
+receivers:
+  otlp/ingress:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4320
+        # A request from outside the project is at most 4 MiB (the receiver's default is 20 MiB).
+        max_request_body_size: 4194304
+        auth:
+          authenticator: bearertokenauth/ingress
+
+service:
+  extensions: [bearertokenauth/ingress]
+  pipelines:
+    logs:
+      receivers: [otlp, otlp/ingress]
+    traces:
+      receivers: [otlp, otlp/ingress]
+    metrics:
+      receivers: [otlp, otlp/ingress, spanmetrics, count]

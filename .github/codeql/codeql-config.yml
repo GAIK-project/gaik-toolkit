@@ -1,0 +1,8 @@
+# CodeQL configuration (.github/workflows/codeql.yml).
+name: wizard-v2 code scanning
+
+paths-ignore:
+  # PoC packages the wizard generated in the evaluation runs: sample output kept
+  # as evidence, not code this repository maintains.
+  - "**/runs/**/generated_package/**"
+  - "**/node_modules/**"

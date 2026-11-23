@@ -1,0 +1,222 @@
+# Sandbox Job for running a generated PoC (S5-1 / #89).
+#
+# One Job per run. The PoC is code the wizard's agent generated from a user's
+# description, so it is treated as untrusted: no cluster credentials, no host
+# access, no writable image, a hard wall-clock limit, and no retries.
+#
+# scripts/submit-sandbox-job.sh substitutes four placeholders: the wizard
+# session whose PoC this runs, a unique run id for the Job name, the runner
+# image (python plus the gaik extras the PoC needs), and NAME_PLACEHOLDER, the
+# instance prefix (wizard-v2 for staging, wizard-v2-<instance> for a second
+# stack) so the Job fetches the package from, and authenticates to, the api of
+# the stack that created it rather than the staging one.
+#
+# Namespace is intentionally omitted, matching the other manifests here: the
+# active `oc project` decides placement.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: wizard-v2-poc-run-RUN_ID_PLACEHOLDER
+  labels:
+    app: wizard-v2-poc-run
+    app.kubernetes.io/part-of: gaik-wizard-v2
+    wizard-v2/session-id: SESSION_ID_PLACEHOLDER
+spec:
+  # Hard 10-minute wall clock (#89). Counts from pod start and kills the Job
+  # whatever the PoC is doing — a generated script that blocks on input or
+  # loops forever must not hold a slot.
+  activeDeadlineSeconds: 600
+  # A failed PoC run is a result, not a flake: never retry, so the user sees
+  # one deterministic outcome and one log.
+  backoffLimit: 0
+  # A finished Job goes as soon as the API has saved its result into the
+  # session (the log is readable by every user of the project). This is the
+  # backstop for a run nobody followed: the cluster reaps it after an hour.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app: wizard-v2-poc-run
+        wizard-v2/session-id: SESSION_ID_PLACEHOLDER
+        # networkpolicy-sandbox.yaml selects the run pods by this label, so
+        # each stack's runs reach only that stack's api.
+        wizard-v2/instance: NAME_PLACEHOLDER
+    spec:
+      restartPolicy: Never
+      # The PoC must not be able to talk to the Kubernetes API.
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      initContainers:
+        # The PoC package comes from wizard_api over HTTP (the /sessions/{id}/poc
+        # zip endpoint), not from a shared volume: the sessions PVC is
+        # ReadWriteOnce and is already mounted by the api pod, so a second pod
+        # cannot mount it on another node. Fetching also means this Job needs no
+        # access to the api's storage at all.
+        - name: fetch-poc
+          image: IMAGE_PLACEHOLDER
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -eu
+              curl -fsS \
+                -H "X-Wizard-Service-Token: ${WIZARD_API_TOKEN}" \
+                -H "X-Wizard-User-Id: ${WIZARD_USER_ID:-}" \
+                "${WIZARD_API_URL}/sessions/SESSION_ID_PLACEHOLDER/poc" \
+                -o /workspace/poc.zip
+              # Each file keeps the time the archive gives it; extractall would give
+              # every file the moment of extraction. A document or audio PoC writes
+              # schemas/output_schema_model.json again when output_schema.py is newer
+              # (GAIK-project/gaik-toolkit#247), so an edit made after Phase 4 reaches
+              # the run only if the times are kept.
+              python -c "import os, time, zipfile
+              archive = zipfile.ZipFile('/workspace/poc.zip')
+              for entry in archive.infolist():
+                  path = archive.extract(entry, '/workspace')
+                  stamp = time.mktime(entry.date_time + (0, 0, -1))
+                  os.utime(path, (stamp, stamp))"
+              rm /workspace/poc.zip
+          env:
+            - name: WIZARD_API_URL
+              value: http://NAME_PLACEHOLDER-api:8100
+            # WIZARD_USER_ID, the session owner, is added by the runner
+            # (sandbox_runner._set_user) or submit-sandbox-job.sh, so the api can
+            # check that the run fetches its own session's package.
+            - name: WIZARD_API_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: NAME_PLACEHOLDER-token
+                  key: WIZARD_API_TOKEN
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      containers:
+        - name: poc-run
+          image: IMAGE_PLACEHOLDER
+          workingDir: /workspace/poc
+          # Run the entrypoint, then print what it wrote to output/ between two
+          # markers, and exit with the PoC's own code. The result lives in an
+          # emptyDir that disappears with the pod and the PoCs print only a
+          # summary, so without this the user of a finished run could not see what
+          # it extracted (#238). Done here, not in the PoC templates: it works for
+          # every package, agent-written ones included, and the templates are
+          # upstream's. Only the top level of output/, only json/txt/md, 64 KB per
+          # file and 256 KB in all; the END marker is always printed.
+          # Every marker line ends with this run's id, which nothing the run
+          # reads can know: text the PoC echoes from its input (a transcript)
+          # cannot pass for the result (#293).
+          # Then every top-level file of output/ again, base64, so the user can
+          # download what the run produced, a PDF report included: 4 MB per
+          # file and 5 MB in all, which keeps the log under the kubelet's 10 MB
+          # rotation; a file over the limit is named as skipped.
+          command: ["sh", "-c"]
+          args:
+            - |
+              python run_poc.py
+              rc=$?
+              echo "=== POC OUTPUT BEGIN === ${WIZARD_RUN_ID:-}"
+              {
+                for f in output/*.json output/*.txt output/*.md; do
+                  [ -f "$f" ] || continue
+                  echo "--- $f --- ${WIZARD_RUN_ID:-}"
+                  head -c 65536 "$f"
+                  echo
+                done
+              } | head -c 262144
+              echo
+              echo "=== POC OUTPUT END === ${WIZARD_RUN_ID:-}"
+              echo "=== POC FILES BEGIN === ${WIZARD_RUN_ID:-}"
+              total=0
+              for f in output/*; do
+                [ -f "$f" ] || continue
+                name=$(basename "$f")
+                size=$(wc -c < "$f" | tr -d ' ')
+                if [ "$size" -gt 4194304 ] || [ $((total + size)) -gt 5242880 ]; then
+                  echo "--- skipped $name $size --- ${WIZARD_RUN_ID:-}"
+                  continue
+                fi
+                total=$((total + size))
+                echo "--- file $name $size --- ${WIZARD_RUN_ID:-}"
+                base64 < "$f"
+              done
+              echo "=== POC FILES END === ${WIZARD_RUN_ID:-}"
+              exit "$rc"
+          env:
+            - name: WIZARD_RUN_ID
+              value: RUN_ID_PLACEHOLDER
+            # The model settings the PoC needs: the key AND where to send it.
+            # gaik's Azure config refuses to start without AZURE_ENDPOINT, so a
+            # key alone made every run die at its first line. Version and
+            # deployment have defaults in gaik; they are passed through so a run
+            # uses the same deployment as the rest of the project when the
+            # Secret sets one. Nothing else from the cluster is exposed — in
+            # particular not the service token or the database URL.
+            - name: AZURE_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_KEY
+                  optional: true
+            - name: AZURE_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_ENDPOINT
+                  optional: true
+            - name: AZURE_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_API_VERSION
+                  optional: true
+            - name: AZURE_DEPLOYMENT
+              valueFrom:
+                secretKeyRef:
+                  name: gaik-demo-api-keys
+                  key: AZURE_DEPLOYMENT
+                  optional: true
+            - name: HOME
+              value: /tmp
+          volumeMounts:
+            - name: workspace
+              mountPath: /workspace
+            - name: tmp
+              mountPath: /tmp
+          securityContext:
+            allowPrivilegeEscalation: false
+            # The image stays immutable; everything the run writes goes to the
+            # two emptyDirs below, which die with the pod.
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+      volumes:
+        # emptyDir, not hostPath and not a PVC: the run gets scratch space that
+        # exists only for the life of the pod and touches no host directory.
+        - name: workspace
+          emptyDir:
+            sizeLimit: 1Gi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 256Mi

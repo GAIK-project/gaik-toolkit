@@ -544,6 +544,9 @@ def test_self_hosted_whisper_stage_needs_no_cloud_audio_credentials(tmp_path, mo
     transcriber = Transcriber(api_config=stage, output_dir=tmp_path / "workspace")
     assert transcriber._resolve_transcription_model() == "whisper_local"
     config["stages"]["transcription"]["transcription_model"] = "gpt-4o-transcribe"
+    # The fork's sandbox runs a stage whose provider has no key on Azure when Azure is
+    # set up (_azure_instead in provider_config); without Azure too, the run stops.
+    monkeypatch.delenv("AZURE_API_KEY")
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
         runner.get_stage_config(config, "transcription")
 

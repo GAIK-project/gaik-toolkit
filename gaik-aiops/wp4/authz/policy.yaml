@@ -1,0 +1,14 @@
+# Role-to-permission table. Configuration, not code: the customer adjusts it.
+# A role listed under "includes" gets all permissions of that role as well.
+roles:
+  viewer:
+    permissions: [solution.read, result.read, dashboard.read]
+  expert:
+    includes: [viewer]
+    permissions: [solution.write, data.upload, job.run, data.export]
+  approver:
+    includes: [viewer]
+    permissions: [result.approve]
+  admin:
+    includes: [viewer]
+    permissions: [config.manage, role.manage, audit.read]

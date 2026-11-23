@@ -1,0 +1,3 @@
+# Sample inputs are kept byte for byte: a line-ending conversion would break a PDF.
+*.pdf -text
+*.txt text eol=lf

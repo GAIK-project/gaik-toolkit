@@ -1,0 +1,26 @@
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      alertmanagerUid: alertmanager
+
+  - name: Alertmanager
+    uid: alertmanager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    jsonData:
+      implementation: prometheus
+
+# The audit store is not provisioned here: it lives in the separate "Security" organisation, which file
+# provisioning cannot create. grafana/setup/security_org.py creates it (see wp4/grafana-oidc.md).
+# Removes the datasource from the main organisation in volumes created before the split.
+deleteDatasources:
+  - name: Audit store
+    orgId: 1

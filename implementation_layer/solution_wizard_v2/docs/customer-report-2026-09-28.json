@@ -1,0 +1,260 @@
+{
+  "title": "Customer test report, 28 September 2026 — what is fixed",
+  "source": "Customer test report of the Rahti staging deployment, 28 September 2026. Findings are referenced by the report's own numbering: 1–22 from the manual session, R1–R9 from the independent AI retest, T1–T9 from the technical section.",
+  "verifiedAgainst": "sync-v1",
+  "note": "Status is what the evidence shows, not what was intended. 'fixed' means at least one named test fails if the finding returns. 'open' means no fix has shipped. Sprint 4 work is listed separately and is not late.",
+  "levels": {
+    "unit": { "label": "Unit (vitest)", "command": "npm run test", "runs": "pr" },
+    "api": { "label": "wizard_api (pytest + Postgres)", "command": "docker-test.sh --step api", "runs": "pr" },
+    "wizard": { "label": "solution_wizard (pytest)", "command": "cd ../solution_wizard && pytest -q", "runs": "pr" },
+    "stack": { "label": "Stack E2E (UI + wizard_api + Postgres)", "command": "docker-test.sh --step stack-e2e", "runs": "push to dev" },
+    "manual": { "label": "Hand-run observation", "command": "—", "runs": "on demand" }
+  },
+  "groups": [
+    {
+      "name": "Gates and progression",
+      "findings": [
+        {
+          "ref": "T4",
+          "text": "Approval gates are not enforced by the server; the status is only computed in the browser",
+          "status": "fixed",
+          "shippedIn": "#187",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_gate_enforcement.py", "name": "test_stepping_past_a_pending_gate_is_refused" },
+            { "level": "api", "file": "../wizard_api/tests/test_session_api.py", "name": "test_patch_cannot_step_past_a_pending_gate" },
+            { "level": "stack", "file": "e2e/gate-enforcement-stack.spec.ts", "name": "the API refuses a step that would pass an unapproved gate" }
+          ]
+        },
+        {
+          "ref": "18, R3",
+          "text": "Typing \"yes\" in the chat passes Gate 1 while the screen still waits for the approval button",
+          "status": "fixed",
+          "shippedIn": "#187",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_gate_enforcement.py", "name": "test_stepping_past_a_pending_gate_is_refused" },
+            { "level": "stack", "file": "e2e/gate-enforcement-stack.spec.ts", "name": "the API refuses a step that would pass an unapproved gate" }
+          ]
+        },
+        {
+          "ref": "18, R1",
+          "text": "The chat runs through Gates 2 and 3 while the screen stays at step 3 of 13",
+          "status": "fixed",
+          "shippedIn": "#187",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_gate_enforcement.py", "name": "test_jumping_over_several_gates_at_once_is_refused" },
+            { "level": "stack", "file": "e2e/gate-enforcement-stack.spec.ts", "name": "a single jump cannot skip several gates at once" }
+          ]
+        },
+        {
+          "ref": "22, R8",
+          "text": "Going back cancels the Gate 1 approval already given",
+          "status": "fixed",
+          "shippedIn": "#187",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_gate_enforcement.py", "name": "test_going_back_and_forward_again_does_not_need_re_approval" },
+            { "level": "api", "file": "../wizard_api/tests/test_session_api.py", "name": "test_going_back_keeps_the_approval_and_the_way_forward" },
+            { "level": "unit", "file": "lib/session-gate-map.test.ts", "name": "keeps an approval the user already gave when they step back below it" },
+            { "level": "stack", "file": "e2e/gate-enforcement-stack.spec.ts", "name": "going back keeps the approval and the way forward" }
+          ]
+        },
+        {
+          "ref": "22 (second half)",
+          "text": "After going back in a finished session, \"Next step\" is blocked with \"Answer the wizard's questions in the chat first\"",
+          "status": "open",
+          "openBecause": "A different mechanism from the gates — the chat-driven advance in the early steps. Needs its own investigation."
+        }
+      ]
+    },
+    {
+      "name": "Language",
+      "findings": [
+        {
+          "ref": "T5",
+          "text": "The UI language is never sent to the AI agent",
+          "status": "fixed",
+          "shippedIn": "#190",
+          "evidence": [
+            { "level": "unit", "file": "app/api/sessions/[id]/chat/route.test.ts", "name": "passes the UI locale to the agent" },
+            { "level": "api", "file": "../wizard_api/tests/test_agent_locale.py", "name": "test_the_bootstrap_pins_the_language_for_a_known_locale" }
+          ]
+        },
+        {
+          "ref": "11, 14",
+          "text": "Finnish and English are mixed in Gate 1, the blueprint and Gate 2",
+          "status": "fixed",
+          "shippedIn": "#190",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_agent_locale.py", "name": "test_the_bootstrap_prompt_carries_the_pin" }
+          ]
+        },
+        {
+          "ref": "17",
+          "text": "The bot answered in Italian",
+          "status": "fixed",
+          "shippedIn": "#190",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_agent_locale.py", "name": "test_the_instruction_overrides_the_language_the_user_writes_in" },
+            { "level": "unit", "file": "app/api/sessions/[id]/chat/route.test.ts", "name": "passes the UI locale to the agent" }
+          ]
+        },
+        {
+          "ref": "R9",
+          "text": "The English UI shows Finnish-only labels on the field list",
+          "status": "fixed",
+          "shippedIn": "#190",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_agent_locale.py", "name": "test_switching_the_ui_language_re_pins_the_agent" }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "The PoC package",
+      "findings": [
+        {
+          "ref": "19, T8",
+          "text": "The download is offered as soon as any file exists; the package has no README and no requirements.txt",
+          "status": "fixed",
+          "shippedIn": "#191",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_poc_package_readiness.py", "name": "test_a_package_with_only_some_files_is_not_ready" },
+            { "level": "api", "file": "../wizard_api/tests/test_poc_endpoints.py", "name": "test_an_incomplete_package_is_not_offered_as_a_download" },
+            { "level": "stack", "file": "e2e/poc-package-gating-stack.spec.ts", "name": "an incomplete package is listed but not downloadable" }
+          ]
+        },
+        {
+          "ref": "R6",
+          "text": "The package can be generated at Gate 2, before anything is approved",
+          "status": "fixed",
+          "shippedIn": "#191",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_poc_endpoints.py", "name": "test_the_package_cannot_be_generated_before_gate_2_is_approved" },
+            { "level": "stack", "file": "e2e/poc-package-gating-stack.spec.ts", "name": "generation is refused until Gate 2 is approved" }
+          ]
+        },
+        {
+          "ref": "19 (button)",
+          "text": "\"Run PoC again\" does not run anything, it only regenerates the same package",
+          "status": "fixed",
+          "shippedIn": "#191",
+          "evidence": [
+            { "level": "stack", "file": "e2e/poc-package-gating-stack.spec.ts", "name": "the button says what it does, and it is not 'run'" }
+          ]
+        },
+        {
+          "ref": "R7",
+          "text": "Invoice lines are stored as one text field; dates and amounts as plain text",
+          "status": "fixed",
+          "shippedIn": "#192",
+          "evidence": [
+            { "level": "wizard", "file": "../solution_wizard/tests/test_nested_schema.py", "name": "test_many_rows_survive_where_one_text_field_used_to_be" },
+            { "level": "wizard", "file": "../solution_wizard/tests/test_nested_schema.py", "name": "test_the_row_fields_are_not_flattened_into_the_parent" },
+            { "level": "wizard", "file": "../solution_wizard/tests/test_nested_schema.py", "name": "test_gaik_validates_the_generated_requirements" }
+          ],
+          "caveat": "The wizard now generates and consumes the nested shape. Whether the agent produces it in a live session depends on the SKILL.md instruction added with it, which cannot be verified without the live agent."
+        }
+      ]
+    },
+    {
+      "name": "Errors and visibility",
+      "findings": [
+        {
+          "ref": "T3",
+          "text": "Errors are hidden and not logged; the agent service has no logging at all",
+          "status": "fixed",
+          "shippedIn": "#189",
+          "evidence": [
+            { "level": "manual", "file": "—", "name": "chat route logs warn on non-ok and error on throw; agent service error paths log" }
+          ],
+          "caveat": "Logging is in place. The chat still substitutes a canned reply when the agent fails, so the user is shown an answer the assistant never wrote — see the open row below."
+        },
+        {
+          "ref": "T3, R2",
+          "text": "When the agent fails, the chat presents a canned mock reply as the assistant's answer",
+          "status": "open",
+          "openBecause": "Removing the fallback changes a contract that two passing tests assert. It is a decision, not a defect fix."
+        },
+        {
+          "ref": "12, 2",
+          "text": "The bot freezes for up to 2–3 minutes with no sign that it is working",
+          "status": "open"
+        }
+      ]
+    },
+    {
+      "name": "Traceability and testing",
+      "findings": [
+        {
+          "ref": "T1",
+          "text": "The code running on Rahti is not in the repository; web and api ran different versions",
+          "status": "fixed",
+          "shippedIn": "#193",
+          "evidence": [
+            { "level": "manual", "file": "—", "name": "deploy.sh refuses a dirty tree and a HEAD on no remote branch; verified in all three states" }
+          ],
+          "caveat": "The version is also shown in the login footer, and both halves of the current deployment now resolve to commits in this repository."
+        },
+        {
+          "ref": "T9",
+          "text": "Automated end-to-end tests are skipped by default, and the nightly acceptance run is on a branch where it never fires",
+          "status": "fixed",
+          "shippedIn": "#193",
+          "evidence": [
+            { "level": "manual", "file": "—", "name": "wizard-v2-acceptance.yml now also triggers on push to dev, which is evaluated from the branch the file is on" }
+          ],
+          "caveat": "The first run of these specs found a regression that had been merged unnoticed, which is the point of the change."
+        }
+      ]
+    },
+    {
+      "name": "Internal terms shown to the user",
+      "findings": [
+        {
+          "ref": "R5",
+          "text": "\"Export to Excel\" is marked as an AI step in the workflow",
+          "status": "fixed",
+          "shippedIn": "#188",
+          "evidence": [
+            { "level": "api", "file": "../wizard_api/tests/test_artifact_sync_step_types.py", "name": "test_an_automated_step_without_a_component_is_not_an_ai_step" },
+            { "level": "api", "file": "../wizard_api/tests/test_artifact_sync_step_types.py", "name": "test_an_unknown_type_is_not_assumed_to_be_ai" }
+          ]
+        },
+        { "ref": "T6", "text": "The agent's instructions tell it to show internal module names, Python types and raw JSON", "status": "open" },
+        { "ref": "4, 15", "text": "Component names, Python types and diagram code appear in the chat", "status": "open" },
+        { "ref": "R4", "text": "Internal values such as accounts_payable are shown on the review screen, and four assumptions cannot be confirmed anywhere", "status": "open" },
+        { "ref": "21", "text": "Developer and placeholder texts are shown to users", "status": "open" }
+      ]
+    },
+    {
+      "name": "Security",
+      "findings": [
+        { "ref": "T2", "text": "Production uses the developer login; two accounts with hard-coded passwords are in the repository", "status": "open", "priority": "highest" },
+        { "ref": "T7", "text": "The agent runs with full permissions including shell commands, driven directly by user chat input", "status": "open", "priority": "highest" }
+      ]
+    },
+    {
+      "name": "Chat and workspace sync",
+      "findings": [
+        { "ref": "R1", "text": "The screen does not follow the conversation; the requirements counter stays at 0 / 0", "status": "open", "openBecause": "The agent writes nothing to disk before Phase 3, so there is nothing for the workspace to follow during gathering. Closing it is a design decision, not a defect fix." },
+        { "ref": "13, R2", "text": "A change agreed in the chat does not reach the review screen", "status": "open", "openBecause": "The sync runs every turn and reads the draft live, so the evidence points at the agent not rewriting its artifact. Needs a live session to confirm." }
+      ]
+    },
+    {
+      "name": "Out of scope by agreement (7 September)",
+      "findings": [
+        { "ref": "3", "text": "Options offered by the bot are not clickable", "status": "descoped" },
+        { "ref": "5", "text": "Too many questions; the conversation is too heavy", "status": "descoped" },
+        { "ref": "7, 8, 10, 20", "text": "Icons, filler text, layout shifts, gate timeline width", "status": "descoped" },
+        { "ref": "9", "text": "The chat panel should be resizable", "status": "descoped" },
+        { "ref": "T3 (tooling)", "text": "Error tracking integration", "status": "descoped" }
+      ]
+    },
+    {
+      "name": "Sprint 4 work, on plan",
+      "findings": [
+        { "ref": "R7 (Excel)", "text": "The generated PoC has no Excel output", "status": "sprint4" },
+        { "ref": "—", "text": "Running the PoC, providing its input, following the logs, refining after a run, downloading a deployable package", "status": "sprint4" }
+      ]
+    }
+  ]
+}

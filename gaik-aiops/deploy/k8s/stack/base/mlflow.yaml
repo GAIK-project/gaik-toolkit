@@ -1,0 +1,67 @@
+# MLflow tracking server. Receives traces from the collector only; no Route or Ingress, since it has no
+# sign-in of its own (OIDC in front is WP4 work).
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  labels: {app.kubernetes.io/name: mlflow}
+spec:
+  selector: {app.kubernetes.io/name: mlflow}
+  ports: [{name: http, port: 5000, targetPort: 5000}]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mlflow-artifacts
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 5Gi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow
+  labels: {app.kubernetes.io/name: mlflow}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: mlflow}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mlflow}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: mlflow
+          image: gaik-aiops/mlflow
+          env:
+            - name: MLFLOW_DB_PASSWORD
+              valueFrom: {secretKeyRef: {name: aiops-db, key: mlflow-password}}
+          args:
+            - mlflow
+            - server
+            - --host=0.0.0.0
+            - --port=5000
+            - --backend-store-uri=postgresql://mlflow:$(MLFLOW_DB_PASSWORD)@postgres:5432/mlflow
+            - --artifacts-destination=/mlartifacts
+            - --allowed-hosts=mlflow:5000,localhost:5000,127.0.0.1:5000
+            # The default four workers exceed the memory limit; two are enough for a pilot.
+            - --workers=2
+          ports: [{containerPort: 5000}]
+          volumeMounts: [{name: artifacts, mountPath: /mlartifacts}]
+          readinessProbe:
+            httpGet: {path: /health, port: 5000}
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {cpu: "1", memory: 2Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: artifacts
+          persistentVolumeClaim: {claimName: mlflow-artifacts}

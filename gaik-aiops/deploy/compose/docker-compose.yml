@@ -1,0 +1,190 @@
+# Local baseline stack. Product choices beyond these open standards are pending.
+name: wp45
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: wp45
+      POSTGRES_PASSWORD: wp45-local-only
+      POSTGRES_DB: observability
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb/00-roles.sql:/docker-entrypoint-initdb.d/00-roles.sql:ro
+      - ./initdb/01-mlflow.sql:/docker-entrypoint-initdb.d/01-mlflow.sql:ro
+      - ../../shared/collection/sql/001_schema.sql:/docker-entrypoint-initdb.d/10-collection-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U wp45 -d observability"]
+      interval: 5s
+      retries: 10
+
+  sink:
+    build: ../../shared/collection/sink
+    environment:
+      COLLECTION_DSN: postgresql://collection_writer:writer-local-only@postgres:5432/observability
+      AUDIT_RETENTION_DAYS: "365"
+      LOG_RETENTION_DAYS: "30"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4319/healthz')"]
+      interval: 5s
+      retries: 10
+
+  prometheus:
+    image: prom/prometheus:v3.2.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-otlp-receiver
+      - --storage.tsdb.retention.time=30d   # placeholder until the customer decides
+    volumes:
+      - ./prometheus:/etc/prometheus:ro
+      - promdata:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 5s
+      retries: 10
+
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    command: ["--config.file=/etc/alertmanager/alertmanager.yml", "--storage.path=/alertmanager"]
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro
+    ports:
+      - "127.0.0.1:9093:9093"
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin-local-only}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_NEWS_NEWS_FEED_ENABLED: "false"
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafanadata:/var/lib/grafana
+    ports:
+      - "127.0.0.1:3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 5s
+      retries: 20
+    depends_on:
+      prometheus:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
+  # "Security" organisation with the audit datasource and dashboards; re-applied every 5 min (see the script).
+  grafana-setup:
+    image: python:3.12-alpine
+    command: ["python", "/setup/security_org.py"]
+    user: "10001"
+    environment:
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_ADMIN_USER: admin
+      GRAFANA_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin-local-only}
+      AUDIT_READER_PASSWORD: reader-local-only
+    volumes:
+      - ./grafana/setup:/setup:ro
+      - ./grafana/dashboards/security:/dashboards/security:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/ready"]
+      interval: 3s
+      retries: 40
+    depends_on:
+      grafana:
+        condition: service_healthy
+
+  # LLM traces, evaluations and feedback (WP5). Receives traces from the collector only, after
+  # pseudonymisation; producers never send to it directly.
+  mlflow:
+    build: ./mlflow
+    command:
+      - mlflow
+      - server
+      - --host=0.0.0.0
+      - --port=5000
+      - --backend-store-uri=postgresql://mlflow:mlflow-local-only@postgres:5432/mlflow
+      - --artifacts-destination=/mlartifacts
+      - --allowed-hosts=mlflow:5000,localhost:5000,127.0.0.1:5000
+    ports:
+      - "127.0.0.1:5000:5000"
+    volumes:
+      - mlartifacts:/mlartifacts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+      interval: 5s
+      retries: 30
+
+  # One experiment per application (service.name) and the collector's routes to them; runs once
+  # before the collector, since MLflow assigns experiment ids itself.
+  mlflow-setup:
+    build: ./mlflow
+    command: ["python", "/opt/setup_experiments.py"]
+    environment:
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      MLFLOW_EXPERIMENTS: ${MLFLOW_EXPERIMENTS:-wizard-v2-api,wizard-v2-web,gaik-poc,example-producer}
+      ROUTES_FILE: /routes/mlflow-routes.yaml
+    volumes:
+      - mlflow-routes:/routes
+    depends_on:
+      mlflow:
+        condition: service_healthy
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.120.0
+    command: ["--config=/etc/otelcol/config.yaml", "--config=/etc/otelcol/generated/mlflow-routes.yaml"]
+    environment:
+      PSEUDONYM_KEY: ${PSEUDONYM_KEY:-local-dev-key}
+      MLFLOW_TRACES_EXPERIMENT_ID: ${MLFLOW_TRACES_EXPERIMENT_ID:-0}
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol/config.yaml:ro
+      - mlflow-routes:/etc/otelcol/generated:ro
+    ports:
+      - "127.0.0.1:4317:4317"   # OTLP gRPC
+      - "127.0.0.1:4318:4318"   # OTLP HTTP
+    depends_on:
+      sink:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+      mlflow-setup:
+        condition: service_completed_successfully
+
+  # Local identity provider for the WP4 OIDC / RBAC spike. Opt in with
+  # --profile identity. Development mode, in-memory store, test users from the realm file.
+  keycloak:
+    profiles: [identity]
+    image: quay.io/keycloak/keycloak:26.1.4
+    command: ["start-dev", "--import-realm", "--http-port=8180", "--hostname=http://localhost:8180", "--health-enabled=true"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: kcadmin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-kcadmin-local-only}
+    volumes:
+      - ./keycloak/gaik-realm.json:/opt/keycloak/data/import/gaik-realm.json:ro
+    ports:
+      - "127.0.0.1:8180:8180"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 30
+
+volumes:
+  mlartifacts:
+  mlflow-routes:
+  pgdata:
+  promdata:
+  grafanadata:

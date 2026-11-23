@@ -1,0 +1,4 @@
+# Python deps for UI-only BPMN generation (scripts/generate_bpmn_from_v2.py,
+# scripts/sync_blueprint_from_bpmn.py). Used when WIZARD_API_URL is unset.
+# Install via: ./scripts/setup.sh  (creates .venv)
+pydantic>=2.0,<3

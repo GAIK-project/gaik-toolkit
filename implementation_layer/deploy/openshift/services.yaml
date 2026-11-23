@@ -1,0 +1,31 @@
+# Cluster-internal Services. Only the web Service is exposed publicly (route.yaml);
+# the API stays ClusterIP and is reached by the frontend at
+# http://NAME_PLACEHOLDER-api:8100. NAME_PLACEHOLDER is the instance prefix
+# deploy.sh substitutes (wizard-v2, or wizard-v2-<instance>).
+apiVersion: v1
+kind: Service
+metadata:
+  name: NAME_PLACEHOLDER-web
+  labels:
+    app: NAME_PLACEHOLDER-web
+spec:
+  selector:
+    app: NAME_PLACEHOLDER-web
+  ports:
+    - port: 3000
+      targetPort: 3000
+      protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: NAME_PLACEHOLDER-api
+  labels:
+    app: NAME_PLACEHOLDER-api
+spec:
+  selector:
+    app: NAME_PLACEHOLDER-api
+  ports:
+    - port: 8100
+      targetPort: 8100
+      protocol: TCP

@@ -1,0 +1,103 @@
+{
+  "uid": "gaik-audit-trail",
+  "title": "Audit trail",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": false,
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "refresh": "1m",
+  "tags": [
+    "gaik",
+    "security",
+    "audit"
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Denied and failed events",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "audit-store"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "audit-store"
+          },
+          "editorMode": "code",
+          "format": "time_series",
+          "rawQuery": true,
+          "rawSql": "SELECT $__timeGroupAlias(event_time, '5m'), event_name AS metric, count(*) AS value\nFROM collection.audit_events\nWHERE $__timeFilter(event_time) AND outcome IN ('denied', 'error')\nGROUP BY 1, 2 ORDER BY 1"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "table",
+      "title": "Events by name and outcome",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "audit-store"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "audit-store"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT event_name, outcome, count(*) AS events\nFROM collection.audit_events\nWHERE $__timeFilter(event_time)\nGROUP BY 1, 2 ORDER BY 3 DESC"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "table",
+      "title": "Latest events",
+      "datasource": {
+        "type": "grafana-postgresql-datasource",
+        "uid": "audit-store"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-postgresql-datasource",
+            "uid": "audit-store"
+          },
+          "editorMode": "code",
+          "format": "table",
+          "rawQuery": true,
+          "rawSql": "SELECT event_time, service_name, event_name, outcome, actor_pseudo_id, client_address,\n       resource_type, resource_id, trace_id\nFROM collection.audit_events\nWHERE $__timeFilter(event_time)\nORDER BY event_time DESC LIMIT 200"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+# Code scanning with CodeQL: security bugs in this repository's own code
+# (Python, TypeScript/JavaScript and the GitHub Actions workflows). The
+# security job in solution-wizard-v2.yml covers dependencies, images and
+# credentials; this covers what we write. No account or secret is needed:
+# code scanning is free for public repositories.
+#
+# Results are in the repository's Security tab (Code scanning) and as
+# annotations on pull requests. If CodeQL's "default setup" is switched on in
+# the repository settings, this workflow's upload is refused; switch it off.
+name: codeql
+
+on:
+  pull_request:
+    branches: [develop, release/wizard-v2]
+  push:
+    branches: [develop, release/wizard-v2]
+  # Weekly, for new queries on unchanged code. GitHub runs schedules only from
+  # the default branch (release/wizard-v2).
+  schedule:
+    - cron: "30 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript, actions]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+          queries: security-extended
+          config-file: ./.github/codeql/codeql-config.yml
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}

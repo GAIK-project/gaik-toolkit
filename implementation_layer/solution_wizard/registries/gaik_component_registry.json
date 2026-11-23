@@ -232,7 +232,8 @@
       "Embedder",
       "VectorStore",
       "Retriever",
-      "AnswerGenerator"
+      "AnswerGenerator",
+      "VectorStore"
     ],
     "required_parameters": [],
     "optional_parameters": [

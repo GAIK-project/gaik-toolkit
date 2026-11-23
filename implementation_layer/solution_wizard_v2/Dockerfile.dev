@@ -1,0 +1,17 @@
+# Dev + test image (vitest, eslint, playwright, next dev)
+FROM node:22-bookworm
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Playwright browsers for E2E inside Docker
+RUN npx playwright install chromium --with-deps
+
+COPY . .
+
+ENV NEXT_TELEMETRY_DISABLED=1
+EXPOSE 3000
+
+CMD ["npm", "run", "dev", "--", "-H", "0.0.0.0", "-p", "3000"]

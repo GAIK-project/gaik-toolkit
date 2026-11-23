@@ -1,0 +1,1369 @@
+@import "tailwindcss";
+
+@theme {
+  /* --- Ground: a cool paper white, tinted towards the logo's blue. The page
+     a user works on is `surface`; `app` is the sidebar and the ground outside
+     the shell. Text pairs are 4.5:1 or better on all three. --- */
+  --color-app: #f4f6fb;
+  --color-surface: #ffffff;
+  --color-surface-muted: #ebeef6;
+  --color-border: #e0e4ee;
+  --color-border-strong: #c6ccdb;
+  /* The edge of a small control that stands among text (a chip, an option, an
+     inline action): 3:1 on the three grounds, so the edge alone says "press". */
+  --color-border-control: #8791a7;
+  --color-text: #111b28;
+  --color-text-strong: #05080b;
+  --color-text-secondary: #333d4f;
+  --color-text-muted: #566076;
+
+  /* --- The one accent: the blue the GAIK logo starts from. Hover and press
+     darken it, so white text on it gains contrast (4.8, 5.7, 7.1:1). --- */
+  --color-brand: #0277c0;
+  --color-brand-hover: #016aad;
+  --color-brand-active: #015c97;
+  --color-brand-strong: #0b71bd;
+  --color-brand-soft: #e6f1fa;
+  --color-brand-soft-border: #b8d9f0;
+  --color-brand-text: #045d97;
+  --color-on-brand: #ffffff;
+
+  /* --- Process step types: data in or out, AI (the purple the logo ends
+     in), a person. Each carries white text on a number badge (4.5:1 or
+     better) and is told from the others. --- */
+  --color-step-io: #46576c;
+  --color-step-ai: #8a2387;
+  --color-step-human: #b4541a;
+
+  /* --- Status: success --- */
+  --color-success-bg: #e6f4e3;
+  --color-success-border: #a9d6a3;
+  --color-success-text: #2f7a2b;
+  /* --- Status: warning --- */
+  --color-warning-bg: #fdf3d9;
+  --color-warning-border: #e6cf8f;
+  --color-warning-text: #8a6a12;
+  /* --- Status: danger --- */
+  --color-danger-bg: #fbe6e5;
+  --color-danger-border: #edb3b1;
+  --color-danger-text: #c0322f;
+  /* --- Status: info / running --- */
+  --color-info-bg: #e2eff2;
+  --color-info-border: #b3d6e0;
+  --color-info-text: #056b8a;
+  /* --- Status: neutral / locked --- */
+  --color-neutral-bg: #ebeef6;
+  --color-neutral-border: #e0e4ee;
+  --color-neutral-text: #566076;
+
+  /* --- Terminal (PoC logs) — kept dark for contrast --- */
+  --color-term-bg: #14181f;
+  --color-term-text: #e6e8e3;
+  --color-term-muted: #9aa4ac;
+  --color-term-ok: #34d399;
+  --color-term-err: #f2909a;
+
+  /* --- Layout (4px grid) --- */
+  --width-sidebar: 16.5rem; /* 264px */
+  --width-chat: 24rem; /* 384px */
+  --width-chat-wide: 32rem; /* 512px — gathering/Q&A, chat is the focus */
+  --width-chat-rail: 3.25rem; /* 52px */
+  --width-step-cell: 6rem; /* 96px */
+
+  /* --- Radius --- */
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* --- Shadows (for light background) --- */
+  --shadow-xs: 0 1px 2px 0 rgb(17 27 40 / 0.06);
+  --shadow-sm: 0 1px 3px 0 rgb(17 27 40 / 0.08), 0 1px 2px -1px rgb(17 27 40 / 0.06);
+  --shadow-md: 0 4px 12px -2px rgb(17 27 40 / 0.10), 0 2px 6px -2px rgb(17 27 40 / 0.08);
+  --shadow-lg: 0 12px 32px -8px rgb(17 27 40 / 0.14);
+
+  /* --- Motion: what answers a press settles quickly and does not bounce.
+     Named apart from --ease-out, which Tailwind's own utilities use. --- */
+  --ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* --- Fonts --- */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+
+html,
+body {
+  background: var(--color-app);
+  color: var(--color-text-secondary);
+  font-family: var(--font-sans);
+  letter-spacing: -0.011em;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.chat-bg {
+  background: var(--color-surface);
+}
+
+/* Thin scrollbars on app surfaces: still there to grab, but quiet. */
+.scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong) transparent;
+}
+
+*:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(2 119 192 / 0.30);
+  border-color: var(--color-brand-strong);
+}
+
+::selection {
+  background: var(--color-brand-soft-border);
+  color: var(--color-text-strong);
+}
+
+/* A field inside a box that shows the focus itself (the chat input) draws no
+   ring of its own. The rule above sits outside the cascade layers, so it beats
+   any utility class; this override has to sit outside them too. */
+.focus-in-box:focus-visible {
+  box-shadow: none;
+  border-color: transparent;
+}
+
+/* A control in a row that clips its overflow (the workspace tabs scroll
+   sideways) draws its ring inside itself, where it is not cut off. */
+.focus-inset:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Tailwind leaves a button with the arrow cursor. Here what can be pressed
+   says so under the pointer; a utility (disabled:cursor-not-allowed) still wins. */
+@layer base {
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  [role="tab"]:not([aria-disabled="true"]),
+  [role^="menuitem"]:not([aria-disabled="true"]),
+  summary,
+  select,
+  input[type="checkbox"],
+  input[type="radio"],
+  label:has(> input[type="checkbox"], > input[type="radio"]) {
+    cursor: pointer;
+  }
+}
+
+@layer components {
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .skip-link {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border-width: 0;
+  }
+
+  .skip-link:focus {
+    position: fixed;
+    top: 1rem;
+    left: 1rem;
+    z-index: 50;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0.5rem 1rem;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    border-width: 1px;
+    @apply rounded-md bg-surface text-text shadow-md border-border;
+  }
+
+  .field-label {
+    @apply block text-sm font-medium text-text-secondary mb-1.5;
+  }
+
+  .input-field {
+    @apply w-full rounded-md bg-surface border border-border-strong px-3 py-2 text-sm text-text placeholder:text-text-muted transition-colors hover:border-text-muted focus:outline-none focus:border-brand;
+  }
+
+  /* One solid primary: the logo's gradient stays in the logo. */
+  .btn-brand {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-brand px-4 py-2 text-sm font-medium text-on-brand shadow-xs transition-[background-color,transform] duration-150 hover:bg-brand-hover active:scale-[0.98] active:bg-brand-active disabled:cursor-not-allowed disabled:opacity-50 disabled:shadow-none disabled:active:scale-100;
+  }
+
+  /* Flat: a border is enough. Only the primary button and what a press
+     opened are lifted off the page. */
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md bg-surface px-4 py-2 text-sm font-medium text-text-secondary border border-border-strong transition-[background-color,border-color,color,transform] duration-150 hover:bg-surface-muted hover:text-text hover:border-text-muted active:scale-[0.98] disabled:bg-surface-muted/50 disabled:text-text-muted disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md border border-border-strong px-4 py-2 text-sm font-medium text-text transition-[border-color,color,transform] duration-150 hover:border-brand hover:text-brand-strong active:scale-[0.98] disabled:border-border disabled:text-text-muted disabled:cursor-not-allowed disabled:active:scale-100;
+  }
+
+  /* An icon-only control: give it aria-label and title. */
+  .icon-btn {
+    @apply inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-text-muted transition-[background-color,color,transform] duration-150 hover:bg-surface-muted hover:text-text active:scale-95 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  /* --- Small controls that stand among content. One look for each kind, so
+     what can be pressed is told from the text and the status marks around it:
+     an edge that is seen, a fill under the pointer, 32 px tall under a mouse
+     and 44 px under a finger. Their chosen state follows aria-pressed (or
+     aria-expanded), so what is drawn and what is announced cannot differ. --- */
+
+  /* An action beside the thing it acts on ("Answer in the chat", "Change",
+     "Skip"). data-tone="brand" marks the one to press next; "quiet" is for a
+     column of the same action, one on every row, where the full edge thirteen
+     times over would be louder than the rows themselves. */
+  .btn-inline {
+    @apply inline-flex min-h-8 shrink-0 items-center justify-center gap-1.5 rounded-md border border-border-control bg-surface px-2.5 py-1 text-xs font-medium text-text-secondary transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text aria-expanded:border-brand aria-expanded:bg-brand-soft aria-expanded:text-brand-text disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 pointer-coarse:min-h-11 pointer-coarse:px-3;
+  }
+
+  .btn-inline[data-tone="brand"] {
+    @apply border-brand bg-brand-soft text-brand-text hover:bg-brand-soft-border/70;
+  }
+
+  .btn-inline[data-tone="quiet"] {
+    @apply border-border-strong hover:border-brand;
+  }
+
+  /* A chip: a choice that is on or off (an example, a start choice's menu). */
+  .chip {
+    @apply inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-border-control bg-surface px-3 py-1 text-xs font-medium text-text transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft hover:text-brand-text active:scale-[0.97] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text aria-expanded:border-brand aria-expanded:bg-brand-soft aria-expanded:text-brand-text disabled:cursor-not-allowed disabled:opacity-50 disabled:active:scale-100 pointer-coarse:min-h-11 pointer-coarse:px-3.5;
+  }
+
+  /* A chip that still waits for its choice ("Taustasi") is quieter than one
+     that shows a choice. */
+  .chip[data-empty] {
+    @apply text-text-secondary;
+  }
+
+  /* One of the answers a question offers: a mark that fills when it is chosen,
+     then its words. Not a pill, so it is not read as a tag. */
+  .choice {
+    @apply inline-flex min-h-8 max-w-full items-center gap-2 rounded-lg border border-border-control bg-surface py-1 pl-2 pr-3 text-left text-[0.8125rem] leading-5 text-text transition-[background-color,border-color,color,transform] duration-150 ease-out hover:border-brand hover:bg-brand-soft active:scale-[0.98] aria-pressed:border-brand aria-pressed:bg-brand-soft aria-pressed:text-brand-text disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100 pointer-coarse:min-h-11;
+  }
+
+  .choice-mark {
+    @apply flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-border-control bg-surface text-transparent transition-[background-color,border-color,color] duration-150 ease-out;
+  }
+
+  .choice:hover .choice-mark {
+    @apply border-brand;
+  }
+
+  .choice[aria-pressed="true"] .choice-mark {
+    @apply border-brand bg-brand text-on-brand;
+  }
+
+  /* A control smaller than a finger keeps its size and is pressed from 44 px
+     around its middle on a touch screen. Opt-in, for a control that stands
+     alone: on buttons set side by side (a step's up and down, a toolbar) the
+     areas would overlap and a press on one's edge would go to its neighbour. */
+  @media (pointer: coarse) {
+    .hit-area {
+      position: relative;
+    }
+
+    .hit-area::after {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: max(100%, 2.75rem);
+      height: max(100%, 2.75rem);
+      transform: translate(-50%, -50%);
+    }
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-success-bg border-success-border text-success-text;
+  }
+
+  .badge-info {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-info-bg border-info-border text-info-text;
+  }
+
+  .badge-warning {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium bg-warning-bg border-warning-border text-warning-text;
+  }
+
+  /* bpmn-js canvas: one look, drawn from the app's own tokens. */
+  .bpmn-viewer-themed .djs-overlays {
+    pointer-events: none;
+  }
+
+  .bpmn-viewer-themed .djs-overlays .djs-overlay-html {
+    pointer-events: auto;
+  }
+
+  /* The read-only viewer draws lane names as overlay captions, so it hides the native
+     ones; the modeler has no captions and keeps bpmn-js's own lane names. */
+  .bpmn-viewer-themed:not(.bpmn-editable) [data-element-id^="Lane_"] > .djs-visual text {
+    visibility: hidden !important;
+  }
+
+  /* The read-only viewer has no editing tools; the modeler (.bpmn-editable) keeps
+     its palette and context pad so the diagram can be edited on the canvas. */
+  .bpmn-viewer-themed:not(.bpmn-editable) .djs-palette,
+  .bpmn-viewer-themed:not(.bpmn-editable) .djs-context-pad {
+    display: none !important;
+  }
+
+  .bpmn-viewer-themed .djs-container {
+    background-color: var(--color-surface) !important;
+    background-image: radial-gradient(circle, rgb(17 27 40 / 0.07) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .bpmn-viewer-themed [data-element-id^="Lane_"] > .djs-visual rect {
+    fill: color-mix(in srgb, var(--color-surface-muted) 35%, transparent) !important;
+    stroke: var(--color-border-strong) !important;
+    stroke-width: 1px !important;
+  }
+
+  .bpmn-viewer-themed [data-element-id="Participant_main"] > .djs-visual rect {
+    fill: transparent !important;
+    stroke: var(--color-border-strong) !important;
+    stroke-width: 1.5px !important;
+  }
+
+  .bpmn-viewer-themed .djs-connection .djs-visual path {
+    stroke: var(--color-text-muted) !important;
+    stroke-width: 1.5px !important;
+  }
+
+  .bpmn-viewer-themed .djs-connection path[stroke-dasharray] {
+    opacity: 0.6 !important;
+    stroke-width: 1.25px !important;
+  }
+
+  .bpmn-viewer-themed .bpmn-caption {
+    background: color-mix(in srgb, var(--color-surface) 96%, transparent);
+    border-color: var(--color-border-strong);
+    color: var(--color-text-strong);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .bpmn-viewer-themed .bpmn-caption--step-above {
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    color: var(--color-text-strong);
+  }
+
+  .bpmn-viewer-themed .bpmn-caption--step-above .bpmn-caption__line--component {
+    color: var(--color-brand-text);
+  }
+
+  .bpmn-viewer-themed .bpmn-caption--lane {
+    color: var(--color-brand-text);
+    background: transparent;
+    border: none;
+    box-shadow: none;
+  }
+
+  .bpmn-viewer-themed .gaik-task-shape {
+    filter: drop-shadow(0 1px 3px rgb(17 27 40 / 0.12));
+  }
+
+  /* Data objects & associations — de-emphasize metadata clutter */
+  .bpmn-viewer-themed [data-element-id^="DataObjectRef"] {
+    opacity: 0.75;
+  }
+
+  /* Step captions of the read-only viewer: structure; colours above. */
+  .bpmn-caption {
+    display: block;
+    padding: 3px 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 1.25;
+    letter-spacing: 0.01em;
+    text-align: center;
+    pointer-events: auto;
+    position: relative;
+    cursor: help;
+    box-sizing: border-box;
+  }
+
+  .bpmn-caption--step-above {
+    display: block;
+    padding: 0 4px;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.4;
+    letter-spacing: 0.01em;
+    text-align: center;
+    pointer-events: none;
+    cursor: default;
+  }
+
+  .bpmn-caption--step-above .bpmn-caption__line {
+    display: block;
+    white-space: normal;
+    word-break: break-word;
+    overflow: visible;
+    text-overflow: unset;
+  }
+
+  .bpmn-caption--step-above .bpmn-caption__line--component {
+    margin-top: 4px;
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  .bpmn-caption--lane {
+    display: block;
+    text-align: center;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+    padding: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    pointer-events: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .bpmn-caption__text {
+    display: block;
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    word-break: break-word;
+  }
+
+  .bpmn-caption[data-tooltip]:hover::after,
+  .bpmn-caption[data-tooltip]:focus-visible::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    transform: translateX(-50%);
+    min-width: 140px;
+    max-width: 280px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--color-text-strong);
+    border: 1px solid var(--color-text-strong);
+    color: var(--color-surface);
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.45;
+    white-space: normal;
+    text-align: center;
+    text-transform: none;
+    letter-spacing: normal;
+    z-index: 300;
+    box-shadow: var(--shadow-md);
+    pointer-events: none;
+  }
+
+  .bpmn-toolbar-btn {
+    @apply inline-flex h-8 min-w-8 items-center justify-center rounded-md px-2 text-base font-semibold text-text-secondary transition-colors hover:bg-surface-muted hover:text-text-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand;
+  }
+}
+
+/* bpmn-js's own stylesheet is unlayered, and an unlayered rule beats any layered one, so
+   the rest of the diagram's styles sit outside @layer: the colours diagram-js reads
+   from variables, the Workflow tab's palette and the floating panels. */
+.bpmn-viewer-themed .djs-parent {
+  --element-selected-outline-stroke-color: var(--color-brand);
+  --element-selected-outline-secondary-stroke-color: var(--color-brand-soft-border);
+  --element-hover-outline-fill-color: var(--color-brand);
+  --lasso-stroke-color: var(--color-brand);
+  --palette-entry-color: var(--color-text-secondary);
+  --palette-entry-hover-color: var(--color-brand-text);
+  --palette-entry-selected-color: var(--color-brand);
+  --context-pad-entry-hover-background-color: var(--color-surface-muted);
+}
+
+/* bpmn-js focuses the canvas on a click, for its keys (Delete, Ctrl+Z), and the
+   browser drew its own thick outline round the whole diagram. A click shows
+   nothing; keyboard focus shows the brand ring the rest of the page uses. */
+.bpmn-viewer-themed .djs-container svg:focus {
+  outline: none;
+}
+.bpmn-viewer-themed .djs-container svg:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: -2px;
+}
+
+/* The palette holds the two tools a save keeps ("Lisää tehtävä", "Yhdistä"): a small
+   bar in the canvas's corner, like the zoom controls opposite it. */
+.bpmn-editable .djs-palette {
+  left: 12px;
+  top: 12px;
+  width: auto;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+.bpmn-editable .djs-palette .entry,
+.bpmn-editable .djs-palette .djs-palette-toggle {
+  width: 32px;
+  height: 32px;
+  line-height: 32px;
+  font-size: 20px;
+  border-radius: 6px;
+}
+.bpmn-editable .djs-palette .entry {
+  float: none;
+  display: block;
+  transition: background-color 150ms ease-out;
+}
+.bpmn-editable .djs-palette .entry:hover {
+  background: var(--color-surface-muted);
+}
+.bpmn-editable .djs-palette .separator {
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+/* A phone has no room for the tools; the diagram is for reading there. */
+@media (max-width: 767px) {
+  .bpmn-editable .djs-palette {
+    display: none;
+  }
+}
+
+/* The Workflow tab's simple flow (React Flow, components/workflow-flow-view): the canvas
+   dotted like the BPMN one, the arrows in the app's colours. A node's handles are there
+   only for React Flow to draw the arrows between; nothing is connected by hand. */
+.simple-flow {
+  background-color: var(--color-surface);
+  background-image: radial-gradient(circle, rgb(17 27 40 / 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.simple-flow .react-flow {
+  --xy-edge-stroke: var(--color-text-muted);
+  --xy-edge-stroke-width: 1.5;
+  --xy-attribution-background-color: transparent;
+}
+.simple-flow .react-flow__handle {
+  opacity: 0;
+}
+
+/* Small floating panels (a step's properties, the save status, the undo note)
+   ease in, from --pop-from: a menu that opens under its control comes from
+   above it (components/chat-start). */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--pop-from, 4px));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pop-in {
+  animation: pop-in 180ms ease-out;
+}
+
+/* Rendered markdown inside assistant chat bubbles (lib/markdown.ts). Kept
+   compact for the narrow chat column; wide tables scroll rather than overflow. */
+.chat-md-body > :first-child {
+  margin-top: 0;
+}
+.chat-md-body > :last-child {
+  margin-bottom: 0;
+}
+.chat-md-body h3,
+.chat-md-body h4,
+.chat-md-body h5,
+.chat-md-body h6 {
+  font-weight: 700;
+  font-size: 0.95em;
+  line-height: 1.3;
+  margin: 0.55em 0 0.25em;
+  color: var(--color-text);
+}
+.chat-md-body p {
+  margin: 0.4em 0;
+}
+.chat-md-body ul,
+.chat-md-body ol {
+  margin: 0.35em 0;
+  padding-left: 1.25em;
+}
+/* Preflight takes list markers away; a round of questions needs them back,
+   and room between them, to read as separate questions. */
+.chat-md-body ul {
+  list-style: disc;
+}
+.chat-md-body ol {
+  list-style: decimal;
+}
+.chat-md-body li {
+  margin: 0.12em 0;
+}
+/* A list under an item (the options under a question) sits close to it. */
+.chat-md-body li > ul,
+.chat-md-body li > ol {
+  margin: 0.2em 0 0.1em;
+}
+.chat-md-body li > ul > li + li,
+.chat-md-body li > ol > li + li {
+  margin-top: 0.15em;
+}
+.chat-md-body li + li {
+  margin-top: 0.45em;
+}
+.chat-md-body li::marker {
+  color: var(--color-text-muted);
+}
+.chat-md-body strong {
+  font-weight: 700;
+}
+.chat-md-body a {
+  color: var(--color-brand-text);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* A link that leaves the wizard: an arrow, then where it goes, not underlined
+   (an inline block does not take its link's underline). */
+.chat-md-body .chat-link-icon {
+  display: inline-block;
+  margin-left: 0.2em;
+  vertical-align: -0.05em;
+}
+.chat-md-body .chat-link-host {
+  display: inline-block;
+  margin-left: 0.3em;
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+}
+.chat-md-body code {
+  background: rgba(17, 27, 40, 0.07);
+  padding: 0.05em 0.35em;
+  border-radius: 4px;
+  font-size: 0.88em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.chat-md-body pre {
+  background: rgba(17, 27, 40, 0.07);
+  padding: 0.6em 0.7em;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.chat-md-body pre code {
+  background: none;
+  padding: 0;
+}
+.chat-md-body hr {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 0.6em 0;
+}
+.chat-md-body .md-table-wrap {
+  overflow-x: auto;
+  margin: 0.5em 0;
+}
+.chat-md-body table {
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+.chat-md-body th,
+.chat-md-body td {
+  border: 1px solid var(--color-border);
+  padding: 0.3em 0.5em;
+  text-align: left;
+  white-space: nowrap;
+}
+.chat-md-body th {
+  font-weight: 700;
+  background: rgba(17, 27, 40, 0.04);
+}
+
+/* The chat as a bottom sheet on a phone (chat-dock): it rises into place. */
+@utility sheet-in {
+  animation: sheet-in 220ms var(--ease-glide);
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+/* Movement only: a sheet whose animation does not run (a background tab)
+   is still fully drawn, 24 px lower at worst. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+  }
+  to {
+    transform: none;
+  }
+}
+
+/* What the wizard is doing while a reply is on its way, as shimmering text. */
+@keyframes text-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+.shimmer-text {
+  background-image: linear-gradient(
+    90deg,
+    var(--color-text-muted) 35%,
+    var(--color-text) 50%,
+    var(--color-text-muted) 65%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: text-shimmer 1.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .shimmer-text {
+    animation: none;
+    background-image: none;
+    color: var(--color-text-muted);
+  }
+}
+
+/* A GAIK component's name in a reply (lib/component-links): text with a dotted
+   underline, and a small card that opens on hover, on keyboard focus and
+   after a press. The card is placed by chat-markdown in viewport pixels. */
+.chat-md-body .cmp-name {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 3px;
+  text-decoration: underline dotted var(--color-text-muted);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  transition: text-decoration-color 150ms ease-out, color 150ms ease-out;
+}
+.chat-md-body .cmp-name:hover,
+.chat-md-body .cmp[data-open] > .cmp-name {
+  color: var(--color-brand-text);
+  text-decoration-color: currentColor;
+}
+.chat-md-body .cmp-card {
+  display: none;
+  position: fixed;
+  z-index: 30;
+  left: 0;
+  top: 0;
+  width: max-content;
+  max-width: 18rem;
+  /* Clear of the name on both sides, and still under the pointer on the way
+     from the name to the card. */
+  padding: 0.3rem 0;
+  /* The card is not part of the sentence or the table cell it sits in. */
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.45;
+  white-space: normal;
+  text-align: left;
+}
+@media (hover: hover) {
+  .chat-md-body .cmp:hover > .cmp-card {
+    display: block;
+  }
+}
+.chat-md-body .cmp[data-focus] > .cmp-card,
+.chat-md-body .cmp[data-open] > .cmp-card {
+  display: block;
+}
+/* Esc closes the card until the pointer or the focus has left the name. */
+.chat-md-body .cmp[data-dismissed]:not([data-open]) > .cmp-card {
+  display: none;
+}
+.chat-md-body .cmp-card-box {
+  display: block;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-md);
+  color: var(--color-text-secondary);
+  animation: cmp-card-in 160ms ease-out;
+}
+.chat-md-body .cmp-card-name {
+  display: block;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow-wrap: anywhere;
+}
+.chat-md-body .cmp-card-line {
+  display: block;
+  margin-top: 0.15rem;
+}
+.chat-md-body .cmp-card-docs {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-weight: 500;
+}
+@keyframes cmp-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-md-body .cmp-card-box {
+    animation: none;
+  }
+}
+
+/* The message field grows and shrinks with its text as one movement
+   (lib/field-grow), not a line at a time. */
+textarea[data-autogrow] {
+  transition: height 160ms cubic-bezier(0.2, 0, 0, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  textarea[data-autogrow] {
+    transition: none;
+  }
+}
+
+/* The AI notice (AI Act art. 50): fine print, and a notice that wraps breaks
+   into even lines. Under the message field (the chat that is the page) it
+   starts where the field's text starts; in the docked chat's header it is the
+   title's second line. Styled by its test id for now: the element's own line
+   is being changed in another open pull request. */
+form [data-testid="chat-ai-notice"] {
+  padding-inline: 0.9375rem;
+}
+[data-testid="chat-ai-notice"] {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+  text-wrap: balance;
+}
+
+/* A mermaid diagram the wizard drew in the chat, at its natural size but no
+   taller than about 320 px; "Suurenna" opens it whole. */
+.chat-diagram {
+  position: relative;
+  margin: 0.5rem 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  background: var(--color-surface);
+  overflow: hidden;
+}
+.chat-diagram-picture {
+  max-height: 20rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.75rem;
+}
+.chat-diagram-picture svg {
+  display: block;
+  max-width: none;
+  height: auto;
+  margin: 0 auto;
+}
+/* A cut-off picture fades out above its bar, so it reads as "there is more". */
+.chat-diagram.is-clipped .chat-diagram-bar::before {
+  content: "";
+  position: absolute;
+  inset-inline: 0;
+  bottom: 100%;
+  height: 3rem;
+  background: linear-gradient(to bottom, transparent, var(--color-surface));
+  pointer-events: none;
+}
+.chat-diagram-bar {
+  position: relative;
+  display: flex;
+  justify-content: flex-end;
+  border-top: 1px solid var(--color-border);
+  padding: 0.25rem 0.375rem;
+}
+.chat-diagram-expand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border-radius: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out;
+}
+.chat-diagram-expand:hover {
+  background: var(--color-surface-muted);
+  color: var(--color-text);
+}
+.chat-diagram.is-whole .chat-diagram-bar {
+  display: none;
+}
+/* Stands in for a diagram while it is still being written or drawn. */
+.chat-diagram-pending {
+  margin: 0.5rem 0;
+}
+.chat-diagram-drawing {
+  display: flex;
+  align-items: center;
+  min-height: 3rem;
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+.chat-md-body .chat-diagram-pending p.chat-diagram-drawing {
+  margin: 0;
+}
+
+/* The full-size diagram (chat-markdown), above everything else. */
+.chat-diagram-dialog {
+  margin: auto;
+  width: fit-content;
+  min-width: min(92vw, 24rem);
+  max-width: min(96vw, 75rem);
+  max-height: 90dvh;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+}
+.chat-diagram-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  animation: chat-dialog-in 180ms ease-out;
+}
+.chat-diagram-dialog::backdrop {
+  background: rgb(17 27 40 / 0.4);
+  animation: chat-backdrop-in 180ms ease-out;
+}
+.chat-diagram-full {
+  min-height: 0;
+  overflow: auto;
+  padding: 1.25rem;
+}
+.chat-diagram-full svg {
+  display: block;
+  max-width: none;
+  height: auto;
+  margin: 0 auto;
+}
+@keyframes chat-dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+@keyframes chat-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The approve button at a gate, as the bar appears and when the wizard has
+   finished a reply there: two soft rings, then still. */
+.gate-nudge {
+  animation: gate-nudge 1.1s ease-out 0.4s 2;
+}
+@keyframes gate-nudge {
+  from {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-brand) 45%, transparent);
+  }
+  to {
+    box-shadow: 0 0 0 12px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-nudge {
+    animation: none;
+  }
+}
+
+/* "Show me" in the chat points at the approve button: a ring around it that
+   comes in on that press and goes out about 1.5 s later (data-pointed). */
+.gate-point {
+  position: relative;
+}
+.gate-point::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border-radius: 10px;
+  border: 2px solid var(--color-brand);
+  opacity: 0;
+  transform: scale(1.06);
+  transition:
+    opacity 240ms ease-out,
+    transform 240ms ease-out;
+  pointer-events: none;
+}
+.gate-point[data-pointed]::after {
+  opacity: 1;
+  transform: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .gate-point::after {
+    display: none;
+  }
+}
+
+/* A reference chip as it comes in above the chat's field. */
+.chat-chip-in {
+  animation: chat-chip-in 160ms ease-out;
+}
+@keyframes chat-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-diagram-dialog[open],
+  .chat-diagram-dialog::backdrop,
+  .chat-chip-in {
+    animation: none;
+  }
+}
+
+/* What a press opened, as it comes in under the control that opened it: a
+   stage's steps in the timeline, the approval under the wizard's reply, the
+   output fields on the Blueprint tab. */
+.reveal-in {
+  animation: reveal-in 240ms var(--ease-glide);
+}
+@keyframes reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .reveal-in {
+    animation: none;
+  }
+}
+
+/* --- The shell: the sidebar with the sessions --------------------------- */
+
+/* Below the desktop layout the sidebar is a drawer over the page. Closed, it
+   is off the screen and hidden, so it is out of the tab order and out of the
+   accessibility tree; it stays visible for as long as it takes to slide out. */
+@media (max-width: 1023.98px) {
+  .sidebar {
+    transition:
+      transform 240ms var(--ease-glide),
+      visibility 0s;
+  }
+
+  .sidebar:not([data-open]) {
+    transform: translateX(-100%);
+    visibility: hidden;
+    transition:
+      transform 200ms ease-in,
+      visibility 0s linear 200ms;
+  }
+}
+
+/* The page under an open drawer, dimmed; a press on it closes the drawer. */
+.sidebar-scrim {
+  background: rgb(17 27 40 / 0.4);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0s linear 200ms;
+}
+
+.sidebar-scrim[data-open] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar:not([data-open]),
+  .sidebar-scrim,
+  .sidebar-scrim[data-open] {
+    transition: none;
+  }
+}
+
+/* With a mouse, a row's actions button shows on hover and on keyboard focus,
+   on the open session's row and while its menu is open; a touch screen has no
+   hover, so there it stays visible. The row's name keeps the button's room
+   only while the button is there, so a name is not cut short for nothing. */
+.session-row-title {
+  padding-right: 2rem;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .session-row-actions {
+    opacity: 0;
+  }
+
+  .session-row-title {
+    padding-right: 0;
+  }
+
+  .session-row:hover .session-row-actions,
+  .session-row:focus-within .session-row-actions,
+  .session-row[data-active] .session-row-actions,
+  .session-row:has(:popover-open) .session-row-actions {
+    opacity: 1;
+  }
+
+  .session-row:hover .session-row-title,
+  .session-row:focus-within .session-row-title,
+  .session-row[data-active] .session-row-title,
+  .session-row:has(:popover-open) .session-row-title {
+    padding-right: 2rem;
+  }
+}
+
+/* A row's menu is a native popover, drawn above the sidebar's scroll box. The
+   browser centres a popover in the window; this one stands at its button,
+   where the script that opens it puts it (components/session-row-menu). */
+.row-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  min-width: 11rem;
+  padding: 0.25rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  box-shadow: var(--shadow-md);
+}
+
+.row-menu:popover-open {
+  animation: pop-in 180ms var(--ease-glide);
+}
+
+/* The spinner on a pressed row waits a moment: a page that opens at once
+   shows none. */
+@keyframes session-opening-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.session-opening {
+  animation: session-opening-in 150ms ease-out 150ms backwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-opening {
+    animation: none;
+  }
+}
+
+/* Cases: the open case and the question in a row arrive with a short rise, so
+   a switch of case reads as one, and are simply there with reduced motion. */
+.case-in {
+  animation: case-in 240ms var(--ease-glide);
+}
+@keyframes case-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .case-in {
+    animation: none;
+  }
+}
+
+/* --- The start: the view a session begins from, and the sign-in ---------- */
+
+/* Behind the start view and the sign-in card: a dot grid that fades out from
+   the logo, and the logo's two colours as one soft light behind it. Ambience
+   only: it sits on `surface`, so the text over it keeps its contrast. `--at`
+   is the height of its middle (the logo on the start view, the card's middle
+   on the sign-in page). */
+.start-backdrop {
+  --at: 36%;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--color-surface);
+  transition: opacity 240ms var(--ease-glide);
+}
+.start-backdrop::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(26 104 182 / 0.3) 1px, transparent 1.5px);
+  background-size: 24px 24px;
+  background-position: center top;
+  -webkit-mask-image: radial-gradient(
+    ellipse 64% 60% at 50% var(--at),
+    #000 0%,
+    rgb(0 0 0 / 0.55) 45%,
+    transparent 80%
+  );
+  mask-image: radial-gradient(
+    ellipse 64% 60% at 50% var(--at),
+    #000 0%,
+    rgb(0 0 0 / 0.55) 45%,
+    transparent 80%
+  );
+}
+.start-backdrop::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: var(--at);
+  width: min(64rem, 140%);
+  height: 36rem;
+  translate: -50% -50%;
+  background:
+    radial-gradient(ellipse 46% 48% at 43% 46%, rgb(2 119 192 / 0.13), transparent 72%),
+    radial-gradient(ellipse 40% 44% at 60% 58%, rgb(138 35 135 / 0.08), transparent 72%);
+}
+
+/* The start view's logo and question arrive once, as the view opens. */
+.start-in {
+  animation: start-in 240ms var(--ease-glide) backwards;
+}
+@keyframes start-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+/* The logo's own arrival on the start view: it comes into focus once, and one
+   soft band of light crosses it. The element is drawn with the view, so a
+   page update never replays it; with reduced motion the logo is simply there
+   and the band stays out of sight. */
+.logo-arrive {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+.logo-arrive > img {
+  display: block;
+}
+.logo-arrive::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    transparent 30%,
+    rgb(255 255 255 / 0.6) 50%,
+    transparent 70%
+  );
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .logo-arrive {
+    animation: logo-arrive 1100ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+  }
+  .logo-arrive::after {
+    animation: logo-band 1200ms ease-in-out 600ms both;
+  }
+}
+@keyframes logo-arrive {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+    filter: blur(8px);
+  }
+}
+@keyframes logo-band {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* A first message was sent: everything but the field steps back, and the
+   field is carried over to the session's page (components/chat-panel). */
+.start-leaves {
+  transition:
+    opacity 200ms ease-out,
+    transform 200ms ease-out;
+}
+.start-leaves[data-leaving] {
+  opacity: 0;
+  transform: translateY(-8px);
+  pointer-events: none;
+}
+.start-backdrop[data-leaving] {
+  opacity: 0;
+}
+
+/* A session opened from the sidebar arrives with a short rise. The element is
+   keyed by the session, so a page update of the same session never replays it. */
+.session-in {
+  animation: session-in 200ms var(--ease-glide) backwards;
+}
+@keyframes session-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-in,
+  .session-in,
+  .row-menu:popover-open {
+    animation: none;
+  }
+  .start-leaves,
+  .start-backdrop {
+    transition: none;
+  }
+}

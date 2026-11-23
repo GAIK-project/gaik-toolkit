@@ -1,0 +1,4 @@
+Mikä on myynnin arvo yhteensä?
+Kuka myyjä myi eniten euroissa?
+Mitä tuotetta myytiin kappalemääräisesti eniten?
+Mikä asiakas osti eniten euroissa?

@@ -1,0 +1,105 @@
+# Checks for the AIOps stack in gaik-aiops/ (ADR 0008): config validation, unit tests and the compose
+# integration tests against a fresh stack. No secrets are needed or used.
+name: AIOps stack
+
+on:
+  pull_request:
+    paths:
+      - "gaik-aiops/**"
+      - ".github/workflows/aiops.yml"
+  push:
+    branches: [main, dev, develop]
+    paths:
+      - "gaik-aiops/**"
+      - ".github/workflows/aiops.yml"
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    # Named explicitly so that steps run with pipefail: "pytest | tee" then fails when a test fails.
+    shell: bash
+    working-directory: gaik-aiops
+
+concurrency:
+  group: aiops-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Collector config is valid
+        run: |
+          docker run --rm -v "$PWD/deploy/compose/otel-collector.yaml:/c.yaml:ro" \
+            -e PSEUDONYM_KEY=ci -e MLFLOW_TRACES_EXPERIMENT_ID=0 \
+            otel/opentelemetry-collector-contrib:0.120.0 validate --config=/c.yaml
+      - name: Alert rules pass their tests
+        run: |
+          docker run --rm --entrypoint promtool -v "$PWD/deploy/compose/prometheus:/p:ro" -w /p/tests \
+            prom/prometheus:v3.2.1 test rules collection-alerts.test.yml wizard-alerts.test.yml
+      - name: Kubernetes manifests render
+        run: |
+          kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/local > /dev/null
+          kubectl kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/rahti > /dev/null
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Unit tests (stack tests skip without a stack)
+        working-directory: gaik-aiops/shared/collection/sink
+        run: uv run --python 3.12 --extra dev pytest -q
+      - name: Sign-in and role tests (stack tests skip without a stack)
+        working-directory: gaik-aiops/wp4/authz
+        run: uv run --python 3.12 --extra dev pytest -q
+
+  stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: checks
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack from empty volumes
+        run: docker compose -f deploy/compose/docker-compose.yml up -d --build --wait
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Stack tests (none may be skipped)
+        working-directory: gaik-aiops/shared/collection/sink
+        run: |
+          sleep 10
+          uv run --python 3.12 --extra dev pytest -q -rs | tee pytest.out
+          if grep -q "SKIPPED" pytest.out; then echo "stack tests were skipped: the stack did not come up"; exit 1; fi
+      - name: Logs on failure
+        if: failure()
+        run: docker compose -f deploy/compose/docker-compose.yml logs --no-color --tail=200
+      - name: Stop the stack
+        if: always()
+        run: docker compose -f deploy/compose/docker-compose.yml down -v
+
+  stack-openbao:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: checks
+    env:
+      COMPOSE: docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/openbao.yml
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack with the OpenBao overlay from empty volumes
+        run: $COMPOSE up -d --build --wait
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - name: Stack tests with the vault-held key (none may be skipped)
+        working-directory: gaik-aiops/shared/collection/sink
+        run: |
+          sleep 10
+          uv run --python 3.12 --extra dev pytest -q -rs | tee pytest.out
+          if grep -q "SKIPPED" pytest.out; then echo "stack tests were skipped"; exit 1; fi
+      - name: OpenBao tests (none may be skipped)
+        working-directory: gaik-aiops/wp4/secrets
+        run: |
+          uv run --python 3.12 --extra dev pytest -q -rs | tee pytest.out
+          if grep -q "SKIPPED" pytest.out; then echo "OpenBao tests were skipped"; exit 1; fi
+      - name: Logs on failure
+        if: failure()
+        run: $COMPOSE logs --no-color --tail=200
+      - name: Stop the stack
+        if: always()
+        run: $COMPOSE down -v

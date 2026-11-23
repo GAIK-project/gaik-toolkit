@@ -18,14 +18,16 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import keyword
 import re
+import shutil
 import string
 from pathlib import Path
 from typing import Any
 
-from .blueprint import Blueprint
-from .docs_generator import md_text
+from .blueprint import Blueprint, external_services
+from .docs_generator import external_services_block, md_text
 from .registry import get_registry
 from .schema_designer import (
     NESTED_KEY,
@@ -40,12 +42,24 @@ TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "poc"
 # A generated PoC installs the gaik release the wizard was validated against
 # (gaik_validated_version.txt), or a later patch of it. A lower floor let pip keep
 # an older gaik whose components the registry and cards no longer describe.
+# provider_config.py and the stage-config constructor arguments need gaik 0.8.0,
+# which stays the floor when the pin cannot be read.
+_MIN_GAIK_VERSION = "0.8.0"
 _VALIDATED_VERSION_FILE = Path(__file__).parent.parent.parent / "gaik_validated_version.txt"
+_VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
 
 def _gaik_version_spec() -> str:
-    """Return the pip specifier for gaik, for example ``>=0.11.0,<0.12``."""
-    version = _VALIDATED_VERSION_FILE.read_text(encoding="utf-8").strip()
+    """Return the pip specifier for gaik, for example ``>=0.11.0,<0.12``.
+
+    Without a readable ``X.Y.Z`` pin only the floor is set.
+    """
+    try:
+        version = _VALIDATED_VERSION_FILE.read_text(encoding="utf-8").strip()
+    except OSError:
+        version = ""
+    if not _VERSION_RE.match(version):
+        return f">={_MIN_GAIK_VERSION}"
     major, minor = (int(part) for part in version.split(".")[:2])
     return f">={version},<{major}.{minor + 1}"
 
@@ -1145,18 +1159,30 @@ def _component_import_lines(entry: dict) -> list[str]:
     entry such as ``Extractor`` is not one: its card imports ``SchemaGenerator``
     and ``DataExtractor``, and importing the family name would stop the run at
     its first line. A class that uses another class of its module, such as
-    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import. Without a card
+    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import, and the classes
+    it lists in ``uses_components`` that the same module exports are imported
+    beside it: the panel is built from ``LLMJudge`` instances. Without a card
     the entry's own name is imported, as before.
     """
-    from .registry import get_reference_cards
+    from .registry import get_reference_cards, get_registry
 
     card = get_reference_cards().get(entry["name"]) or {}
     match = _CARD_IMPORT_RE.fullmatch(str(card.get("import", "")).strip())
-    if match:
-        names = [name.strip() for name in match["names"].split(",") if name.strip()]
-        if names:
-            return [f"from {match['module']} import {name}" for name in names]
-    return [f"from {entry['import_path']} import {entry['name']}"]
+    names = [name.strip() for name in match["names"].split(",") if name.strip()] if match else []
+    lines = [f"from {match['module']} import {name}" for name in names] or [
+        f"from {entry['import_path']} import {entry['name']}"
+    ]
+    import_path = entry["import_path"]
+    registry = get_registry()
+    for member in entry.get("uses_components") or []:
+        if member == entry["name"]:
+            continue
+        if (registry.lookup_by_name(member) or {}).get("import_path") != import_path:
+            continue
+        line = f"from {import_path} import {member}"
+        if line not in lines:
+            lines.append(line)
+    return lines
 
 
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
@@ -1344,6 +1370,9 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         "component_imports_placeholder": "\n".join(f"# {line}" for line in import_lines),
         "input_instructions": _input_instructions(bc),
         "output_instructions": _output_instructions(bc),
+        # technical_spec.external_services: their keys in .env.example, and the README section
+        "external_services_env": _external_services_env(bc),
+        "external_services_readme": _external_services_readme(bc),
         # _generic template extras
         "generic_pipeline_skeleton": _build_generic_pipeline_skeleton(bc),
         "generic_input_loaders": _build_input_loaders(bc),
@@ -1408,9 +1437,109 @@ def _output_instructions(bp: Blueprint) -> str:
     return f"Results written to `output/<input_stem>{suffix}`."
 
 
+def _comment_text(value: Any, limit: int = 200) -> str:
+    """Text for one comment line of a generated file: no line break or control character."""
+    text = " ".join(re.sub(r"[\x00-\x1f\x7f]", " ", str(value)).split())
+    return text if len(text) <= limit else text[: limit - 3].rstrip() + "..."
+
+
+def _external_services_env(blueprint: Blueprint) -> str:
+    """The .env.example lines of the external services: each one's own variables,
+    empty, under a comment naming the service and what it is for. A name two services
+    share is written once."""
+    written: set[str] = set()
+    blocks: list[str] = []
+    for service in external_services(blueprint):
+        names = [name for name in service.env_vars if name not in written]
+        if not names:
+            continue
+        written.update(names)
+        comment = _comment_text(f"{service.name}: {service.purpose}")
+        blocks.append(f"# {comment}\n" + "\n".join(f"{name}=" for name in names))
+    if not blocks:
+        return ""
+    return (
+        "\n# --- External services (outside GAIK) ---\n"
+        "# Without its key the PoC skips the step, says so in its log, and runs the rest.\n"
+        + "\n\n".join(blocks)
+        + "\n"
+    )
+
+
+def _external_services_readme(blueprint: Blueprint) -> str:
+    """The README section on the external services, or "" when the blueprint has none."""
+    block = external_services_block(blueprint)
+    if not block:
+        return ""
+    return (
+        "## External services\n\n"
+        "Some steps use a service outside GAIK, with its own account and key in `.env`. "
+        "Without the key or the package, the PoC skips the step, says so in its log "
+        "(`SKIPPED <service>: ...`), and runs the GAIK steps; a test run without them "
+        "shows those lines.\n\n" + block + "\n\n---\n"
+    )
+
+
 # ---------------------------------------------------------------------------
 # File generators
 # ---------------------------------------------------------------------------
+
+
+def _normalised(name: str) -> str:
+    """A project or extra name as pip compares it (PEP 503, PEP 685)."""
+    return re.sub(r"[-_.]+", "-", name).lower()
+
+
+_REQUIREMENT_RE = re.compile(r"([A-Za-z0-9][A-Za-z0-9._-]*)\s*(?:\[([^\]]*)\])?\s*(.*)")
+
+
+def _requirement_parts(line: str) -> tuple[str, set[str], set[str]]:
+    """A requirement line's project name, extras and version specifiers, normalised."""
+    match = _REQUIREMENT_RE.fullmatch(line.strip())
+    if not match:
+        return line, set(), set()
+    name, extras, specifiers = match.groups()
+    return (
+        _normalised(name),
+        {_normalised(e) for e in (extras or "").split(",") if e.strip()},
+        {s.replace(" ", "") for s in specifiers.split(",") if s.strip()},
+    )
+
+
+def _external_requirements(blueprint: Blueprint, lines: list[str]) -> list[str]:
+    """The external services' packages, each as written, unless it adds nothing.
+
+    The blueprint refuses a service package that names gaik or another project
+    written above (``POC_OWN_PROJECTS``), so no line here pins one of them. pip
+    combines every line of one project: ``requests[socks]>=2.31`` beside
+    ``requests>=2`` adds an extra and a stricter version, so it is kept. A line is
+    left out only when the lines already there ask for all its extras and
+    specifiers, as an exact duplicate or a bare name does.
+    """
+    required: dict[str, tuple[set[str], set[str]]] = {}
+
+    def note(line: str) -> bool:
+        """Record ``line``; True when it asks for something not asked for yet."""
+        name, extras, specifiers = _requirement_parts(line)
+        if name not in required:
+            required[name] = (extras, specifiers)
+            return True
+        have_extras, have_specifiers = required[name]
+        adds = not (extras <= have_extras and specifiers <= have_specifiers)
+        have_extras |= extras
+        have_specifiers |= specifiers
+        return adds
+
+    for line in lines:
+        note(line)
+    added = [
+        service.python_package
+        for service in external_services(blueprint)
+        if service.python_package and note(service.python_package)
+    ]
+    if not added:
+        return []
+    return ["# Packages of the external services (README, External services)", *added]
 
 
 def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
@@ -1433,6 +1562,8 @@ def _write_requirements_txt(blueprint: Blueprint, poc_dir: Path) -> None:
     lines.append("pyyaml")
     if _wants_pdf(blueprint):
         lines.append("reportlab>=4.0")
+    # After the gaik lines: a third-party package never replaces a gaik requirement.
+    lines.extend(_external_requirements(blueprint, lines))
     (poc_dir / "requirements.txt").write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
@@ -1513,6 +1644,250 @@ def _write_readme(variables: dict[str, Any], poc_dir: Path) -> None:
     shown = {**variables, **{k: md_text(variables[k]) for k in _CODE_TEXT_KEYS if k in variables}}
     shown.update({f"{k}_text": md_text(v) for k, v in variables["blueprint"].items()})
     (poc_dir / "README.md").write_text(_fill(tmpl, shown), encoding="utf-8")
+
+
+# ---------------------------------------------------------------------------
+# The package's test page (app.py, ui/)
+# ---------------------------------------------------------------------------
+
+#: The file endings each wired entrypoint looks for in sample_input/.
+_DOCUMENT_SUFFIXES = [".pdf", ".docx", ".doc", ".jpg", ".jpeg", ".png", ".tiff", ".tif"]
+_AUDIO_SUFFIXES = [".wav", ".mp3", ".m4a", ".ogg", ".flac", ".webm", ".mp4"]
+#: technical_spec.input_types -> (input kind, file endings) for a pipeline the
+#: agent wires itself. A type that is not listed takes any file.
+_INPUT_KINDS = {
+    "audio": ("audio", _AUDIO_SUFFIXES),
+    "video": ("audio", _AUDIO_SUFFIXES),
+    "pdf": ("document", _DOCUMENT_SUFFIXES),
+    "docx": ("document", _DOCUMENT_SUFFIXES),
+    "document": ("document", _DOCUMENT_SUFFIXES),
+    "image": ("document", _DOCUMENT_SUFFIXES),
+    "document_collection": ("document", [".pdf"]),
+    "text": ("text", [".txt", ".md"]),
+    "csv": ("table", [".csv", ".xlsx"]),
+    "xlsx": ("table", [".csv", ".xlsx"]),
+    "excel": ("table", [".csv", ".xlsx"]),
+    "spreadsheet": ("table", [".csv", ".xlsx"]),
+    "tabular": ("table", [".csv", ".xlsx"]),
+    "json": ("data", [".json"]),
+}
+_INPUT_LABELS = {
+    "en": {
+        "audio": "A recording",
+        "document": "A document",
+        "documents": "The documents to search",
+        "text": "A text file, or text typed below",
+        "table": "A table file",
+        "data": "A data file",
+        "file": "The solution's input files",
+    },
+    "fi": {
+        "audio": "Äänite",
+        "document": "Asiakirja",
+        "documents": "Asiakirjat, joista haetaan",
+        "text": "Tekstitiedosto tai alle kirjoitettu teksti",
+        "table": "Taulukkotiedosto",
+        "data": "Datatiedosto",
+        "file": "Ratkaisun syötetiedostot",
+    },
+}
+_QUESTION_LABELS = {"en": "Your question", "fi": "Kysymyksesi"}
+#: The test page's fixed files: their place in the package and their template under
+#: TEMPLATES_DIR. They are the same in every package, so wizard_api's package check
+#: (``poc_service.package_problems``) can tell a changed copy from the one written here.
+TEST_PAGE_TEMPLATES = {
+    "app.py": "_common/app.py.tmpl",
+    "ui/index.html": "_common/ui/index.html",
+}
+#: The page's own files beside index.html, copied as they are: the Sora font
+#: (SIL Open Font License 1.1, its text beside the files) and the GAIK mark.
+_PAGE_ASSETS = (
+    "fonts/sora-latin-wght-normal.woff2",
+    "fonts/sora-latin-ext-wght-normal.woff2",
+    "fonts/OFL.txt",
+    "gaik.svg",
+)
+
+
+def _short(value: Any, limit: int) -> str:
+    """Free text for the page's data file: one line, no control characters, cut to ``limit``."""
+    text = " ".join(str(value if value is not None else "").split())
+    return "".join(ch for ch in text if ch.isprintable())[:limit]
+
+
+def _spec_list(spec: Any, key: str) -> list:
+    value = spec.get(key, []) if isinstance(spec, dict) else getattr(spec, key, [])
+    return value if isinstance(value, list) else []
+
+
+def _page_inputs(blueprint: Blueprint, pattern: str, ui_language: str) -> list[dict[str, Any]]:
+    """What the test page lets the user add, following what the entrypoint reads."""
+    labels = _INPUT_LABELS[ui_language]
+
+    def entry(kind: str, suffixes: list[str], multiple: bool, label: str | None = None) -> dict:
+        return {
+            "kind": kind,
+            "label": labels[label or kind],
+            "extensions": list(suffixes),
+            "multiple": multiple,
+        }
+
+    if pattern == "audio_to_structured":
+        return [entry("audio", _AUDIO_SUFFIXES, False)]
+    if pattern == "document_to_structured":
+        return [entry("document", _DOCUMENT_SUFFIXES, False)]
+    if pattern == "rag":
+        return [entry("document", [".pdf"], True, "documents")]
+    found: dict[str, dict] = {}
+    for input_type in _spec_list(blueprint.technical_spec, "input_types"):
+        kind, suffixes = _INPUT_KINDS.get(str(input_type).lower(), ("file", []))
+        if kind in found:
+            merged = found[kind]["extensions"]
+            merged.extend(s for s in suffixes if s not in merged)
+        else:
+            found[kind] = entry(kind, suffixes, True)
+    return list(found.values()) or [entry("file", [], True)]
+
+
+def _page_output_fields(spec: Any) -> list[dict[str, str]]:
+    """The output fields as the page labels them: key, label, type and description."""
+    if not isinstance(spec, dict):
+        return []
+    types = spec.get("field_types") if isinstance(spec.get("field_types"), dict) else {}
+    descriptions = (
+        spec.get("field_descriptions") if isinstance(spec.get("field_descriptions"), dict) else {}
+    )
+    fields: list[dict[str, str]] = []
+    for field in spec.get("fields") or []:
+        if isinstance(field, dict):
+            # A report's sections: {"id": ..., "title": ..., "instructions": ...}.
+            key = _short(field.get("id") or field.get("title") or "", 100)
+            label = _short(field.get("title") or key.replace("_", " ").capitalize(), 200)
+            field_type, description = "text", ""
+        else:
+            key = _short(field, 100)
+            label = key.replace("_", " ").capitalize()
+            field_type = _short(types.get(field, "string"), 40)
+            description = _short(descriptions.get(field, ""), 500)
+        if not key:
+            continue
+        item = {"key": key, "label": label, "type": field_type}
+        if description:
+            item["description"] = description
+        fields.append(item)
+    return fields
+
+
+#: workflow step type -> what the page calls the step. An automated task is "ai"
+#: when a gaik component does it and "auto" otherwise; anything else is a plain step.
+_STEP_KINDS = {
+    "user_task": "input",
+    "human_review": "review",
+    "decision": "decision",
+}
+_MAX_PAGE_STEPS = 30
+_MAX_STEP_ARTIFACTS = 6
+
+
+def _artifact_names(names: Any) -> list[str]:
+    """Artifact ids as words ("purchase_order_json" -> "purchase order json")."""
+    if not isinstance(names, list):
+        return []
+    shown = (_short(str(name).replace("_", " "), 80) for name in names[:_MAX_STEP_ARTIFACTS])
+    return [name for name in shown if name]
+
+
+def _page_steps(blueprint: Blueprint) -> list[dict[str, Any]]:
+    """The workflow's steps in the order they run, for the page's "how it works" strip.
+
+    Each step is its title, what kind of step it is, the gaik component that does
+    it (where one does) and the artifacts it uses and gives. A blueprint without
+    steps gives an empty list, and the page shows no strip.
+    """
+    steps: list[dict[str, Any]] = []
+    for step in _topo_order(list(blueprint.workflow.steps))[:_MAX_PAGE_STEPS]:
+        title = _short(step.name, 200) or _short(str(step.id).replace("_", " "), 200)
+        if not title:
+            continue
+        component = _short(step.component, 100)
+        if str(step.type) == "automated_task":
+            kind = "ai" if component else "auto"
+        else:
+            kind = _STEP_KINDS.get(str(step.type), "step")
+        item: dict[str, Any] = {"id": _short(step.id, 100), "title": title, "kind": kind}
+        if component:
+            item["component"] = component
+        item["uses"] = _artifact_names(step.inputs)
+        item["gives"] = _artifact_names(step.outputs)
+        steps.append(item)
+    return steps
+
+
+def _solution_description(
+    blueprint: Blueprint, variables: dict[str, Any], pattern: str
+) -> dict[str, Any]:
+    """The data the test page reads: what the solution is, takes in and gives out."""
+    language = str(variables.get("language") or "en")
+    ui_language = "fi" if language.lower().startswith("fi") else "en"
+    # Only the RAG entrypoint reads a question from a text file beside the documents.
+    # A pipeline the agent wires takes typed text where its input_types say text.
+    asks_question = pattern == "rag"
+    return {
+        "id": blueprint.use_case.id,
+        "name": _short(blueprint.use_case.name, 200),
+        "purpose": _short(blueprint.use_case.description, 1000),
+        "language": ui_language,
+        "content_language": language,
+        "pattern": pattern,
+        "inputs": _page_inputs(blueprint, pattern, ui_language),
+        "asks_question": asks_question,
+        "question_label": _QUESTION_LABELS[ui_language] if asks_question else "",
+        "output_fields": _page_output_fields(blueprint.target_output_spec),
+        "steps": _page_steps(blueprint),
+    }
+
+
+def _json_for_page(data: Any) -> str:
+    """JSON whose text cannot end a tag or a script wherever a page puts it.
+
+    The page reads this file with fetch and shows its values as text. The angle
+    brackets and the ampersand are written as escapes all the same, so the file
+    stays data if a later front end inlines it.
+    """
+    text = json.dumps(data, indent=2, ensure_ascii=False)
+    for char in ("<", ">", "&", chr(0x2028), chr(0x2029)):
+        text = text.replace(char, f"\\u{ord(char):04x}")
+    return text + "\n"
+
+
+def _write_test_page(
+    blueprint: Blueprint, variables: dict[str, Any], pattern: str, poc_dir: Path
+) -> list[Path]:
+    """Write the package's own test page: app.py and ui/ (the page, its assets, solution.json).
+
+    The server and the page (:data:`TEST_PAGE_TEMPLATES`) and the page's assets
+    (its font files with their licence, the GAIK mark) are the same files in every
+    package; only ``ui/solution.json`` comes from the blueprint, and as data. No
+    blueprint value is written into the code or the markup.
+    """
+    written = []
+    for relative, template in TEST_PAGE_TEMPLATES.items():
+        target = poc_dir / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(_read_template(*template.rsplit("/", 1)) or "", encoding="utf-8")
+        written.append(target)
+    data_path = poc_dir / "ui" / "solution.json"
+    data_path.write_text(
+        _json_for_page(_solution_description(blueprint, variables, pattern)), encoding="utf-8"
+    )
+    written.append(data_path)
+    source_dir = TEMPLATES_DIR / "_common" / "ui"
+    for relative in _PAGE_ASSETS:
+        target = poc_dir / "ui" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(source_dir / relative, target)
+        written.append(target)
+    return written
 
 
 # ---------------------------------------------------------------------------
@@ -1656,6 +2031,9 @@ def scaffold_poc(
     _write_readme(variables, poc_dir)
     files_created.append(poc_dir / "README.md")
 
+    # The test page: a fixed server and page, and the blueprint's facts as data.
+    files_created.extend(_write_test_page(blueprint, variables, pattern, poc_dir))
+
     # Synthetic data for document/RAG patterns.
     # Both DocumentsToStructuredData (vision_parser) and RAGWorkflow (VisionRagParser)
     # require PDF files.  We attempt to generate a minimal PDF via reportlab;
@@ -1684,6 +2062,16 @@ def scaffold_poc(
                 encoding="utf-8",
             )
             files_created.append(txt_path)
+
+    # The first test run of a RAG package has no terminal and nobody's question
+    # yet: without one it has nothing to answer. The entrypoint reads the text
+    # files beside the documents as questions, one per line. A file of that
+    # name that is already there is kept: it may hold the user's own questions.
+    if synthetic and pattern == "rag":
+        questions_path = poc_dir / "sample_input" / "sample_questions.txt"
+        if not questions_path.exists():
+            questions_path.write_text("What is this document about?\n", encoding="utf-8")
+            files_created.append(questions_path)
 
     # The topology-aware key under which this pipeline's template would be saved
     # if the user later promotes it to the library (Part 2).

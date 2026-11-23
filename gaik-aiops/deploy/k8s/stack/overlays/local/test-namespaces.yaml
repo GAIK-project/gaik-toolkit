@@ -1,0 +1,11 @@
+# Namespaces for the network policy checks in test.sh: one allowed to send OTLP, one not.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aiops-producer-test
+  labels: {gaik-aiops/producer: "true"}
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aiops-outsider-test

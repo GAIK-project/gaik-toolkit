@@ -1,0 +1,24 @@
+# A long-running pod with the sandbox job security context, used by test.sh to probe connections.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: probe
+  namespace: gaik-sandbox
+  labels: {app: probe}
+spec:
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    seccompProfile: {type: RuntimeDefault}
+  containers:
+    - name: probe
+      image: curlimages/curl:8.11.1
+      command: ["sleep", "3600"]
+      resources:
+        limits: {cpu: 200m, memory: 64Mi}
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities: {drop: [ALL]}

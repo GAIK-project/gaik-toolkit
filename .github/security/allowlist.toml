@@ -1,0 +1,62 @@
+# Accepted findings for the Solution Wizard V2 security checks
+# (.github/workflows/solution-wizard-v2.yml, jobs security and security-images).
+#
+# Only HIGH and CRITICAL findings with a fix available fail CI; everything
+# else is reported without failing and needs no entry here. Add an entry only
+# for a blocking finding that is understood and accepted for a while.
+#
+# Every entry needs:
+#   id       advisory or check ID: GHSA-..., PYSEC-..., CVE-..., or a Trivy
+#            check ID (DS-0002, KSV-0014, ...); an alias of the finding matches
+#   reason   why it is accepted, and what would end the exception
+#   expires  YYYY-MM-DD; after it the entry stops applying and CI fails again
+# Optional narrowing:
+#   source   pip-audit | npm-audit | trivy
+#   package  package name
+#   target   glob over the scanned file or image (Trivy's Target)
+#
+# Keep expiries short (a few months) so each exception is looked at again.
+
+[[finding]]
+id = "KSV-0014"
+source = "trivy"
+target = "*deployment-api.yaml"
+reason = """The api container writes the session folders and the agent's state under its \
+own tree; a read-only root needs those moved to mounted volumes first. Pod \
+hardening is agreed with the platform owner (decision of 6 Nov) and done in \
+one change for the api and web deployments."""
+expires = 2027-01-31
+
+[[finding]]
+id = "KSV-0014"
+source = "trivy"
+target = "*deployment-web.yaml"
+reason = """Next's standalone server writes its cache under the application tree; a read- \
+only root needs that on a volume first. Same change as the api deployment."""
+expires = 2027-01-31
+
+[[finding]]
+id = "KSV-0118"
+source = "trivy"
+target = "*deployment-api.yaml"
+reason = """The deployment relies on the platform's restricted security context (random \
+non-root uid, dropped capabilities) instead of stating one. Stated in the same \
+hardening change as KSV-0014."""
+expires = 2027-01-31
+
+[[finding]]
+id = "KSV-0118"
+source = "trivy"
+target = "*deployment-web.yaml"
+reason = """As for the api deployment: the platform's restricted security context applies; \
+it is stated in the manifest in the hardening change."""
+expires = 2027-01-31
+
+[[finding]]
+id = "DS-0002"
+source = "trivy"
+target = "*Dockerfile"
+reason = """The platform runs every container as a random non-root uid whatever the image \
+says, so the missing USER line changes nothing there. A USER line is added \
+with the image rebuild that also moves the images to patched bases."""
+expires = 2027-01-31

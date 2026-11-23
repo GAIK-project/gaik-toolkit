@@ -11,14 +11,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 import pytest
-
 from solution_wizard.registry import _validate_entries, get_registry
 from solution_wizard.selector import (
     CHAINS,
     module_for_pattern,
+    modules_covering_inputs,
     transformation_chain,
 )
-
 
 # ---------------------------------------------------------------------------
 # Registry loads and self-validates
@@ -140,7 +139,76 @@ def test_module_entry_has_required_llm_fields():
         assert field in entry, f"Missing field: {field}"
 
 
+def test_audio_module_declares_the_transcript_it_returns():
+    """#145 — the entry declared only structured_json, so Rule 4 rejected any
+    workflow handing the reviewer both the extracted record and the transcript
+    it came from. AudioToStructuredData returns PipelineResult.transcription
+    alongside extracted_fields; the registry has to say so."""
+    entry = module_for_pattern("audio_to_structured")
+    outputs = {t.lower() for t in entry["output_artifact_types"]}
+    assert "structured_json" in outputs
+    assert "transcript" in outputs
+    assert "enhanced_transcript" in outputs
+
+
 def test_module_entry_has_uses_components():
     entry = module_for_pattern("audio_to_structured")
     assert "uses_components" in entry
     assert len(entry["uses_components"]) > 0
+
+
+# ---------------------------------------------------------------------------
+# Multi-source cases: the module-first rule has to read every input
+# ---------------------------------------------------------------------------
+
+
+def test_multi_source_chain_ends_in_structured_output():
+    chain = transformation_chain("multi_source_to_structured")
+    assert chain[0] == "mixed_input"
+    assert "structured_json" in chain
+    assert chain[-1] == "final_output"
+
+
+def test_no_single_module_covers_a_mixed_source_case():
+    """A meeting delivered as audio + agenda PDF + participant JSON.
+
+    The per-kind modules read one kind each, and the one module that reads a
+    mix (MultiSourceReportGenerator) writes a narrative report, so it is not a
+    match for a structured record. An empty list is the signal to compose.
+    """
+    # The inputs alone are covered — by the two report writers (gaik 0.8.2
+    # added report_writer next to the legacy generator) — but nothing covers
+    # them *and* produces a structured record.
+    assert {m["id"] for m in modules_covering_inputs(["audio", "pdf", "text"])} == {
+        "multi_source_report_generator",
+        "report_writer",
+    }
+    assert modules_covering_inputs(["audio", "pdf", "text"], ["structured_json"]) == []
+    assert module_for_pattern("multi_source_to_structured") is None
+
+
+def test_audio_only_module_is_not_offered_for_a_mixed_case():
+    """The misclassification this guards against: picking the audio module for
+    a case that also has a PDF silently drops the PDF."""
+    audio_only = modules_covering_inputs(["audio"])
+    assert "audio_to_structured_data" in {m["id"] for m in audio_only}
+    assert "audio_to_structured_data" not in {
+        m["id"] for m in modules_covering_inputs(["audio", "pdf"])
+    }
+
+
+def test_the_mixed_reader_is_found_when_prose_output_is_wanted():
+    """The report writers do read the whole mix — it is the output shape, not
+    the inputs, that rules them out for structured records. ReportWriter is
+    the default since gaik 0.8.2; the legacy generator stays selectable."""
+    ids = {m["id"] for m in modules_covering_inputs(["audio", "pdf", "image"])}
+    assert ids == {"multi_source_report_generator", "report_writer"}
+    for module_id in ids:
+        entry = get_registry().lookup_by_id(module_id)
+        assert "structured_json" not in entry["output_artifact_types"], module_id
+
+
+def test_input_coverage_is_case_insensitive_and_ignores_blanks():
+    assert modules_covering_inputs([]) == []
+    ids = {m["id"] for m in modules_covering_inputs([" PDF ", "docx"])}
+    assert "documents_to_structured_data" in ids

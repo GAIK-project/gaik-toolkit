@@ -1,0 +1,68 @@
+# Stand-ins for the API and a database in the application namespace (unprivileged nginx on 8080).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: gaik-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: api}
+  template:
+    metadata:
+      labels: {app: api}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports: [{containerPort: 8080}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api
+  namespace: gaik-app
+spec:
+  selector: {app: api}
+  ports: [{port: 8080, targetPort: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db
+  namespace: gaik-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: db}
+  template:
+    metadata:
+      labels: {app: db}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: db
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          ports: [{containerPort: 8080}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db
+  namespace: gaik-app
+spec:
+  selector: {app: db}
+  ports: [{port: 8080, targetPort: 8080}]

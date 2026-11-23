@@ -349,7 +349,32 @@ def test_lanes_use_business_process_participants():
     lanes = {l.get("name") for l in proc.findall(".//bpmn:lane", NS)}
     assert "Doctor" in lanes
     assert "Supervisor" in lanes
-    assert "GAIK AI System" in lanes
+    assert "GenAI" in lanes
+
+
+def test_official_naming_conventions():
+    """Task / data / event labels follow GAIK modeling guide + official samples."""
+    xml, root = _parse(_hospital_blueprint())
+    proc = root.find("bpmn:process", NS)
+    # No custom caption suffixes
+    for e in proc:
+        name = e.get("name") or ""
+        assert "[User input]" not in name
+        assert "[Human review]" not in name
+        assert "[Data store]" not in name
+        assert "[Integration]" not in name
+    # Descriptive events
+    starts = [e.get("name") for e in proc if _local(e) == "startEvent"]
+    ends = [e.get("name") for e in proc if _local(e) == "endEvent"]
+    assert any(n and n.startswith("Started ") for n in starts)
+    assert any(n and "completed" in (n or "").lower() for n in ends)
+    # Human-readable data objects (not raw snake_case ids)
+    data_names = [e.get("name") for e in proc if _local(e) == "dataObjectReference"]
+    assert "Voice Note Audio" in data_names
+    assert "Raw Transcript" in data_names
+    # Component code prefix on automated tasks
+    services = [e.get("name") for e in proc if _local(e) == "serviceTask"]
+    assert any(n and n.startswith("[STR] ") for n in services)
 
 
 # ---------------------------------------------------------------------------

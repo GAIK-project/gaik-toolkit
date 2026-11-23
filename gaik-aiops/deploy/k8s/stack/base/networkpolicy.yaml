@@ -1,0 +1,36 @@
+# Nothing reaches the stack's pods unless allowed here. Pods in the namespace talk to each other;
+# producers in other namespaces reach only the collector's OTLP ports, and only from namespaces that
+# carry the label gaik-aiops/producer=true. Exposing Grafana through a Route is added per environment.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+  ingress:
+    - from: [{podSelector: {}}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-otlp-from-producers
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: otel-collector}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {gaik-aiops/producer: "true"}
+      ports:
+        - {protocol: TCP, port: 4317}
+        - {protocol: TCP, port: 4318}

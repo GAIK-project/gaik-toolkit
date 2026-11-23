@@ -1,0 +1,107 @@
+# Rahti (CSC OpenShift): the stack in its own project, gaik-aiops. Images for MLflow and the sink are
+# built on Rahti (buildconfigs.yaml); the upstream images come from quay.io and ghcr.io where they are
+# published, to stay clear of Docker Hub's pull limits. Secrets are created on Rahti by
+# create-secrets.sh and never live in git. See README.md.
+#
+# Render (the load restrictor is needed because the configuration lives in deploy/compose):
+#   oc kustomize --load-restrictor LoadRestrictionsNone deploy/k8s/stack/overlays/rahti
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The project is created once with `oc new-project` (README.md); it is not a resource here.
+namespace: gaik-aiops
+
+resources:
+  - ../../base
+  - buildconfigs.yaml
+  - mlflow-auth.yaml
+  - mlflow-signin.yaml
+  - routes.yaml
+  - networkpolicy-router.yaml
+  - otlp-ingress.yaml
+
+images:
+  # Built on Rahti into the project's own image streams.
+  - name: gaik-aiops/mlflow
+    newName: image-registry.openshift-image-registry.svc:5000/gaik-aiops/aiops-mlflow
+    newTag: latest
+  - name: gaik-aiops/collection-sink
+    newName: image-registry.openshift-image-registry.svc:5000/gaik-aiops/aiops-sink
+    newTag: latest
+  # The same versions as the base, from the registries their projects publish to besides Docker Hub,
+  # pinned by the digest of the multi-arch image (the tag in each comment), so a re-pushed tag changes
+  # nothing here. To update: docker buildx imagetools inspect <image>:<tag>, then the Digest line.
+  - name: prom/prometheus
+    newName: quay.io/prometheus/prometheus
+    digest: sha256:6927e0919a144aa7616fd0137d4816816d42f6b816de3af269ab065250859a62  # v3.2.1
+  - name: prom/alertmanager
+    newName: quay.io/prometheus/alertmanager
+    digest: sha256:27c475db5fb156cab31d5c18a4251ac7ed567746a2483ff264516437a39b15ba  # v0.28.1
+  - name: otel/opentelemetry-collector-contrib
+    newName: ghcr.io/open-telemetry/opentelemetry-collector-releases/opentelemetry-collector-contrib
+    digest: sha256:85ac41c2db88d0df9bd6145e608a3cb023f5d8443868adbfbbf66efb51087917  # 0.120.0
+  # Grafana has a public Route here, so it runs a patched release; the base's 11.5.2 has known
+  # security fixes missing. Keep this on the newest patch release of the line.
+  - name: grafana/grafana
+    newName: docker.io/grafana/grafana
+    digest: sha256:d67af92050b8d93b393dc741864752a69c9da1ffa39c1bb9af49ad5d9e47d2c3  # 11.6.16
+
+configMapGenerator:
+  - name: mlflow-auth-nginx
+    files: [nginx.conf=mlflow-auth-nginx.conf]
+  - name: otel-collector-ingress
+    files: [otlp-ingress-collector.yaml]
+  # The GAIK waiting-for-approval page of implementation_layer/deploy/openshift/signin-templates,
+  # with MLflow's Keycloak sign-out address filled in (a test keeps the two the same).
+  - name: mlflow-signin-templates
+    files: [error.html=mlflow-signin-error.html]
+
+patches:
+  # The base's workloads; mlflow-auth.yaml and mlflow-signin.yaml set no seccomp profile to begin with.
+  - path: patch-rahti-seccomp.yaml
+    target: {kind: Deployment, labelSelector: "app.kubernetes.io/name notin (mlflow-auth,mlflow-signin)"}
+  - path: patch-rahti-seccomp.yaml
+    target: {kind: StatefulSet}
+  - path: patch-rahti-cpu-requests.yaml
+  - path: patch-grafana-public-url.yaml
+  - path: patch-grafana-oidc.yaml
+  - path: patch-mlflow-public-host.yaml
+    target: {kind: Deployment, name: mlflow}
+  - path: patch-image-triggers.yaml
+  # The token-checked OTLP receiver for other projects (otlp-ingress.yaml), read after the base's two
+  # configuration files.
+  - path: patch-otlp-ingress.yaml
+  - target: {kind: Deployment, name: otel-collector}
+    patch: |-
+      - op: test
+        path: /spec/template/spec/containers/0/args/1
+        value: --config=/etc/otelcol/generated/mlflow-routes.yaml
+      - op: add
+        path: /spec/template/spec/containers/0/args/-
+        value: --config=/etc/otelcol/ingress/otlp-ingress-collector.yaml
+  # grafana-setup needs only Python's standard library; the MLflow image has it, so no Docker Hub pull.
+  - target: {kind: Deployment, name: grafana-setup}
+    patch: |-
+      - op: test
+        path: /spec/template/spec/containers/0/image
+        value: python:3.12-alpine
+      - op: replace
+        path: /spec/template/spec/containers/0/image
+        value: gaik-aiops/mlflow
+
+# The public host names are set once, in routes.yaml (spec.host), and copied from there into Grafana's
+# root URL and MLflow's allowed hosts and origins, which the patches above leave as ROUTE_HOST.
+replacements:
+  - source: {kind: Route, name: grafana, fieldPath: spec.host}
+    targets:
+      - select: {kind: Deployment, name: grafana}
+        fieldPaths: ["spec.template.spec.containers.[name=grafana].env.[name=GF_SERVER_ROOT_URL].value"]
+        options: {delimiter: "/", index: 2}
+  - source: {kind: Route, name: mlflow, fieldPath: spec.host}
+    targets:
+      - select: {kind: Deployment, name: mlflow}
+        fieldPaths: ["spec.template.spec.containers.[name=mlflow].args.6"]
+        options: {delimiter: ",", index: 3}
+      - select: {kind: Deployment, name: mlflow}
+        fieldPaths: ["spec.template.spec.containers.[name=mlflow].args.8"]
+        options: {delimiter: "/", index: 2}

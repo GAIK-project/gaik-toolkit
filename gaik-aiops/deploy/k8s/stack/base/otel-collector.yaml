@@ -1,0 +1,79 @@
+# The single ingress (OTLP). An init container creates one MLflow experiment per application and writes
+# the collector's routes to them, as the compose stack's mlflow-setup service does.
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  labels: {app.kubernetes.io/name: otel-collector}
+spec:
+  selector: {app.kubernetes.io/name: otel-collector}
+  ports:
+    - {name: otlp-grpc, port: 4317, targetPort: 4317}
+    - {name: otlp-http, port: 4318, targetPort: 4318}
+    - {name: metrics, port: 8888, targetPort: 8888}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  labels: {app.kubernetes.io/name: otel-collector}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: otel-collector}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: otel-collector}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      initContainers:
+        - name: mlflow-setup
+          image: gaik-aiops/mlflow
+          command: ["sh", "-c"]
+          args:
+            - >-
+              until python -c "import urllib.request; urllib.request.urlopen('http://mlflow:5000/health')" 2>/dev/null;
+              do echo waiting for mlflow; sleep 3; done;
+              exec python /opt/setup_experiments.py
+          envFrom: [{configMapRef: {name: mlflow-experiments}}]
+          env:
+            - {name: MLFLOW_TRACKING_URI, value: "http://mlflow:5000"}
+            - {name: ROUTES_FILE, value: /routes/mlflow-routes.yaml}
+          volumeMounts: [{name: routes, mountPath: /routes}]
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      containers:
+        - name: otel-collector
+          image: otel/opentelemetry-collector-contrib:0.120.0
+          args: ["--config=/etc/otelcol/config.yaml", "--config=/etc/otelcol/generated/mlflow-routes.yaml"]
+          env:
+            - name: PSEUDONYM_KEY
+              valueFrom: {secretKeyRef: {name: aiops-pseudonym, key: key}}
+            - {name: MLFLOW_TRACES_EXPERIMENT_ID, value: "0"}
+          ports:
+            - {containerPort: 4317}
+            - {containerPort: 4318}
+            - {containerPort: 8888}
+          volumeMounts:
+            - {name: config, mountPath: /etc/otelcol/config.yaml, subPath: otel-collector.yaml}
+            - {name: routes, mountPath: /etc/otelcol/generated, readOnly: true}
+          readinessProbe:
+            tcpSocket: {port: 4318}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: config
+          configMap: {name: otel-collector}
+        - name: routes
+          emptyDir: {}

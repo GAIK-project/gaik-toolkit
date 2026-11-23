@@ -1,0 +1,113 @@
+# Dedicated Postgres for wizard_api (sessions + blueprint versions).
+#
+# Image: pgvector/pgvector:pg17 — same known-good image the demo app runs on
+# Rahti. wizard_api uses only plain Postgres features; the vector extension
+# simply goes unused. Picking the proven image avoids the random-UID / PGDATA
+# permission problems the stock `postgres` image hits on OpenShift.
+#
+# The `NAME_PLACEHOLDER-db` Secret (credentials + database-url) is NOT defined
+# here — it lives only in the untracked secrets.yaml (see secrets.yaml.example)
+# so no password-shaped field is ever committed. Apply secrets before this
+# file; the Postgres pod stays pending until the Secret exists.
+# wizard_api reads WIZARD_DATABASE_URL from the Secret's `database-url` key.
+#
+# NAME_PLACEHOLDER is the instance prefix deploy.sh substitutes: every instance
+# gets its own database, so two code lines never share migrations or data.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: PersistentVolumeClaim
+    metadata:
+      name: NAME_PLACEHOLDER-db-data
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 5Gi
+
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: NAME_PLACEHOLDER-db
+      labels:
+        app: NAME_PLACEHOLDER-db
+    spec:
+      replicas: 1
+      strategy:
+        type: Recreate
+      selector:
+        matchLabels:
+          app: NAME_PLACEHOLDER-db
+      template:
+        metadata:
+          labels:
+            app: NAME_PLACEHOLDER-db
+        spec:
+          containers:
+            - name: postgresql
+              image: docker.io/pgvector/pgvector:pg17
+              imagePullPolicy: IfNotPresent
+              ports:
+                - containerPort: 5432
+                  protocol: TCP
+              env:
+                - name: POSTGRES_USER
+                  valueFrom:
+                    secretKeyRef:
+                      name: NAME_PLACEHOLDER-db
+                      key: database-user
+                - name: POSTGRES_PASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: NAME_PLACEHOLDER-db
+                      key: database-password
+                - name: POSTGRES_DB
+                  valueFrom:
+                    secretKeyRef:
+                      name: NAME_PLACEHOLDER-db
+                      key: database-name
+                # Store data in a subdir so a lost+found at the mount root
+                # doesn't confuse initdb.
+                - name: PGDATA
+                  value: /var/lib/postgresql/data/pgdata
+              volumeMounts:
+                - name: db-data
+                  mountPath: /var/lib/postgresql/data
+              resources:
+                requests:
+                  memory: 256Mi
+                limits:
+                  memory: 1Gi
+              livenessProbe:
+                exec:
+                  command: ["/bin/sh", "-c", "pg_isready -U wizard"]
+                initialDelaySeconds: 30
+                periodSeconds: 10
+                timeoutSeconds: 5
+              readinessProbe:
+                exec:
+                  command: ["/bin/sh", "-c", "pg_isready -U wizard"]
+                initialDelaySeconds: 5
+                periodSeconds: 10
+                timeoutSeconds: 5
+          volumes:
+            - name: db-data
+              persistentVolumeClaim:
+                claimName: NAME_PLACEHOLDER-db-data
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: NAME_PLACEHOLDER-db
+      labels:
+        app: NAME_PLACEHOLDER-db
+    spec:
+      selector:
+        app: NAME_PLACEHOLDER-db
+      ports:
+        - name: postgresql
+          port: 5432
+          targetPort: 5432
+      type: ClusterIP

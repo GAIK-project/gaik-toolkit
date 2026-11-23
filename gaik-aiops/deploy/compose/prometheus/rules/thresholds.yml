@@ -1,0 +1,45 @@
+# Alert thresholds in one place. Each is a constant series the alert rules
+# compare against, so a deployment changes a value here and nothing else.
+# The defaults are placeholders until the customer sets service levels; the
+# reasoning for each is in wp5-a1/dashboards-alerting.md.
+groups:
+  - name: gaik-thresholds
+    interval: 1m
+    rules:
+      # Disk and data
+      - record: gaik:threshold:volume_used_ratio_warning
+        expr: vector(0.80)
+      - record: gaik:threshold:volume_used_ratio_critical
+        expr: vector(0.90)
+      - record: gaik:threshold:database_bytes_warning
+        expr: vector(4 * 1024 * 1024 * 1024)
+      - record: gaik:threshold:memory_used_ratio_warning
+        expr: vector(0.85)
+
+      # Capacity
+      - record: gaik:threshold:agents_used_ratio_warning
+        expr: vector(0.80)
+      - record: gaik:threshold:sandbox_used_ratio_warning
+        expr: vector(0.80)
+      - record: gaik:threshold:capacity_refusals_10m
+        expr: vector(0)
+      - record: gaik:threshold:stuck_turn_seconds
+        expr: vector(3000)
+
+      # Failures
+      - record: gaik:threshold:turn_failure_ratio_15m
+        expr: vector(0.20)
+      - record: gaik:threshold:sandbox_failure_ratio_30m
+        expr: vector(0.50)
+      - record: gaik:threshold:provider_errors_10m
+        expr: vector(3)
+
+      # Sessions and security
+      - record: gaik:threshold:ownership_denials_10m
+        expr: vector(10)
+      - record: gaik:threshold:sessions_per_owner_10m
+        expr: vector(10)
+
+      # Upload malware check
+      - record: gaik:threshold:scanner_signatures_age_seconds
+        expr: vector(172800)

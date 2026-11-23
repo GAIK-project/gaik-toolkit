@@ -1,0 +1,14 @@
+# MLflow refuses requests whose Host header or Origin it does not know (DNS rebinding and cross-site
+# protection). Add the public address that mlflow-auth passes on. The test op fails the render if the
+# base's arguments move, instead of replacing the wrong one. ROUTE_HOST is replaced with the mlflow
+# Route's spec.host (kustomization.yaml, replacements), which expects --allowed-hosts at index 6 and
+# --cors-allowed-origins at index 8.
+- op: test
+  path: /spec/template/spec/containers/0/args/6
+  value: --allowed-hosts=mlflow:5000,localhost:5000,127.0.0.1:5000
+- op: replace
+  path: /spec/template/spec/containers/0/args/6
+  value: --allowed-hosts=mlflow:5000,localhost:5000,127.0.0.1:5000,ROUTE_HOST
+- op: add
+  path: /spec/template/spec/containers/0/args/-
+  value: --cors-allowed-origins=https://ROUTE_HOST

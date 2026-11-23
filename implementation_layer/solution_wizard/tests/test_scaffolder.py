@@ -15,6 +15,7 @@ from solution_wizard.registry import get_registry
 from solution_wizard.scaffolder import (
     _EVAL_BODIES,
     _determine_pattern,
+    _VALIDATED_VERSION_FILE,
     _write_requirements_txt,
     scaffold_poc,
     validate_generated_python,
@@ -186,6 +187,22 @@ def test_requirements_txt_pins_the_validated_gaik(tmp_path):
     _write_requirements_txt(bp, tmp_path)
     req = (tmp_path / "requirements.txt").read_text().splitlines()
     assert [line for line in req if line.startswith("gaik")] == [f"gaik{spec}"]
+
+
+def test_requirements_txt_keeps_the_floor_without_a_readable_pin(tmp_path, monkeypatch):
+    import solution_wizard.scaffolder as scaffolder
+
+    pin = tmp_path / "pin.txt"
+    pin.write_text("0.10.0\n")
+    monkeypatch.setattr(scaffolder, "_VALIDATED_VERSION_FILE", pin)
+    assert scaffolder._gaik_version_spec() == ">=0.10.0,<0.11"
+
+    monkeypatch.setattr(scaffolder, "_VALIDATED_VERSION_FILE", tmp_path / "missing.txt")
+    assert scaffolder._gaik_version_spec() == ">=0.8.0"
+    bad = tmp_path / "bad.txt"
+    bad.write_text("0.10.1.dev3\n")
+    monkeypatch.setattr(scaffolder, "_VALIDATED_VERSION_FILE", bad)
+    assert scaffolder._gaik_version_spec() == ">=0.8.0"
 
 
 def test_requirements_txt_rag_module(tmp_path):

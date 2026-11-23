@@ -1,0 +1,575 @@
+{
+  "source": "implementation_layer/solution_wizard/registries/gaik_component_registry.json",
+  "components": [
+    {
+      "name": "AnswerGenerator",
+      "inputs": [
+        "text",
+        "retrieved_chunks"
+      ],
+      "outputs": [
+        "answer",
+        "answer_with_citations"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/answer_generator/README.md"
+    },
+    {
+      "name": "AudioToStructuredData",
+      "inputs": [
+        "audio",
+        "video"
+      ],
+      "outputs": [
+        "structured_json",
+        "transcript",
+        "enhanced_transcript"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_modules/audio_to_structured_data/README.md"
+    },
+    {
+      "name": "BatchEvaluationRunner",
+      "inputs": [
+        "structured_json"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://gaik-project.github.io/gaik-toolkit/toolkit/evaluators/"
+    },
+    {
+      "name": "DataExtractor",
+      "inputs": [
+        "text",
+        "transcript",
+        "enhanced_transcript",
+        "parsed_text"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/extractor/README.md"
+    },
+    {
+      "name": "DoclingApiClientParser",
+      "inputs": [
+        "pdf",
+        "document"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/README.md"
+    },
+    {
+      "name": "DoclingParser",
+      "inputs": [
+        "pdf",
+        "document",
+        "image"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/README.md"
+    },
+    {
+      "name": "DocumentClassifier",
+      "inputs": [
+        "text",
+        "pdf",
+        "document"
+      ],
+      "outputs": [
+        "classification",
+        "classification_result"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/doc_classifier/README.md"
+    },
+    {
+      "name": "DocumentsToStructuredData",
+      "inputs": [
+        "pdf",
+        "docx",
+        "document"
+      ],
+      "outputs": [
+        "structured_json",
+        "parsed_text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_modules/documents_to_structured_data/README.md"
+    },
+    {
+      "name": "DocxParser",
+      "inputs": [
+        "docx",
+        "document"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/README.md"
+    },
+    {
+      "name": "DraftReviewer",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "text",
+        "validation_report"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/draft_reviewer/README.md"
+    },
+    {
+      "name": "Embedder",
+      "inputs": [
+        "text_chunks",
+        "text"
+      ],
+      "outputs": [
+        "embeddings"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/embedder/README.md"
+    },
+    {
+      "name": "ExtractionEvaluator",
+      "inputs": [
+        "structured_json"
+      ],
+      "outputs": [
+        "evaluation_report"
+      ],
+      "docs": "https://gaik-project.github.io/gaik-toolkit/toolkit/evaluators/"
+    },
+    {
+      "name": "Extractor",
+      "inputs": [
+        "text",
+        "transcript",
+        "enhanced_transcript",
+        "parsed_text"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/extractor/README.md"
+    },
+    {
+      "name": "FieldsToDocx",
+      "inputs": [
+        "structured_json",
+        "validation_report",
+        "text",
+        "transcript",
+        "enhanced_transcript",
+        "parsed_text"
+      ],
+      "outputs": [
+        "word_document"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/fields_to_docx/README.md"
+    },
+    {
+      "name": "FinnishTextProcessor",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/finnish_text_processor/README.md"
+    },
+    {
+      "name": "FormUnderstander",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/form_understander/README.md"
+    },
+    {
+      "name": "JevClassifier",
+      "inputs": [
+        "text",
+        "pdf",
+        "document"
+      ],
+      "outputs": [
+        "classification",
+        "classification_result"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/jev_classifier/README.md"
+    },
+    {
+      "name": "KnowledgeCurator",
+      "inputs": [
+        "normalized_evidence",
+        "parsed_text",
+        "text"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/knowledge_curator/README.md"
+    },
+    {
+      "name": "LLMJudge",
+      "inputs": [
+        "structured_json",
+        "text",
+        "transcript",
+        "enhanced_transcript",
+        "parsed_text",
+        "pdf",
+        "image"
+      ],
+      "outputs": [
+        "validation_report",
+        "judgement",
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/validators/llm_judge/README.md"
+    },
+    {
+      "name": "LLMJudgePanel",
+      "inputs": [
+        "structured_json",
+        "pdf",
+        "image"
+      ],
+      "outputs": [
+        "validation_report",
+        "judgement"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/validators/llm_judge/README.md"
+    },
+    {
+      "name": "MultimodalParser",
+      "inputs": [
+        "pdf",
+        "document"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text",
+        "html"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/multimodal_parser/README.md"
+    },
+    {
+      "name": "MultiSourceReportGenerator",
+      "inputs": [
+        "pdf",
+        "docx",
+        "document",
+        "audio",
+        "video",
+        "image",
+        "text"
+      ],
+      "outputs": [
+        "text",
+        "word_document"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_modules/multi_source_report_generator/README.md"
+    },
+    {
+      "name": "ParallelTranscriber",
+      "inputs": [
+        "audio",
+        "video"
+      ],
+      "outputs": [
+        "text",
+        "transcript"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parallel_transcriber/README.md"
+    },
+    {
+      "name": "PgVectorStore",
+      "inputs": [
+        "text_chunks",
+        "embeddings"
+      ],
+      "outputs": [
+        "vector_index",
+        "retrieved_chunks"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/pg_vector_store/README.md"
+    },
+    {
+      "name": "PostgresAgent",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "answer",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/postgres_agent/README.md"
+    },
+    {
+      "name": "PyMuPDFParser",
+      "inputs": [
+        "pdf"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/README.md"
+    },
+    {
+      "name": "RAGEvaluator",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "evaluation_report"
+      ],
+      "docs": "https://gaik-project.github.io/gaik-toolkit/toolkit/evaluators/"
+    },
+    {
+      "name": "RAGWorkflow",
+      "inputs": [
+        "document_collection",
+        "pdf",
+        "text"
+      ],
+      "outputs": [
+        "answer",
+        "answer_with_citations"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_modules/RAG_workflow/README.md"
+    },
+    {
+      "name": "Ranker",
+      "inputs": [
+        "retrieved_chunks"
+      ],
+      "outputs": [
+        "retrieved_chunks"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/ranker/README.md"
+    },
+    {
+      "name": "RelevanceGate",
+      "inputs": [
+        "retrieved_chunks"
+      ],
+      "outputs": [
+        "retrieved_chunks"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/relevance_gate/README.md"
+    },
+    {
+      "name": "ReportSynthesizer",
+      "inputs": [
+        "structured_json"
+      ],
+      "outputs": [
+        "text",
+        "word_document"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/report_synthesizer/README.md"
+    },
+    {
+      "name": "ReportWriter",
+      "inputs": [
+        "pdf",
+        "docx",
+        "document",
+        "tabular",
+        "audio",
+        "video",
+        "image",
+        "text"
+      ],
+      "outputs": [
+        "text",
+        "word_document"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_modules/report_writer/README.md"
+    },
+    {
+      "name": "Retriever",
+      "inputs": [
+        "text",
+        "vector_index"
+      ],
+      "outputs": [
+        "retrieved_chunks"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/retriever/README.md"
+    },
+    {
+      "name": "SchemaGenerator",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/extractor/README.md"
+    },
+    {
+      "name": "SourceNormalizer",
+      "inputs": [
+        "pdf",
+        "docx",
+        "document",
+        "tabular",
+        "audio",
+        "video",
+        "image",
+        "text"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text",
+        "normalized_evidence"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/source_normalizer/README.md"
+    },
+    {
+      "name": "SourceTracing",
+      "inputs": [
+        "structured_json",
+        "text",
+        "transcript",
+        "enhanced_transcript",
+        "parsed_text",
+        "pdf"
+      ],
+      "outputs": [
+        "structured_json",
+        "validation_report"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/source_tracing/README.md"
+    },
+    {
+      "name": "SpreadsheetParser",
+      "inputs": [
+        "tabular",
+        "document"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/spreadsheet_parser/README.md"
+    },
+    {
+      "name": "TabularAgent",
+      "inputs": [
+        "tabular",
+        "text"
+      ],
+      "outputs": [
+        "answer",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/tabular_agent/README.md"
+    },
+    {
+      "name": "TextToSpeech",
+      "inputs": [
+        "text"
+      ],
+      "outputs": [
+        "audio"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/text_to_speech/README.md"
+    },
+    {
+      "name": "Transcriber",
+      "inputs": [
+        "audio",
+        "video"
+      ],
+      "outputs": [
+        "text",
+        "transcript"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/transcriber/README.md"
+    },
+    {
+      "name": "TranscriptEnhancer",
+      "inputs": [
+        "text",
+        "transcript"
+      ],
+      "outputs": [
+        "text",
+        "enhanced_transcript"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/enhance_transcript/README.md"
+    },
+    {
+      "name": "VectorStore",
+      "inputs": [
+        "text_chunks",
+        "embeddings"
+      ],
+      "outputs": [
+        "vector_index",
+        "retrieved_chunks"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/RAG/vector_store/README.md"
+    },
+    {
+      "name": "VisionExtractor",
+      "inputs": [
+        "pdf",
+        "image",
+        "document"
+      ],
+      "outputs": [
+        "structured_json"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/vision_extractor/README.md"
+    },
+    {
+      "name": "VisionParser",
+      "inputs": [
+        "pdf",
+        "image"
+      ],
+      "outputs": [
+        "parsed_text",
+        "paged_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/README.md"
+    },
+    {
+      "name": "VisionPlusParser",
+      "inputs": [
+        "pdf",
+        "document"
+      ],
+      "outputs": [
+        "parsed_text",
+        "text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/parsers/README.md"
+    },
+    {
+      "name": "WebScraper",
+      "inputs": [
+        "url",
+        "html"
+      ],
+      "outputs": [
+        "text",
+        "parsed_text"
+      ],
+      "docs": "https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/src/gaik/software_components/web_scraper/README.md"
+    }
+  ]
+}
