@@ -68,7 +68,7 @@ The script will create a configuration file. You need to copy it to Claude Deskt
    - Press `Win + R`
    - Paste: `%APPDATA%\Claude\claude_desktop_config.json`
    - Press Enter
-3. If that file is missing or empty, paste the whole generated content. Otherwise add only the `"gaik-transcriber": {...}` entry to its existing `"mcpServers"` object, keep everything else, and save.
+3. If that file is missing or empty, paste the whole generated content. Otherwise copy both the `"gaik-transcriber": {...}` and the `"filesystem": {...}` entries into its existing `"mcpServers"` object, replacing any entry with the same name, keep everything else, and save. The new `filesystem` entry is the one that limits Claude's file access to the folder you chose; an older one may reach a whole drive.
 
 **Step 3: Restart Claude Desktop**
 
@@ -96,7 +96,7 @@ If you prefer to set things up yourself:
 Open Command Prompt and run:
 ```
 python -m venv transcription-MCP\.venv
-transcription-MCP\.venv\Scripts\python.exe -m pip install mcp==1.30.0 "gaik[transcriber]==0.11.1" python-dotenv==1.2.4
+transcription-MCP\.venv\Scripts\python.exe -m pip install mcp==1.30.0 "gaik[transcriber]==0.12.0" python-dotenv==1.2.4
 ```
 
 **Step 2: Configure API Key**
@@ -399,7 +399,7 @@ report-writing/
 
 ### Dependencies
 
-- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.11.1`, `python-dotenv==1.2.4`
+- **Python packages:** `mcp==1.30.0`, `gaik[transcriber]==0.12.0`, `python-dotenv==1.2.4`
 - **Node.js packages:** `@modelcontextprotocol/server-filesystem@2026.8.31`, installed with
   `npm ci` from `filesystem-MCP/package-lock.json` (pinned versions and integrity hashes)
 - **External APIs:** OpenAI Whisper API (for audio transcription)

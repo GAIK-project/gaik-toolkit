@@ -12,7 +12,9 @@ from pathlib import Path
 from typing import Any
 
 from gaik.software_components import _http
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.endpoints import check_endpoint, log_endpoint
+from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits
 
 
@@ -63,9 +65,11 @@ class DoclingApiClientParser:
         input_file = Path(document_path)
         if not input_file.exists():
             raise FileNotFoundError(f"Document file not found: {input_file}")
+        self.limits.check_file_size(input_file)
+        check_file_type(input_file)
         self.limits.check_document(input_file)
 
-        print(f"Sending document: {input_file.name} ...")
+        print(f"Sending document: {file_tag(input_file)} ...")
 
         # Health check
         r = _http.get(

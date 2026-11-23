@@ -85,7 +85,7 @@ def test_provider_model_allowlists(monkeypatch) -> None:
             "gpt-5.6-terra",
         ),
         "claude": ("claude-sonnet-5-5", "claude-haiku-5-5"),
-        "google": ("gemini-3.8-flash",),
+        "google": ("gemini-3.8-flash", "gemini-4-argon", "gemini-4-carbon"),
     }
 
     monkeypatch.setenv("AZURE_API_KEY", "test-key")
@@ -109,7 +109,46 @@ def test_google_is_offered_only_with_credentials(monkeypatch) -> None:
         route._provider_settings("google", "gemini-3.8-flash")
 
     monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
-    assert route._offered_models("google") == ("gemini-3.8-flash",)
+    assert route._offered_models("google") == (
+        "gemini-3.8-flash",
+        "gemini-4-argon",
+        "gemini-4-carbon",
+    )
+
+
+def test_gemini_4_models_are_offered_to_the_team_only(monkeypatch) -> None:
+    monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
+    monkeypatch.delenv("DEMO_SERVER_MODELS", raising=False)
+    monkeypatch.setattr(model_allow_list, "request_is_staff", lambda: False)
+    assert model_allow_list.offered_to(route._offered_models("google")) == ["gemini-3.8-flash"]
+    with pytest.raises(HTTPException, match="GAIK project team"):
+        model_allow_list.check_team_tier("gemini-4-carbon")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("model", ["google/gemma-4-31b-it", "openai/gpt-oss-120b"])
+async def test_an_aitta_model_is_refused_before_any_upload_or_call(monkeypatch, model) -> None:
+    monkeypatch.setattr(
+        route, "get_request_api_config", lambda: {"provider": "aitta", "model": model}
+    )
+    task, _schema, _requirements = route._load_example_schema()
+    upload = UploadFile(filename="sample.pdf", file=io.BytesIO(b"%PDF-test"))
+
+    with pytest.raises(HTTPException) as refused:
+        await route.extract_vision(
+            files=[upload],
+            user_requirements=task,
+            schema_id=route.EXAMPLE_SCHEMA_ID,
+            model_provider="openai",
+            model=None,
+            reasoning_effort="medium",
+            merge_table=False,
+            additional_instructions=None,
+            include_verification=False,
+            include_sources=False,
+        )
+    assert refused.value.status_code == 400
+    assert refused.value.detail == route.AITTA_REFUSAL
 
 
 @pytest.mark.asyncio
@@ -170,6 +209,77 @@ async def test_extract_passes_reviewed_schema_and_all_options(monkeypatch) -> No
     assert captured["extract"]["requirements"] is expected_requirements
     assert "schema_dir" not in captured["extract"]
     assert all(not Path(path).exists() for path in captured["extract"]["file_paths"])
+
+
+@pytest.mark.asyncio
+async def test_verification_names_the_uploaded_file_not_the_servers_copy(monkeypatch) -> None:
+    # gaik names the file a value was found in; the router reads temporary copies.
+    monkeypatch.setattr(model_allow_list, "request_is_staff", lambda: True)
+
+    class FakeVisionExtractor:
+        def __init__(self, **kwargs):
+            pass
+
+        def extract(self, **kwargs):
+            po, bom = (Path(path).name for path in kwargs["file_paths"])
+
+            def entry(file):
+                return {
+                    "confidence_score": 0.9,
+                    "confidence_reason": "Stated.",
+                    "found_in_text": file is not None,
+                    "file": file,
+                    "page": 1 if file else None,
+                }
+
+            verification = {
+                "po_number": entry(po),
+                "rows": [{"part": entry(bom)}, {"part": entry(None)}],
+            }
+            data = {
+                "po_number": {"value": "PO-77", **entry(po)},
+                "rows": [{"part": {"value": "BX-4410", **entry(bom)}}],
+                # An extracted field called "file" is the document's own value.
+                "file": po,
+            }
+            return SimpleNamespace(
+                data=data,
+                verification=verification,
+                model="gpt-test",
+                documents_processed=2,
+                duration_s=0.1,
+                usage=None,
+            )
+
+    import gaik.software_components.vision_extractor as component
+
+    monkeypatch.setattr(component, "VisionExtractor", FakeVisionExtractor)
+    monkeypatch.setenv("AZURE_API_KEY", "test-key")
+    task, _, _ = route._load_example_schema()
+    uploads = [
+        UploadFile(filename="PO.pdf", file=io.BytesIO(b"%PDF-test")),
+        UploadFile(filename="BOM1.pdf", file=io.BytesIO(b"%PDF-test")),
+    ]
+
+    response = await route.extract_vision(
+        files=uploads,
+        user_requirements=task,
+        schema_id=route.EXAMPLE_SCHEMA_ID,
+        model_provider="claude",
+        model="claude-sonnet-5-5",
+        reasoning_effort="medium",
+        merge_table=False,
+        additional_instructions=None,
+        include_verification=True,
+        include_sources=False,
+    )
+
+    assert response.verification["po_number"]["file"] == "PO.pdf"
+    assert response.verification["rows"][0]["part"]["file"] == "BOM1.pdf"
+    assert response.verification["rows"][1]["part"]["file"] is None
+    assert response.data["po_number"]["file"] == "PO.pdf"
+    assert response.data["rows"][0]["part"]["file"] == "BOM1.pdf"
+    assert response.data["file"] != "PO.pdf"  # not a verification entry
 
 
 def test_example_schema_comes_with_a_field_table_and_its_real_structure() -> None:

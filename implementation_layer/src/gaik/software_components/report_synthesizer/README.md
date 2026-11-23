@@ -71,7 +71,7 @@ knowledge = KnowledgeBase(
 )
 
 synthesizer = ReportSynthesizer(get_llm_config())
-# optional: model="...", reviewer_model="...", strict_review=True, review_attempts=5,
+# optional: model="...", reviewer_model="...", strict_review=False, review_attempts=5,
 #           writer_options={"reasoning_effort": "medium"}, reviewer_options={...},
 #           citations=False (no source citations in the report)
 report = synthesizer.synthesize(
@@ -136,12 +136,15 @@ starts once all of its prerequisites are reviewed.
   report-wide inputs. Fact units carry `source.file`, `locator`, `source_class` and
   `time_qualifier`, so the writer can cite and attribute them as the instructions say.
 - **Derived section** (with `depends_on`): written only from the reviewed texts of its
-  prerequisites, each wrapped as `<section id=".." title="..">`, with no knowledge JSON.
+  prerequisites, each in its own `<source_material>` block labelled `section <id>: <title>`
+  (see "Source material as data" below), with no knowledge JSON.
   Derived sections can depend on other derived sections, e.g. `recommendations` on the
   technical sections and `summary` on everything.
 - The writer uses only the facts in its material, writes `(missing: <item>)` for each
   `missing` entry and each required item the material does not cover, and states both
-  sides of an unresolved conflict, marked `Unresolved:`.
+  sides of an unresolved conflict, marked `Unresolved:`. For a resolved conflict it follows
+  the units in `preferred_unit_ids`, which KnowledgeCurator sets in code or a person sets in
+  the knowledge file; the conflict's description does not choose a side.
 - The section heading is added by the code; a heading the writer emits anyway is
   stripped. An empty writer answer raises `RuntimeError` naming the section.
 - Sections are returned in the order of the `sections` list, not the writing order, so a
@@ -180,9 +183,11 @@ instructions. `(missing: …)` markers are kept. Derived sections are written fr
 prerequisite texts, so they follow the same setting.
 
 The reviewed text is the section text, and it is what derived sections are written from.
-Each section's applied and unresolved edits go into `report.review_log`. With
-`strict_review=True`, a section with unresolved edits raises `RuntimeError` naming the
-section, which stops the run.
+Each section's applied and unresolved edits go into `report.review_log`. By default
+(`strict_review=True`) a section with unresolved edits raises `RuntimeError` naming the
+section, which stops the run, so a report never comes back as reviewed with a correction
+left out. `strict_review=False` returns the report and keeps the unresolved edits in the
+review log only.
 
 ## Saving and editing
 

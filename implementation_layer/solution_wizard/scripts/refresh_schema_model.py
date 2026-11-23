@@ -1,18 +1,28 @@
 #!/usr/bin/env python3
 """Write output_schema_model.json again from a corrected output_schema.py.
 
-The PoC loads its extraction model with load_schema(), which reads
-output_schema_model.json and never imports output_schema.py. After Step 4.5 in
-SKILL.md edits output_schema.py, run this so the model file holds the same
-corrections; otherwise the PoC runs on the schema from before them.
+With gaik 0.11 or later, the audio and document PoCs load their extraction model
+with load_schema(), which rebuilds it from output_schema_model.json without
+importing output_schema.py. After Step 4.5 in SKILL.md edits output_schema.py, run
+this so the model file holds the same corrections; otherwise those PoCs run on the
+schema from before them, unless they write the file again themselves (they do when
+output_schema.py is newer). The custom and hybrid PoCs import output_schema.py.
 
 The class is the one named "model_name" in output_schema_requirements.json. The
 script imports output_schema.py: the file the wizard wrote and edited in this PoC
 workspace, next to the run_poc.py the wizard runs. Do not point it at a schemas
-folder from elsewhere. It refuses a model the saved format cannot describe (exit
-code 1, nothing written). With a gaik release that has no saved_schema module,
-load_schema() still reads output_schema.py itself, so the edit is already in
-effect: the script says so and exits 0 without writing anything.
+folder from elsewhere. It refuses a model the saved format cannot describe, such as
+a field constraint (exit code 1, nothing written). The one constraint kept is a
+pattern on a text field written as the schema generator writes it,
+Annotated[str, constr(pattern=r"...")], also inside Optional[...] or list[...];
+Field(pattern=...), a bare constr(pattern=...) type and
+Annotated[str, StringConstraints(pattern=...)] are refused. With a
+gaik release that has no saved_schema module, load_schema() reads output_schema.py
+itself, so the edit is in effect with that release: the script writes nothing and
+exits 0, with a warning when an older output_schema_model.json is there, since a
+later gaik would load that file. The file is kept rather than removed: without it,
+gaik rebuilds the model from the requirements JSON, which drops a correction made
+only in output_schema.py, and the PoCs no longer write it again from the .py.
 
 Usage:
     python scripts/refresh_schema_model.py --schemas-dir poc/schemas
@@ -74,6 +84,19 @@ def main() -> int:
         print(f"Model file not refreshed: {type(exc).__name__}: {exc}", file=sys.stderr)
         return 1
     if path is None:
+        stale = args.schemas_dir / "output_schema_model.json"
+        if stale.is_file():
+            print(
+                f"WARNING: {stale} was not written again: the installed gaik has no "
+                "saved_schema module. It still holds the schema from before this edit. "
+                "This gaik's load_schema() reads output_schema.py, so the edit is in effect "
+                "with it, but with gaik 0.11 or later the audio and document PoCs load the "
+                "model file, and write it again from output_schema.py only while the .py "
+                "is newer. Run this script with gaik 0.11 or later before such a run; do "
+                "not delete the model file.",
+                file=sys.stderr,
+            )
+            return 0
         print(
             "Model file not needed: the installed gaik has no saved_schema module, "
             "so load_schema() reads output_schema.py and the edit is in effect."

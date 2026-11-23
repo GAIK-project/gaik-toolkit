@@ -277,11 +277,10 @@ def test_pymupdfparser_documents_page_markers_and_citation_call():
 
 
 def test_docxparser_flags_the_dot_doc_gap():
-    """DocxParser's is_supported_file() accepts legacy .doc, but python-docx's
-    Document() cannot open it and raises at parse time -- this must be flagged
-    somewhere on the card (not silently presented as supported), so a use case
-    receiving real .doc (not .docx) files is flagged as unsupported rather than
-    routed into a parser that will crash on it.
+    """python-docx cannot open a legacy binary .doc, so DocxParser refuses one with
+    the fix (save it as .docx) and no longer accepts the extension. The card must say
+    so, so a use case receiving real .doc (not .docx) files is flagged as unsupported
+    rather than routed into a parser that refuses it.
     """
     card = get_reference_cards().get("DocxParser")
     haystack = " ".join(str(card.get(k, "")) for k in ("note", "returns")) + " ".join(
@@ -289,9 +288,9 @@ def test_docxparser_flags_the_dot_doc_gap():
     )
     assert ".doc" in haystack and (
         "PackageNotFoundError" in haystack or "cannot open" in haystack
-    ), (
-        "DocxParser card must flag that legacy .doc is accepted by is_supported_file() but not actually parseable"
-    )
+    ), "DocxParser card must flag that legacy .doc is not parseable"
+    assert "save it as .docx" in haystack
+    assert "returns True for both" not in haystack, "is_supported_file() refuses .doc now"
 
 
 def test_no_parser_other_than_visionparser_and_pymupdf_claims_page_citations():

@@ -81,6 +81,8 @@ def test_list_rows_are_annotated(invoice):
         "confidence_score": 1.0,
         "confidence_reason": "explicit",
         "found_in_text": True,
+        # Plain page texts do not say which file they come from.
+        "file": None,
         "page": 1,
     }
     assert result["lines"][1]["code"]["found_in_text"] is False
@@ -124,6 +126,79 @@ def test_extract_flags_a_confident_misread(invoice, monkeypatch):
     assert vendor["value"] == "V-51834"
     assert vendor["confidence_score"] == 1.0
     assert vendor["found_in_text"] is False and vendor["page"] is None
+    assert vendor["file"] is None
     assert result.data["total"]["found_in_text"] is True
+    assert result.data["total"]["file"] == "invoice.pdf"
     assert result.data["total"]["page"] == 2
     assert result.verification["vendor_number"]["found_in_text"] is False
+
+
+@pytest.fixture
+def order_files(tmp_path):
+    """The issue's case (#141 item 7): a two-page PO, then a BOM."""
+    po = _pdf(tmp_path / "PO.pdf", ["Purchase order PO-77", "Delivery terms FCA"])
+    bom = _pdf(tmp_path / "BOM1.pdf", ["Part number BX-4410\nQty 12"])
+    return po, bom
+
+
+def test_each_file_is_numbered_from_its_own_first_page(order_files):
+    po, bom = order_files
+    pages = text_layer.read_pdf_page_texts([po, bom])
+
+    assert [(page.file, page.page) for page in pages] == [
+        ("PO.pdf", 1),
+        ("PO.pdf", 2),
+        ("BOM1.pdf", 1),
+    ]
+    assert text_layer.locate("BX-4410", pages) == (True, 1)
+    entry = {"confidence_score": 1.0, "confidence_reason": "Stated."}
+    result = text_layer.annotate(
+        {"part": "BX-4410", "terms": "FCA"}, {"part": entry, "terms": entry}, pages
+    )
+    assert result["part"] == {**entry, "found_in_text": True, "file": "BOM1.pdf", "page": 1}
+    assert result["terms"] == {**entry, "found_in_text": True, "file": "PO.pdf", "page": 2}
+
+
+def test_an_unreadable_pdf_does_not_shift_the_pages_of_the_next(order_files, tmp_path):
+    po, bom = order_files
+    broken = tmp_path / "broken.pdf"
+    broken.write_bytes(b"%PDF-1.7 not really")
+
+    pages = text_layer.read_pdf_page_texts([broken, bom, po])
+
+    assert [(page.file, page.page) for page in pages] == [
+        ("BOM1.pdf", 1),
+        ("PO.pdf", 1),
+        ("PO.pdf", 2),
+    ]
+    assert text_layer.read_pdf_pages([broken, bom]) == [pages[0].text]
+
+
+def test_extract_names_the_file_and_its_own_page(order_files, monkeypatch):
+    po, bom = order_files
+    extractor = VisionExtractor(
+        api_config={"api_key": "unused", "model": "test-model"},
+        include_verification=True,
+    )
+    requirements = ExtractionRequirements(
+        use_case_name="Order",
+        fields=[FieldSpec(field_name="part_number", field_type="str", description="Part")],
+    )
+
+    class Order(BaseModel):
+        part_number: str
+
+    canned = {
+        "part_number": {"value": "BX-4410", "confidence_score": 0.9, "confidence_reason": "BOM."}
+    }
+    monkeypatch.setattr(extractor, "_extract", lambda *args, **kwargs: (canned, None))
+
+    result = extractor.extract(
+        file_paths=[po, bom],
+        user_requirements="part number",
+        extraction_model=Order,
+        requirements=requirements,
+    )
+
+    assert result.data["part_number"]["file"] == "BOM1.pdf"
+    assert result.data["part_number"]["page"] == 1

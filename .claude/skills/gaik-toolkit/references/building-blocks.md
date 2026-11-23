@@ -292,7 +292,7 @@ result = extractor.extract(
     user_requirements="Extract purchase order header and line items ...",
     extraction_model=None,            # Optional pre-built Pydantic model
     requirements=None,                # Optional pre-built ExtractionRequirements
-    schema_dir=None,                  # Persist/load schema.py + requirements.json
+    schema_dir=None,                  # Persist/load schema_model.json + requirements.json
 )
 ```
 
@@ -302,7 +302,11 @@ result = extractor.extract(
 **Schema resolution order:**
 
 1. Both `extraction_model` and `requirements` passed → use directly.
-2. `schema_dir` set and `schema.py` + `requirements.json` exist → load from disk.
+2. `schema_dir` set and `requirements.json` + `schema_model.json` exist → the model is
+   rebuilt from `schema_model.json` as data (`saved_schema.read_model_file`); the
+   `schema.py` written beside it is only for reading and is never imported. A folder
+   from an older gaik (`schema.py` + `requirements.json` only) is rebuilt from the
+   requirements where they determine the model, else refused with `SavedSchemaError`.
 3. Otherwise → generate via `SchemaGenerator` (one text LLM call).
 
 ### VisionExtractionResult
@@ -462,7 +466,8 @@ the environment variables of the `model_provider` + flag combination. Other opti
 `additional_instructions`.
 
 **Returns:** `ParseResult` — a dataclass with `raw_markdown`, `clean_markdown`, `html`
-(only when `create_html=True`) and `usage`. It has **no `save()` method**; write the file
+(only when `create_html=True`), `usage` and `truncated` (the reply stopped at the
+output-token cap). It has **no `save()` method**; write the file
 yourself.
 
 ---
@@ -537,6 +542,7 @@ When `enhanced_transcript=True`, the Transcriber runs the raw transcript through
 | `segments` | list[dict] \| None | Whisper segments with start/end/text (whisper_local only) |
 | `srt_content` | str \| None | SRT subtitle content (whisper_local only) |
 | `vtt_content` | str \| None | VTT subtitle content (whisper_local only) |
+| `failed_segments` | list[dict] | With `allow_partial=True`, the chunks that failed (`segment`, `start_seconds`, `end_seconds`); empty when none failed. A run in which every chunk failed raises `RuntimeError` |
 
 **Methods:**
 - `result.save(directory, *, save_raw=True, save_enhanced=True, encoding="utf-8")` - Persist to disk. Returns `dict[str, Path | None]` mapping `"raw"` and `"enhanced"` to saved file paths.
@@ -571,7 +577,7 @@ enhancer = TranscriptEnhancer(
 # From string
 result = enhancer.enhance_text(
     transcript_text="...",
-    generate_summary=False,           # Include change count summary
+    generate_summary=False,           # Kept for older callers: the summary is always set
     diff_chunks=False,                # Include list of changed spans
     additional_instructions=None,     # Extra instructions for Pass 2
     progress_callback=None,           # Optional: Callable[[str, dict], None]
@@ -598,8 +604,10 @@ result = enhancer.enhance_file(
 result.enhanced_text           # Corrected transcript
 result.original_text           # Input transcript
 result.source_file             # File path (if enhance_file was used)
-result.correction_summary      # CorrectionSummary (if generate_summary=True)
+result.correction_summary      # CorrectionSummary (always set)
 result.diff_chunks             # List[DiffChunk] (if diff_chunks=True)
+result.refused_passes          # List[RefusedPass]: passes refused in code (digits changed,
+                               #   or more than max_change_ratio of the letters); input kept
 result.model_dump()            # Serialize to dict
 ```
 
@@ -749,6 +757,7 @@ saved_path = result.save("tts_outputs")
 | `language` | str | Language code |
 | `response_format` | str | Audio format |
 | `content_type` | str | MIME type |
+| `instructions` | str \| None | Instructions sent; `None` for a model that takes none (`tts-1`, `tts-hd`) |
 
 **Methods:**
 - `result.save(output_dir)` - Save audio file, returns path

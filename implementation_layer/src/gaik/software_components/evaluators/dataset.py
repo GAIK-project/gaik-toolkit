@@ -69,9 +69,10 @@ class EvaluationDataset:
 
     @classmethod
     def from_jsonl(cls, path: str | Path) -> EvaluationDataset:
+        """Load one item per line; a UTF-8 byte order mark at the start is skipped."""
         path = Path(path)
         items: list[EvaluationItem] = []
-        with path.open(encoding="utf-8") as fh:
+        with path.open(encoding="utf-8-sig") as fh:
             for line_no, line in enumerate(fh, start=1):
                 line = line.strip()
                 if not line:
@@ -85,9 +86,10 @@ class EvaluationDataset:
 
     @classmethod
     def from_csv(cls, path: str | Path) -> EvaluationDataset:
+        """Load one item per row; a UTF-8 byte order mark (Excel's "CSV UTF-8") is skipped."""
         path = Path(path)
         items: list[EvaluationItem] = []
-        with path.open(encoding="utf-8", newline="") as fh:
+        with path.open(encoding="utf-8-sig", newline="") as fh:
             reader = csv.DictReader(fh)
             for row in reader:
                 items.append(_item_from_dict(dict(row)))

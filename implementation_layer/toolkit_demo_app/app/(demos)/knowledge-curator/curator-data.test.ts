@@ -134,3 +134,21 @@ describe("the examples", () => {
     }
   });
 });
+
+test("the examples rank primary sources first, as their instructions describe", () => {
+  for (const example of EXAMPLES) {
+    expect(example.source_precedence).toEqual(["primary", "secondary"]);
+    // The text no longer decides conflicts: the precedence does. On a gaik without
+    // it the model reads the ranking from the instructions, so the summary names neither.
+    expect(example.instructions).not.toContain("prefer the primary");
+    expect(example.summary).not.toContain("instructions say");
+  }
+});
+
+test("the example with conflicts does not promise them settled where gaik cannot rank sources", () => {
+  // Its instructions only label the sources primary or secondary, so on gaik 0.11.1
+  // the model may well leave its conflicts open.
+  const sale = EXAMPLES.find((example) => example.id === "sale")!;
+  expect(sale.tags).toContain("conflicts");
+  expect(sale.summary).toContain("may leave the conflicts open");
+});

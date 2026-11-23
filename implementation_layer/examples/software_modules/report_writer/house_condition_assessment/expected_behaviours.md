@@ -18,6 +18,13 @@ script after the speech round trip, so grep for key words rather than whole sent
 
 ## Source hierarchy (P4)
 
+`report_writer_example.py` sets `"source_precedence": ["primary", "secondary"]` (the bundled
+`report_spec.json` leaves the key out until the gaik release that carries it (0.12.0 or later), since the demo
+app loads the spec with gaik from PyPI): the curator resolves a conflict in
+code when exactly one side cites a recording, unless that recording is itself unsure (a unit of
+`low` confidence). Every other conflict stays `unresolved` for a person to settle in the knowledge
+file at the evidence checkpoint.
+
 ### C1: main distribution board, known only from a document
 - **Planted:** `renovation_report_1998.pdf`, page 3, section 6: "The main distribution board was
   replaced in 1998." `rec3_building_services.mp3` describes the board but gives no year.
@@ -50,7 +57,8 @@ script after the speech round trip, so grep for key words rather than whole sent
     between 115 and 125 ... The highest reading is 125."
 - **Expected:** the Wet rooms section follows the observation: elevated readings next to the shower
   floor drain, stated as observed. It mentions that the 2019 survey found no elevated readings.
-  `knowledge/wet_rooms.json` records the conflict as `resolved`.
+  `knowledge/wet_rooms.json` records the conflict as `resolved` by `primary`, with the recording's
+  unit in `preferred_unit_ids`.
 - **Check:**
   - `conflicts knowledge/wet_rooms.json` shows a `resolved` moisture conflict.
   - `section "Wet rooms" | grep -iE "125|elevated"`
@@ -62,9 +70,12 @@ script after the speech round trip, so grep for key words rather than whole sent
     ... I can't tell from here."
   - `roof_renovation_2012.pdf`, page 1: "The old underlay was removed and a new roof underlay was
     installed over the whole roof."
-- **Expected:** "Unresolved: ..." in the Structures and roof section, giving both views, and an
-  `unresolved` entry in the `conflicts` of `knowledge/structures.json`.
+- **Expected:** the recording's underlay unit has `"confidence": "low"`, so the precedence does not
+  decide the conflict: "Unresolved: ..." in the Structures and roof section, giving both views, and
+  an `unresolved` entry in the `conflicts` of `knowledge/structures.json`.
 - **Check:**
+  - `grep -n -i -B2 -A8 '"quote": ".*not sure' knowledge/structures.json` shows the unit with
+    `"confidence": "low"`.
   - `conflicts knowledge/structures.json` shows an `unresolved` underlay conflict.
   - `section "Structures and roof" | grep -i "unresolved"`
 
@@ -74,13 +85,19 @@ script after the speech round trip, so grep for key words rather than whole sent
     and was not part of the 1998 renovation."
   - `roof_renovation_2012.pdf`, page 1: "The new roof covering is profiled steel sheet, 0.5 mm,
     coated, dark grey."
-- **Expected:** the report follows the newer document: the roof covering is steel sheet. Concrete
-  tiles appear, if at all, only as the covering that was replaced in 2012.
+- **Expected:** both sides are secondary, so the precedence cannot decide, and "newer document
+  wins" is not a rule the classes express. If the curator lists the covering as a conflict, it is
+  `unresolved`; the person settles it at the evidence checkpoint by marking it `resolved` with the
+  2012 unit in `preferred_unit_ids` (the KnowledgeCurator README, Editing knowledge files). The
+  report then follows the newer document: the roof covering is steel sheet, and concrete tiles
+  appear, if at all, only as the covering that was replaced in 2012. Left unsettled, the section
+  gives both views as "Unresolved: ...". The curator may also read the two as a historical change
+  (1998 and 2012) rather than a conflict, which needs no settling.
 - **Check:**
-  - `section "Structures and roof" | grep -i "steel sheet"`
-  - `grep -n -i "concrete tile" report/report.md` shows only past or replaced wording.
-  - `conflicts knowledge/structures.json` shows the covering conflict as `resolved`, if the curator
-    lists it.
+  - `conflicts knowledge/structures.json`: a covering conflict, if listed, is `unresolved` before
+    the person settles it.
+  - After settling: `section "Structures and roof" | grep -i "steel sheet"`, and
+    `grep -n -i "concrete tile" report/report.md` shows only past or replaced wording.
 
 ## Explicit missing data and scope (P7)
 

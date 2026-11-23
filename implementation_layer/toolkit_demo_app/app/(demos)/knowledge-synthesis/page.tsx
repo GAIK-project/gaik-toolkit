@@ -1,7 +1,9 @@
 "use client";
 
 import { MessageResponse } from "@/components/ai-elements/message";
+import { RunButton } from "@/components/demo/run-button";
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
+import { ModelNameInput } from "@/components/demo/model-name-input";
 import { PageTransition } from "@/components/demo/page-transition";
 import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
@@ -429,12 +431,23 @@ export default function KnowledgeSynthesisPage() {
       if (!raw) throw new Error("Synthesize ended without a result.");
       toast.success("Report written");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(false);
+      if (abortRef.current === controller) setRunning(false);
     }
+  }
+
+  /** Cancels the run in the browser; the knowledge and sections stay. */
+  function stopRun() {
+    abortRef.current?.abort();
+    setRunning(false);
+    setProgress([]);
   }
 
   const sections = run
@@ -832,7 +845,8 @@ export default function KnowledgeSynthesisPage() {
                           {step}
                         </p>
                         <Row label="Model">
-                          <Input
+                          <ModelNameInput
+                            kind="chat"
                             placeholder="The server's model"
                             value={options[`${step}_model`] ?? ""}
                             disabled={busy}
@@ -879,29 +893,16 @@ export default function KnowledgeSynthesisPage() {
               </Accordion>
               <CardContent className="space-y-2 pt-0">
                 <div className="flex gap-2">
-                  <Button
-                    size="lg"
+                  <RunButton
+                    running={running}
+                    onRun={synthesize}
+                    onStop={stopRun}
+                    icon={Sparkles}
                     className="flex-1"
-                    onClick={synthesize}
                     disabled={busy || !ready}
                   >
-                    {running ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Sparkles className="mr-2 h-4 w-4" />
-                    )}
-                    {running ? "Writing the report…" : "Synthesize"}
-                  </Button>
-                  {running && (
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={() => abortRef.current?.abort()}
-                    >
-                      <X className="mr-2 h-4 w-4" />
-                      Cancel
-                    </Button>
-                  )}
+                    Synthesize
+                  </RunButton>
                 </div>
                 {!ready && !running && (
                   <p className="text-muted-foreground text-xs">

@@ -14,6 +14,7 @@ import {
   DEFAULT_OPTIONS,
   MAX_ZIP_BYTES,
   parseKnowledge,
+  PRIMARY_FIRST,
   readKnowledge,
   readWorkspaceZip,
   sectionsProblem,
@@ -55,6 +56,17 @@ test("buildRequest trims text, drops blank required items and blank models", () 
     instructions: "rules",
     options: { model: null, reasoning_effort: "low", max_workers: 2 },
   });
+});
+
+test("buildRequest sends the source precedence only when it names a class", () => {
+  const sections = [{ id: "a", title: "A", instructions: "", required_items: [] }];
+
+  expect("source_precedence" in buildRequest(sections, "", DEFAULT_OPTIONS)).toBe(false);
+  expect("source_precedence" in buildRequest(sections, "", DEFAULT_OPTIONS, [])).toBe(false);
+  expect(buildRequest(sections, "", DEFAULT_OPTIONS, PRIMARY_FIRST).source_precedence).toEqual([
+    "primary",
+    "secondary",
+  ]);
 });
 
 test("sectionsProblem names the first problem", () => {

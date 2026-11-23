@@ -285,7 +285,8 @@
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Select an available embedding model/deployment separately from the chat model. Anthropic/Foundry has no native embeddings API; Aitta, compatible endpoints and LiteLLM require an explicit embedding model. Rebuild the index after changing provider, model or vector dimensions.",
       "The default parser='vision' parses PDFs with VisionRagParser (Docling layout + a vision model for images; the rag-workflow extra pulls docling and torch). parser='text' (gaik>=0.8.10, extra rag-workflow-text) reads the text layer without them, but the wizard's RAG template and install_extra use the vision default: choose RAGWorkflow only when image-aware parsing (scans, figures, diagrams) is required, and for text-layer PDFs compose a text parser such as PyMuPDFParser with Embedder, Retriever and AnswerGenerator.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: each document before it is parsed, through the parser; limits is passed to the parser only when set, and the default (InputLimits.local_parsing()) limits the size and, for parser='vision', the embedded images (500), not the pages. Change a limit with limits=InputLimits(...).",
+      "Each indexed file is one document identified by its document_ids entry or else its path as given with forward slashes (Path(path).as_posix(), not resolved: a relative and an absolute spelling of one file are two documents, and one relative path from two working directories is one; filenames are display names only); indexing the same id again replaces its chunks (gaik 0.12.0 or later; a persisted collection from an older gaik needs a new collection_name)"
     ],
     "best_for": [
       "document_qa",
@@ -365,8 +366,10 @@
       "enhanced_transcript_instructions",
       "default_prompt",
       "initial_prompt",
+      "allow_partial",
       "api_config",
-      "limits"
+      "limits",
+      "enhancement_max_change_ratio"
     ],
     "supported_providers": [
       "openai",
@@ -391,7 +394,8 @@
       "whisper_local requires a self-hosted transcription endpoint (local_api_base + local_api_key); transcribe() raises ValueError without both. Confirm the user has one before selecting this path.",
       "Speaker labels are exposed on .segments only. .srt_content and .vtt_content are built by segments_to_srt/segments_to_vtt, which read start/end/text and drop every other key.",
       "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend including whisper_local) before the first transcription call, read with ffprobe or from the decoded audio; max_media_bytes is off by default. max_size_mb and max_duration_seconds only decide chunking. Change a limit with limits=InputLimits(...).",
-      "Since gaik 0.11.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable."
+      "Since gaik 0.11.0, local_api_base must be the address set in LOCAL_TRANSCRIBER_API_BASE (plain http works for it), this machine, or a host in GAIK_ALLOWED_ENDPOINT_HOSTS; otherwise the constructor raises EndpointNotAllowedError. Read it from that variable.",
+      "Since gaik 0.12.0, a chunk of a split recording that cannot be transcribed makes transcribe() raise RuntimeError naming the segment and its time range; the remaining chunks are not sent. allow_partial=True returns the transcript with a '[Transcription failed for segment N]' line instead, as earlier releases did; since gaik 0.12.0 result.failed_segments then lists the failed chunks, and a run in which every chunk failed raises RuntimeError even so."
     ],
     "best_for": [
       "audio_to_transcript",
@@ -444,7 +448,8 @@
       "api_config",
       "model",
       "reasoning_effort",
-      "use_azure"
+      "use_azure",
+      "max_change_ratio"
     ],
     "supported_providers": [
       "openai",
@@ -469,6 +474,7 @@
     "known_limitations": [
       "Tuned for Finnish; other languages require prompt customisation",
       "Should not be used when transcript faithfulness is more important than correctness",
+      "Each pass is refused in code, keeping its input, when it changes any digit or more than max_change_ratio (default 25%) of the letters; result.refused_passes lists them and original_text keeps the raw transcript. Not checked in code: decimal separators, signs, units, magnitude words, numbers written as words, names.",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
@@ -782,7 +788,8 @@
       "model",
       "parser",
       "config",
-      "limits"
+      "limits",
+      "temperature"
     ],
     "supported_providers": [
       "openai",
@@ -969,7 +976,9 @@
     },
     "known_limitations": [
       "Requires PostgreSQL with pgvector extension (`pip install gaik[pg-vector-store]`)",
-      "Database must be set up separately before use"
+      "Database must be set up separately before use",
+      "Re-indexing replaces a document's rows (add(..., replace=True), delete_document) only for rows added by gaik 0.12.0 or later to a table setup() has run on; older rows stay searchable but are not found: re-index into a new table_name",
+      "close(timeout=None) waits for a call in another thread to end; with timeout=<seconds> it raises TimeoutError after that long and leaves the connection open"
     ],
     "best_for": [
       "semantic_search",
@@ -1121,6 +1130,7 @@
       "whisper_local_chunk_parallelism",
       "whisper_local_chunk_duration_minutes",
       "whisper_local_max_audio_minutes",
+      "whisper_request_format",
       "api_config",
       "limits"
     ],
@@ -1148,7 +1158,8 @@
       "Produces timestamps but never speaker labels, on any backend. gpt-4o-transcribe-diarize requests diarized output and parses the speaker field, then discards it when building the SRT (and TranscriptionResult exposes only .content, so it cannot be recovered); the whisper_local backend hardcodes diarization=False in its request payload. For speaker attribution use Transcriber(transcription_model='whisper_local', diarization=True).",
       "The whisper_local backend takes its endpoint from api_config['api_base'] (required) and api_config['key'] or ['api_key'] (optional -- the auth header is omitted when empty). This differs from Transcriber, which uses the local_api_base/local_api_key constructor kwargs and requires both.",
       "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the recording's length (max_media_seconds, default 6 hours, on every backend) before audio is extracted or any call is made; whisper_local_max_audio_minutes is a second cap for Whisper Local only. A recording without a length in its header (a WebM recorded in a browser) is measured by decoding its audio, and one whose length cannot be read at all is refused. max_media_bytes is off by default. Change a limit with limits=InputLimits(...).",
-      "Since gaik 0.11.0, api_config['api_base'] for whisper_local follows the same rule as Transcriber's local_api_base (LOCAL_TRANSCRIBER_API_BASE, this machine or GAIK_ALLOWED_ENDPOINT_HOSTS), and an Azure audio endpoint must be an Azure host, the address in AZURE_ENDPOINT or a listed host; otherwise EndpointNotAllowedError (at construction for gpt-4o-transcribe-diarize, when the Whisper client is built otherwise)."
+      "Since gaik 0.11.0, api_config['api_base'] for whisper_local follows the same rule as Transcriber's local_api_base (LOCAL_TRANSCRIBER_API_BASE, this machine or GAIK_ALLOWED_ENDPOINT_HOSTS), and an Azure audio endpoint must be an Azure host, the address in AZURE_ENDPOINT or a listed host; otherwise EndpointNotAllowedError (at construction for gpt-4o-transcribe-diarize, when the Whisper client is built otherwise).",
+      "Since gaik 0.12.0, a chunk FFmpeg cannot create, even on its retry, or one that comes out shorter than asked for (by encoded length) with audio after it, makes transcribe() raise RuntimeError naming the missing time ranges, instead of returning a transcript without that stretch; there is no option to keep a partial transcript."
     ],
     "best_for": [
       "long_audio_transcription",
@@ -1261,7 +1272,7 @@
       "Orchestrates existing GAIK parsers/transcriber/extractor; no new parsing logic -- inherits each sub-component's limits",
       "Long-form synthesis cost grows with sources x sections; agentic mode is significantly more expensive than single-call",
       "Report content is drawn only from supplied evidence; it does not browse or fetch external sources",
-      "Since gaik 0.10.0: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config stores an input outside that folder with only a warning, so that config loads back only with root=.",
+      "Since gaik 0.10.0: load_report_config(path, root=None) requires the stored paths to stay inside the config file's folder, or inside root; otherwise it raises SourcePathError. save_report_config refuses such a path with SourcePathError from gaik 0.12.0 (0.11.1 and earlier store it with only a warning, so that config loads back only with root=); save_report_config(..., root=) writes one that loads with the same root.",
       "Agentic mode requires the multi-source-report-generator-agentic extra (langgraph); DOCX export requires multi-source-report-generator-docx extra and Pandoc system binary",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "Audio stages require a separate native OpenAI/Azure configuration when the extraction or writing provider is Aitta, Anthropic, Google/Vertex, LiteLLM or a generic compatible endpoint. Chat support does not imply audio support.",
@@ -1346,6 +1357,7 @@
       "description",
       "language",
       "instructions",
+      "source_precedence",
       "required_items",
       "depends_on",
       "sample_report",
@@ -1551,6 +1563,7 @@
       "max_workers",
       "chat_options",
       "instructions",
+      "source_precedence",
       "drop_unverified"
     ],
     "supported_providers": [
@@ -1582,7 +1595,8 @@
       "Every quote must occur verbatim (whitespace aside) in the source it cites. A fact whose quote still fails after one retry is dropped and listed in KnowledgeBase.dropped; with drop_unverified=False, curate() raises ValueError instead. A conflict pointing at a unit that does not exist gets the same retry; if it still does, the bad reference is left out and a conflict left with fewer than two units is removed (drop_unverified=False raises ValueError instead).",
       "Dropping can leave the knowledge smaller than the sources support: a dropped fact may be true with a wrongly copied quote, and a required item covered only by a dropped fact is not added to missing. Check KnowledgeBase.dropped when completeness matters; dropped is not saved, so it is empty after KnowledgeBase.load.",
       "Derived sections (with depends_on) are not curated; a template with no other section raises ValueError.",
-      "Conflicts are marked resolved only when the source hierarchy in instructions decides them -- state the hierarchy (e.g. primary site observations over older documents) in instructions.",
+      "Conflicts are decided in code from the units' cited sources, never by the model's own verdict: resolved only when exactly one of the conflict's units has the class source_precedence ranks highest among them and that unit is not of low confidence, else unresolved for a person to settle (also in the knowledge file). A rule the classes cannot express, such as a newer document over an older one, needs a person.",
+      "A fact whose summary states a number that its quote and time_qualifier do not give (an age computed from a year) fails the quote check like a wrong quote.",
       "usage is not saved, so it is empty after KnowledgeBase.load.",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
@@ -1680,7 +1694,7 @@
     "known_limitations": [
       "Input is a KnowledgeBase holding exactly one entry per non-derived section and nothing else (usually from KnowledgeCurator; it can also be written by hand). A mismatch, duplicate or cyclic dependency raises ValueError before any LLM call.",
       "A technical section is written only from its own knowledge JSON; a derived section (depends_on) only from the reviewed texts of its prerequisites.",
-      "Unapplied reviewer edits are logged in review_log; strict_review=True raises RuntimeError instead. An empty writer answer raises RuntimeError.",
+      "By default (strict_review=True from gaik 0.12.0; 0.11.1 and older default to False) a section with unapplied reviewer edits raises RuntimeError; strict_review=False logs them in review_log and returns the report. An empty writer answer raises RuntimeError.",
       "Report.save writes report.docx by default (docx=False skips it); DOCX needs the Pandoc system binary.",
       "usage is not saved, so it is empty after Report.load.",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
@@ -1989,6 +2003,7 @@
     },
     "known_limitations": [
       "context_recall requires ground_truth; skipped otherwise (skip_context_recall=True by default)",
+      "An item the judge gave no score for on a metric (call failed, reply unreadable, no flag) gets score 0 and an entry in RAGItemResult.errors, and is left out of that metric's mean; RAGMetrics.failed counts those items per metric, so a partial run is visible there",
       "Scores are Likert 1-5 normalized to 0-1; not calibrated against human raters",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
@@ -2165,6 +2180,7 @@
       "response_format",
       "speed",
       "default_instructions",
+      "send_instructions",
       "instructions",
       "api_config"
     ],
@@ -2527,7 +2543,8 @@
       "convert_image (image input) returns a single markdown string, not a page list -- page provenance applies to PDF input only",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF or image before any page is rendered or sent: size (100 MiB), pages (500; with first_pages=N only those pages) and the pixels of each page at the chosen dpi or of the image file (89,478,485). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF or image before any page is rendered or sent: size (100 MiB), pages (500; with first_pages=N only those pages) and the pixels of each page at the chosen dpi or of the image file (89,478,485). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (convert_pdf: another known type than PDF; convert_image: content that is not a PNG, JPEG, GIF, WebP, TIFF or BMP image; an image under another image extension, or a file without a suffix, is sent with the image type its content has) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "page_attributed_parsing",
@@ -2615,7 +2632,8 @@
       "Requires a premium multimodal model from OpenAI/Azure, Anthropic, or Google (pip install gaik[multimodal-parser])",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF before it is sent: size (100 MiB), pages (500) and the pixels of each rendered page; a PDF whose pages cannot be counted is refused. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF before it is sent: size (100 MiB), pages (500) and the pixels of each rendered page; a PDF whose pages cannot be counted is refused. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "complex_tables_spanning_pages",
@@ -2686,7 +2704,8 @@
       "Slow without a CUDA-enabled GPU -- OCR and formula enrichment dominate runtime on CPU",
       "ocr_engine choice affects language support and system dependencies ('tesseract_cli' requires a system Tesseract install)",
       "parse_document flattens the document into one text_content string -- no page-level provenance",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before Docling reads it: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before Docling reads it: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (.pdf, .docx, .pptx, .doc/.ppt, .txt) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "scanned_document_ocr",
@@ -2776,7 +2795,8 @@
       "Returns one flat parsed_markdown string -- no page-level provenance",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra.",
       "The shared provider path requires a model accepting image content. An OpenAI-compatible chat endpoint or Aitta catalog entry does not by itself guarantee vision support.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size before Docling runs, then the embedded images before the first vision call: at most 500 (max_images, one call each) of at most 89,478,485 pixels; Docling reads the pages locally, so no page limit by default. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size before Docling runs, then the embedded images before the first vision call: at most 500 (max_images, one call each) of at most 89,478,485 pixels; Docling reads the pages locally, so no page limit by default. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF, is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "documents_with_meaningful_images",
@@ -2844,7 +2864,8 @@
       "Sends the document to an external service -- unsuitable when data must not leave the local environment",
       "Returns parsed_markdown (not text_content like the local DoclingParser) and flattens pages -- no page-level provenance",
       "Declared under the 'parser' extra because that is where requests is pinned; the client itself does not need docling installed locally",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before it is uploaded: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file before it is uploaded: size (100 MiB) and the unpacked size of an Office file; no page limit by default (InputLimits.local_parsing()). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (for the extensions it knows: .pdf, Office, image and text files) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "gpu_accelerated_docling_parsing",
@@ -2904,7 +2925,8 @@
       "No OCR -- cannot read scanned or image-only PDFs (use DoclingParser)",
       "Simple layouts only; tables and multi-column text degrade badly",
       "Default (use_markdown=True) concatenates pages into one text_content string with no page marker -- no page-level provenance. use_markdown=False inserts '=== PAGE N ===' markers (plus per-line [x:,y:] bounding-box tags) and IS a valid, free/local way to get file_name|page_number citations for text-layer PDFs -- see the reference card's call_page_citations pattern.",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size (100 MiB) before it is opened; no page limit by default (InputLimits.local_parsing()), InputLimits(max_pages=N) adds one. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the PDF's size (100 MiB) before it is opened; no page limit by default (InputLimits.local_parsing()), InputLimits(max_pages=N) adds one. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is another known type than PDF (DOCX, XLSX, an image), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "fast_local_text_extraction",
@@ -2961,10 +2983,11 @@
       ]
     },
     "known_limitations": [
-      "Word documents -- use a PDF parser for PDFs. Declares .doc support (is_supported_file() accepts it), but python-docx's Document() cannot open the legacy binary .doc format -- a real .doc file raises PackageNotFoundError at parse time. Treat only .docx as actually supported.",
+      "Word documents (.docx) -- use a PDF parser for PDFs. A legacy binary .doc (Word 97-2003) is refused with FileTypeMismatchError whose message says to save it as .docx; a DOCX saved under the .doc name is read. Text in content controls and tracked insertions is read; tracked deletions are not.",
       "DOCX has no fixed page model, so page-level citations are not possible",
       "use_markdown=False emits paragraph-index and style markers rather than clean prose",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB) and unpacked size (10 x that) before it is read. Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB) and unpacked size (10 x that) before it is read. Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says, or is not a DOCX (a legacy binary .doc included), is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "word_document_parsing",
@@ -3199,7 +3222,7 @@
     "known_limitations": [
       "RAGWorkflow already performs answer generation -- select this directly only for custom pipelines",
       "Streams by default (stream=True); set stream=False to receive a single string",
-      "Citation quality depends entirely on the retrieved context -- it formats citations, it does not verify sources",
+      "The model cites by reference number and numbered references are resolved to the retrieved chunks; the citations list holds only retrieved chunks and a [name, page X] no chunk has is removed. A number that is not a chunk's reference, and sources in other forms, are left as written in the answer. It cannot check that a cited chunk supports the sentence it is attached to",
       "Provider support is conditional on the selected model and endpoint: verify account access, input modalities and structured-output support. Native Google/Vertex requires llm-google, Anthropic/Foundry llm-anthropic, and the optional LiteLLM backend llm-litellm in addition to the component extra."
     ],
     "best_for": [
@@ -3619,7 +3642,9 @@
     "uses_components": [],
     "required_parameters": [],
     "optional_parameters": [
-      "limits"
+      "limits",
+      "csv_delimiter",
+      "csv_encoding"
     ],
     "supported_providers": [],
     "cost_relevant_parameters": [],
@@ -3636,7 +3661,8 @@
       "Formula cells show the result stored in the file; a workbook whose formulas have no stored results (written by a library and never opened in Excel) raises ValueError -- open and save it in Excel or LibreOffice first",
       "The first non-empty row is the header; empty rows are dropped and empty sheets omitted; a file with no non-empty rows raises ValueError",
       "Reads a spreadsheet as text. To ask questions over its data use TabularAgent; for mixed source files use SourceNormalizer, which calls this parser",
-      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). Change a limit with limits=InputLimits(...)."
+      "Since gaik 0.11.0, a file over its input limits is refused with InputLimitError (a ValueError) before it is read or sent to a model; checked: the file's size (100 MiB), an .xlsx's unpacked size and the data rows of each sheet or CSV (1,000,000). Change a limit with limits=InputLimits(...).",
+      "The file's type is read from the start of its content, not from its name: a file whose content is not the type its extension says (an .xlsx that is no XLSX workbook, a .csv that is not text) is refused with FileTypeMismatchError (gaik.software_components.file_type; a ValueError naming the file, its extension and the detected type) before it is read or sent to a model."
     ],
     "best_for": [
       "spreadsheet_to_markdown",
@@ -3697,7 +3723,8 @@
       "Default is an in-memory store: the index is lost when the process ends; persist=True keeps it in a local Chroma folder (needs chromadb, installed with gaik[vector-store])",
       "In-memory search compares the query with every stored embedding, so it suits small and medium collections",
       "Metadata filtering is basic",
-      "A single process: not a shared or production index -- use PgVectorStore for that"
+      "A single process: not a shared or production index -- use PgVectorStore for that",
+      "Re-indexing replaces a document's chunks only when each chunk names its document (metadata document_id, source or document_name) and, for a persisted collection, the collection was built by gaik 0.12.0 or later; otherwise re-index into a new collection_name"
     ],
     "best_for": [
       "proof_of_concept_retrieval",

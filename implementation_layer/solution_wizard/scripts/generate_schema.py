@@ -35,6 +35,7 @@ import argparse
 import json
 import keyword
 import sys
+import types
 from pathlib import Path
 from typing import Annotated, Literal, Union, get_args, get_origin
 
@@ -139,8 +140,14 @@ def _collect_models(model: type) -> list[type]:
             return
         seen.add(current)
         for field in current.model_fields.values():
-            if get_origin(field.annotation) is list:
-                args = get_args(field.annotation)
+            annotation = field.annotation
+            if get_origin(annotation) in (Union, types.UnionType):
+                # A collection the task lets be null: list[Row] | None.
+                inner = [arg for arg in get_args(annotation) if arg is not type(None)]
+                if len(inner) == 1:
+                    annotation = inner[0]
+            if get_origin(annotation) is list:
+                args = get_args(annotation)
                 if args and isinstance(args[0], type) and hasattr(args[0], "model_fields"):
                     collect(args[0])
         ordered.append(current)
@@ -366,10 +373,11 @@ def main() -> int:
     )
 
     # -- Describe the model for output_schema_model.json: what load_schema()
-    # rebuilds the model from (gaik >= the release that loads saved schemas as
-    # data); the .py file below is for reading and is never imported. The
-    # description is made before any file is written, so a model the saved
-    # format refuses leaves the schemas folder as it was, not half-written.
+    # rebuilds the model from (gaik 0.11 and later, which load saved schemas as
+    # data); load_schema() then does not import the .py file below, though the
+    # custom and hybrid PoCs do. The description is made before any file is
+    # written, so a model the saved format refuses leaves the schemas folder as
+    # it was, not half-written.
     try:
         from gaik.software_components.extractor.saved_schema import (
             SavedSchemaError,
@@ -440,7 +448,8 @@ def main() -> int:
         "\nIf the user requests changes, edit output_schema.py and"
         "\noutput_schema_requirements.json directly -- do NOT re-run this script --"
         "\nthen run scripts/refresh_schema_model.py --schemas-dir <schemas dir>:"
-        "\nthe PoC loads output_schema_model.json, not output_schema.py."
+        "\nwith gaik 0.11 or later the audio and document PoCs load output_schema_model.json,"
+        "\nnot output_schema.py."
     )
     return 0
 

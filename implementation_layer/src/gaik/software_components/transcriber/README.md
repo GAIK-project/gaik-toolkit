@@ -28,6 +28,7 @@ transcriber = Transcriber(
     api_config=config,
     output_dir="transcripts",
     enhanced_transcript=True,
+    allow_partial=False,  # True: a chunk that fails is marked instead (Chunking Behavior)
 )
 
 result = transcriber.transcribe(file_path="meeting.mp3")
@@ -69,6 +70,13 @@ An explicit `transcription_model` always wins over the one in `api_config`.
   to `1200` and is capped at 1400 even if you pass a larger value. Lower it freely; raising
   it above the ceiling has no effect.
 - `whisper_local` uses the local transcription server path and does not use PyDub chunking.
+- When a chunk cannot be transcribed, `transcribe` raises a `RuntimeError` that names the
+  chunk's time range, and the remaining chunks are not sent. Pass `allow_partial=True` to
+  get the transcript with a `[Transcription failed for segment N]` line under that chunk's
+  timestamp instead; `result.failed_segments` then lists each failed chunk
+  (`{"segment": 2, "start_seconds": 40.0, "end_seconds": 80.0}`), and is empty when none
+  failed. A run in which every chunk failed (a wrong key, a missing deployment) raises a
+  `RuntimeError` even with `allow_partial=True`: markers alone are no transcript.
 
 ## Input limits
 
@@ -92,6 +100,8 @@ Optional pass-through instructions:
 - `enhanced_transcript_instructions`
 
 If `enhanced_transcript_instructions` is provided, it is forwarded to the second pass of `TranscriptEnhancer` as `additional_instructions`.
+
+`enhancement_max_change_ratio` (default `0.25`) is passed to `TranscriptEnhancer` as `max_change_ratio`. A pass that changes digits or more than that share of the letters is refused and the text before it is kept; the refusals are in `TranscriptionResult.enhancement_refused_passes` (see the enhance_transcript README).
 
 Example:
 

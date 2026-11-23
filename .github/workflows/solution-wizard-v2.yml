@@ -98,7 +98,7 @@ jobs:
         run: pip install -e . pytest pyyaml python-dotenv
       # gaik is deliberately not installed: the reference-card structural tests
       # skip without it, and checking cards against a released gaik is the
-      # gaik-sync skill's job, not this workflow's. The four --ignore'd files
+      # gaik-sync skill's job, not this workflow's. The --ignore'd files
       # are UPSTREAM's (GAIK-project/gaik-toolkit; see GITFLOW.md): they import
       # gaik at module or fixture level and upstream runs them with gaik
       # installed. test_provider_scaffolding needs gaik too (every case errors
@@ -107,10 +107,12 @@ jobs:
       # Upstream's test_source_tracing.py checks the scaffolder without gaik, so it
       # runs here; only its three tests that compare the registry entry and the
       # card with the installed gaik are deselected, and so are the five tests of
-      # upstream's test_cards_describe_current_gaik.py that import gaik, and the four
+      # upstream's test_cards_describe_current_gaik.py that import gaik, the five
       # of upstream's test_governance_and_poc_output.py that load the generated
-      # provider_config.py or run_poc.py, which import gaik. --deselect takes a node id,
-      # which starts at the repository root (pytest's rootdir), not at this folder.
+      # provider_config.py or run_poc.py, which import gaik, and the two of
+      # upstream's test_hybrid_generic.py that import every generated import line.
+      # --deselect takes a node id, which starts at the repository root (pytest's
+      # rootdir), not at this folder.
       - name: Pytest solution_wizard
         working-directory: implementation_layer/solution_wizard
         run: >-
@@ -119,6 +121,7 @@ jobs:
           --ignore=tests/test_decimal_schema_persistence.py
           --ignore=tests/test_generate_schema_cli.py
           --ignore=tests/test_pipeline_composite_loading.py
+          --ignore=tests/test_nullable_collection_schema_source.py
           --ignore=tests/test_provider_scaffolding.py
           --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_registry_entry_points_at_real_files_and_a_real_extra
           --deselect=implementation_layer/solution_wizard/tests/test_source_tracing.py::test_card_recipe_matches_the_real_api
@@ -132,6 +135,9 @@ jobs:
           --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_run_time_refuses_an_external_provider_before_reading_credentials
           --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_transcript_enhancement_is_off_when_no_external_model_is_allowed
           --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_the_local_audio_poc_gives_the_transcriber_its_local_endpoint
+          --deselect=implementation_layer/solution_wizard/tests/test_governance_and_poc_output.py::test_without_credentials_only_an_unenhanced_local_whisper_run_goes_on
+          --deselect=implementation_layer/solution_wizard/tests/test_hybrid_generic.py::test_generic_imports_exist_in_gaik
+          --deselect=implementation_layer/solution_wizard/tests/test_hybrid_generic.py::test_every_registry_entry_imports_only_what_gaik_exports
       - name: Test report (solution_wizard)
         if: always()
         run: python .github/scripts/junit_summary.py "solution_wizard unit tests" "$RUNNER_TEMP/junit/solution-wizard.xml"
@@ -249,9 +255,11 @@ jobs:
           python-version: "3.11"
       - name: Install test dependencies
         run: pip install pytest pyyaml
+      # --noconftest: unit_tests/conftest.py imports gaik (to load .env for the
+      # live tests), and these files need neither gaik nor its fixtures.
       - name: Pytest deploy manifests and scripts
         run: >-
-          pytest -q
+          pytest -q --noconftest
           --junitxml="$RUNNER_TEMP/junit/deploy-manifests.xml"
           implementation_layer/unit_tests/test_sandbox_job_manifest.py
           implementation_layer/unit_tests/test_deploy_instances.py

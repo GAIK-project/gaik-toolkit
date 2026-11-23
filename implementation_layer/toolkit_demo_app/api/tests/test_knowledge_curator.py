@@ -78,9 +78,10 @@ class FakeCurator:
         assert config is CONFIG
         self.model, self.max_workers, self.chat_options = model, max_workers, chat_options
 
-    def curate(self, sources, sections, *, instructions, progress_callback):
+    def curate(self, sources, sections, *, instructions, progress_callback, source_precedence=None):
         CALLS.append(
             {
+                "source_precedence": source_precedence,
                 "model": self.model,
                 "workers": self.max_workers,
                 "chat_options": self.chat_options,
@@ -203,10 +204,44 @@ def test_run_passes_sections_sources_and_options_to_the_curator(client):
             "workers": 2,
             "chat_options": {"reasoning_effort": "low"},
             "instructions": "Prefer primary sources.",
+            "source_precedence": None,
             "sections": ["vent", "roof"],
             "files": ["notes.txt", "report.pdf"],
         }
     ]
+
+
+def test_run_passes_the_source_precedence_to_the_curator(client):
+    _events(_run(client, {**REQUEST, "source_precedence": ["primary", "secondary"]}))
+
+    assert CALLS[0]["source_precedence"] == ["primary", "secondary"]
+
+
+def test_an_older_gaik_curates_without_the_precedence_and_says_so(client, monkeypatch):
+    """gaik 0.11.1 has no source_precedence: the run goes on, and the message says that
+    its model resolves conflicts from the instructions instead."""
+
+    class OldCurator(FakeCurator):
+        def curate(self, sources, sections, *, instructions, progress_callback):
+            return super().curate(
+                sources, sections, instructions=instructions, progress_callback=progress_callback
+            )
+
+    class OldGaik(FakeGaik):
+        KnowledgeCurator = OldCurator
+
+    monkeypatch.setattr(route, "_gaik", lambda: OldGaik)
+    events = _events(_run(client, {**REQUEST, "source_precedence": ["primary", "secondary"]}))
+
+    assert events[-1][0] == "result"
+    assert CALLS[0]["source_precedence"] is None
+    (notice,) = [
+        data["message"]
+        for name, data in events
+        if name == "progress" and "cannot rank sources" in data["message"]
+    ]
+    assert "the model resolves a conflict where the instructions rank the sources" in notice
+    assert "every conflict is left" not in notice
 
 
 def test_a_curator_failure_is_an_error_event(client):
@@ -238,6 +273,12 @@ def _without(key):
             "must be distinct",
         ),
         ({**REQUEST, "options": {"max_workers": 99}}, NORMALIZED, "Invalid request"),
+        ({**REQUEST, "source_precedence": ["notes"]}, NORMALIZED, "Invalid request"),
+        (
+            {**REQUEST, "source_precedence": ["primary", "primary"]},
+            NORMALIZED,
+            "names a class more than once",
+        ),
         (REQUEST, {"knowledge/x.json": "{}"}, "not allowed"),
         (REQUEST, _without("normalized/sources.json"), "sources.json is missing"),
         (REQUEST, _without("normalized/02_report.md"), "02_report.md is missing"),

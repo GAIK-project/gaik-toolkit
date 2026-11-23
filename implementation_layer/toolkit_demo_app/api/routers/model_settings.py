@@ -7,9 +7,11 @@ from fastapi.concurrency import run_in_threadpool
 
 try:
     from utils.config import get_api_config
+    from utils.model_allow_list import chat_models, offered_to, transcription_models
     from utils.model_settings import request_model_settings
 except ImportError:
     from api.utils.config import get_api_config
+    from api.utils.model_allow_list import chat_models, offered_to, transcription_models
     from api.utils.model_settings import request_model_settings
 
 try:
@@ -39,6 +41,9 @@ async def list_server_models(request: Request):
     """Models the deployment runs on its own credentials, default first.
 
     ``allowed`` is false for a team-only model when the user is not on the team.
+    ``report_models`` are the names the report demos' model fields accept (Source
+    Normalizer, Report Writer, Knowledge Curator and Synthesis), from the lists their
+    routes check, without the team-only ones outside the team.
     """
     staff = is_staff(request.scope)
     models = server_models()
@@ -68,6 +73,10 @@ async def list_server_models(request: Request):
         if has_aitta
         else None,
         "default": models[0].id if models else None,
+        "report_models": {
+            "chat": offered_to(chat_models()),
+            "transcription": offered_to(transcription_models()),
+        },
         "models": [
             {
                 "id": m.id,

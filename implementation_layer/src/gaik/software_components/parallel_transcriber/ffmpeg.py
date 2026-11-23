@@ -14,13 +14,15 @@ import concurrent.futures
 import json
 import logging
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 from collections.abc import Callable
-from pathlib import Path
+from pathlib import Path, PurePath
 
-from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS
+from gaik.software_components._log_names import file_tag
+from gaik.software_components.input_limits import PROBE_TIMEOUT_SECONDS, media_input_args
 
 from .config import TranscriptionConfig
 from .models import ChunkSpec
@@ -31,6 +33,84 @@ logger = logging.getLogger(__name__)
 FFPROBE_TIMEOUT_SECONDS = PROBE_TIMEOUT_SECONDS
 # Decoding reads the whole recording; six hours of audio decode in well under this.
 DECODE_TIMEOUT_SECONDS = 600
+
+
+# How far a chunk's encoded length may fall short of the length asked for before it is
+# retried (and, after the retry, counts as a gap when audio continues past it): MP3
+# frames and seeking cost fractions of a second. Lengths, not file sizes, so the check
+# holds at every bitrate.
+_CHUNK_LENGTH_TOLERANCE_SECONDS = 1.0
+# The least audio a chunk must hold, and must add past the chunks before it, to be
+# sent: OpenAI refuses audio under 0.1 s, and a model asked about a fraction of a second
+# of near-silence can make words up. FFmpeg encodes a chunk that starts past the end of
+# the audio as empty, so this only decides about a real tail, which at 0.25 s is part
+# of a word at most; a longer tail shorter than the tolerance above is kept.
+_MIN_TAIL_SECONDS = 0.25
+
+
+def _paths_tagged(exc: BaseException, *paths: str | PurePath | None, limit: int = 300) -> str:
+    """``"OSError: ... file 3f9a1c2b.mp3"``: the error with every spelling of each path,
+    and of the folder it is in, replaced by its tag.
+
+    Like :func:`~gaik.software_components._log_names.error_text`, but the spellings of
+    all the paths are replaced together, longest first: path by path, one path's name
+    tagged inside another's spelling first would leave that other's folders in the text.
+    A file's name and stem are replaced only as a whole word (a recording named
+    ``audio.mp3`` leaves "audio stream" alone): the stem only before an extension, a
+    quote or a path separator.
+    """
+    text = f"{type(exc).__name__}: {exc}"
+    # spelling -> (tag, how it must stand in the text)
+    tags: dict[str, tuple[str, str]] = {}
+    for path in paths:
+        if not path:
+            continue
+        whole = str(path)
+        pure = PurePath(whole)
+        tag = file_tag(whole)
+        for form in (whole, whole.replace("\\", "\\\\")):
+            # A path given as a bare file name is matched as a name, as a whole word.
+            tags.setdefault(form, (tag, "path" if re.search(r"[\\/]", form) else "name"))
+        tags.setdefault(pure.name, (tag, "name"))
+        tags.setdefault(pure.stem, (tag, "stem"))
+        folder = str(pure.parent)
+        if folder not in (".", "", pure.anchor):
+            folder_tag = "folder " + file_tag(folder).split(" ", 1)[1]
+            for form in (folder, folder.replace("\\", "\\\\")):
+                tags.setdefault(form, (folder_tag, "path"))
+    for form in sorted(tags, key=len, reverse=True):
+        if len(form) < 3:
+            continue
+        tag, kind = tags[form]
+        if kind == "path":
+            text = text.replace(form, tag)
+            continue
+        after = r"(?![\w-])" if kind == "name" else r"(?=\.\w|['\"\\/])"
+        text = re.sub(rf"(?<![\w.-]){re.escape(form)}{after}", lambda _m, t=tag: t, text)
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def _encoded_seconds(chunk_path: Path) -> float | None:
+    """Length in seconds of an encoded chunk; 0.0 when it holds no readable audio, and
+    None when reading its length timed out, so its length is not known."""
+    try:
+        return get_audio_duration(chunk_path, decode_timeout=FFPROBE_TIMEOUT_SECONDS)
+    except subprocess.TimeoutExpired:
+        logger.warning("Reading the length of %s timed out", file_tag(chunk_path))
+        return None
+    except (OSError, ValueError, subprocess.SubprocessError) as exc:
+        logger.warning(
+            "Could not read the length of %s: %s",
+            file_tag(chunk_path),
+            _paths_tagged(exc, chunk_path),
+        )
+        return 0.0
+
+
+def _clock(seconds: float) -> str:
+    """``seconds`` as ``H:MM:SS``, for naming a stretch of a recording."""
+    whole = int(seconds)
+    return f"{whole // 3600}:{whole % 3600 // 60:02d}:{whole % 60:02d}"
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +163,7 @@ def get_audio_duration(
             "format=duration",
             "-of",
             "csv=p=0",
-            file_path,
+            *media_input_args(file_path),
         ],
         capture_output=True,
         text=True,
@@ -93,7 +173,7 @@ def get_audio_duration(
     try:
         return float(result.stdout.strip())
     except ValueError:
-        logger.info("%s has no duration in its header; decoding it", Path(file_path).name)
+        logger.info("%s has no duration in its header; decoding it", file_tag(file_path))
         return decoded_audio_seconds(file_path, timeout=decode_timeout)
 
 
@@ -113,8 +193,7 @@ def decoded_audio_seconds(
             "-nostdin",
             "-v",
             "error",
-            "-i",
-            str(file_path),
+            *media_input_args(file_path),
             "-map",
             "0:a:0",
             "-f",
@@ -151,7 +230,7 @@ def has_video_stream(file_path: str | Path) -> bool:
                 "stream=index",
                 "-of",
                 "csv=p=0",
-                str(file_path),
+                *media_input_args(file_path),
             ],
             capture_output=True,
             timeout=30,
@@ -178,7 +257,7 @@ def has_audio_stream(file_path: str | Path) -> bool:
                 "stream=index",
                 "-of",
                 "csv=p=0",
-                str(file_path),
+                *media_input_args(file_path),
             ],
             capture_output=True,
             timeout=30,
@@ -223,8 +302,7 @@ def extract_audio(
 
     cmd = [
         "ffmpeg",
-        "-i",
-        str(input_path),
+        *media_input_args(input_path),
         "-vn",
         "-acodec",
         "libmp3lame",
@@ -242,7 +320,7 @@ def extract_audio(
         str(output_path),
     ]
 
-    logger.info("Extracting audio: %s -> %s", input_path.name, output_path.name)
+    logger.info("Extracting audio: %s -> %s", file_tag(input_path), file_tag(output_path))
 
     creationflags = subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0
     process = subprocess.Popen(
@@ -358,7 +436,12 @@ def split_into_chunks(
 ) -> list[dict]:
     """Split an audio file into chunks using parallel FFmpeg processes.
 
-    Failed chunks are retried sequentially before giving up.
+    Each chunk's encoded length is read back with ffprobe. A chunk FFmpeg fails on,
+    or one shorter than asked for, is retried sequentially. After the retry, a
+    chunk that still fails, or one that is short while audio continues past its
+    end, stops the split and names its time range. Chunks past the real end of the
+    audio, which a file whose header overstates its length produces, are skipped
+    and logged, and a split in which no chunk holds audio raises.
 
     Args:
         audio_file_path: Source audio (or video when *strip_video* is True).
@@ -372,7 +455,9 @@ def split_into_chunks(
         sorted by chunk index.
 
     Raises:
-        RuntimeError: If ffmpeg is not available or no chunks are created.
+        RuntimeError: If ffmpeg is not available, no chunk holds audio, or a
+            chunk cannot be created in full even on retry; the message names the
+            missing time ranges.
     """
     if not check_ffmpeg_available():
         raise RuntimeError("ffmpeg/ffprobe not found on PATH")
@@ -384,11 +469,10 @@ def split_into_chunks(
     output_dir = specs[0].chunk_path.parent
 
     logger.info(
-        "Splitting %d chunks (workers=%d, threads_per=%d, temp=%s)",
+        "Splitting %d chunks (workers=%d, threads_per=%d)",
         total_specs,
         max_workers,
         cfg.ffmpeg_threads_per_process,
-        output_dir,
     )
 
     def _encode_chunk(spec: ChunkSpec) -> dict:
@@ -399,10 +483,13 @@ def split_into_chunks(
 
         cmd = [
             "ffmpeg",
+            # stderr then holds the error alone, not the banner and progress lines.
+            "-hide_banner",
+            "-loglevel",
+            "error",
             "-ss",
             str(spec.actual_start),
-            "-i",
-            audio_file_path,
+            *media_input_args(audio_file_path),
             "-t",
             str(spec.duration),
         ]
@@ -452,8 +539,11 @@ def split_into_chunks(
             _stdout, stderr = process.communicate(timeout=cfg.ffmpeg_chunk_timeout_seconds)
 
             if process.returncode != 0:
+                # FFmpeg's message names the input and the chunk file (built from the
+                # input's name): it goes into the error raised to the caller, and the
+                # log line keeps only the exit code.
                 msg = f"FFmpeg exit {process.returncode}: {stderr[:300]}"
-                logger.error("Chunk %d failed: %s", spec.index + 1, msg)
+                logger.error("Chunk %d failed: FFmpeg exit %d", spec.index + 1, process.returncode)
                 return {"error": msg, "index": spec.index}
 
             chunk_path = spec.chunk_path
@@ -462,26 +552,19 @@ def split_into_chunks(
                 logger.error("Chunk %d: %s", spec.index + 1, msg)
                 return {"error": msg, "index": spec.index}
 
-            chunk_size_mb = chunk_path.stat().st_size / (1024 * 1024)
-            if chunk_size_mb <= 0.1 and not spec.is_last:
-                logger.warning(
-                    "Chunk %d too small (%.1f MB), skipping",
-                    spec.index + 1,
-                    chunk_size_mb,
-                )
-                chunk_path.unlink(missing_ok=True)
-                return {"error": f"chunk too small ({chunk_size_mb:.2f} MB)", "index": spec.index}
-
+            seconds = _encoded_seconds(chunk_path)
             logger.info(
-                "Chunk %d/%d: %s (%.1f MB)",
+                "Chunk %d/%d (%.1f s of %.1f s, %.1f MB)",
                 spec.index + 1,
                 total_specs,
-                chunk_path.name,
-                chunk_size_mb,
+                seconds if seconds is not None else float("nan"),
+                spec.duration,
+                chunk_path.stat().st_size / (1024 * 1024),
             )
 
             return {
                 "file": str(chunk_path),
+                "seconds": seconds,
                 "metadata": {
                     "index": spec.index,
                     "nominal_start": spec.nominal_start,
@@ -500,7 +583,13 @@ def split_into_chunks(
             spec.chunk_path.unlink(missing_ok=True)
             return {"error": "FFmpeg timed out", "index": spec.index}
         except Exception as exc:
-            logger.error("Error creating chunk %d: %s", spec.index + 1, exc)
+            logger.error(
+                "Error creating chunk %d: %s",
+                spec.index + 1,
+                _paths_tagged(
+                    exc, audio_file_path, Path(audio_file_path).absolute(), spec.chunk_path
+                ),
+            )
             spec.chunk_path.unlink(missing_ok=True)
             return {"error": f"{type(exc).__name__}: {exc}", "index": spec.index}
 
@@ -508,28 +597,92 @@ def split_into_chunks(
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         results = list(executor.map(_encode_chunk, specs))
 
-    successful = [r for r in results if "file" in r]
-    failed = [r for r in results if "error" in r]
+    tolerance = _CHUNK_LENGTH_TOLERANCE_SECONDS
+    least = _MIN_TAIL_SECONDS
 
-    # ── Sequential retry for failed chunks ────────────────────────
-    if failed:
+    def _is_short(result: dict) -> bool:
+        # A chunk whose length could not be read is retried like a short one.
+        if result["seconds"] is None:
+            return True
+        return result["seconds"] < specs[result["metadata"]["index"]].duration - tolerance
+
+    # ── Sequential retry for failed and short chunks ─────────────
+    retry_indices = [
+        r["index"] if "error" in r else r["metadata"]["index"]
+        for r in results
+        if "error" in r or _is_short(r)
+    ]
+    if retry_indices:
         logger.warning(
-            "%d/%d chunks failed in parallel pass, retrying sequentially",
-            len(failed),
+            "%d/%d chunks failed or came out short in parallel pass, retrying sequentially",
+            len(retry_indices),
             total_specs,
         )
-        still_failed = []
-        for fail_result in failed:
-            spec = specs[fail_result["index"]]
-            retry = _encode_chunk(spec)
-            if "file" in retry:
-                logger.info("Chunk %d recovered on retry", spec.index + 1)
-                successful.append(retry)
-            else:
-                still_failed.append(retry)
-        failed = still_failed
+        for index in retry_indices:
+            retry = _encode_chunk(specs[index])
+            if "file" in retry and not _is_short(retry):
+                logger.info("Chunk %d recovered on retry", index + 1)
+            results[index] = retry
 
-    successful.sort(key=lambda r: r["metadata"]["index"])
+    failed = [r for r in results if "error" in r]
+    # A chunk whose length is still unknown may hold audio: a gap, not an empty tail.
+    for r in results:
+        if "file" in r and r["seconds"] is None:
+            index = r["metadata"]["index"]
+            Path(r["file"]).unlink(missing_ok=True)
+            failed.append(
+                {"error": f"the length of chunk {index + 1} could not be read", "index": index}
+            )
+    encoded = [r for r in results if "file" in r and r["seconds"] is not None]
+
+    # The audio ends where the last chunk that holds audio ends. A file whose header
+    # overstates its length gives chunks past that point, which are skipped; a chunk
+    # that is short while audio continues past it is a gap.
+    audio_ends = [
+        specs[r["metadata"]["index"]].actual_start + r["seconds"]
+        for r in encoded
+        if r["seconds"] > least
+    ]
+    if not audio_ends and not failed:
+        raise RuntimeError(
+            f"None of the {total_specs} chunks holds any audio, so there is nothing to transcribe."
+        )
+    audio_end = max(audio_ends, default=0.0)
+
+    successful: list[dict] = []
+    covered_until = 0.0
+    for r in encoded:
+        spec = specs[r["metadata"]["index"]]
+        needed_until = min(spec.actual_start + spec.duration, audio_end)
+        chunk_end = spec.actual_start + r["seconds"]
+        if max(chunk_end, covered_until) < needed_until - tolerance:
+            failed.append(
+                {
+                    "error": (
+                        f"chunk {spec.index + 1} holds {r['seconds']:.1f} s of "
+                        f"{spec.duration:.1f} s, with audio after it"
+                    ),
+                    "index": spec.index,
+                }
+            )
+        elif r["seconds"] <= least or chunk_end <= covered_until + least:
+            # Nothing, or too little to send, that the chunks before it do not already
+            # hold. _MIN_TAIL_SECONDS, not the tolerance: a recording that ends 0.8 s
+            # past the previous chunk's end overlap has 0.8 s more to transcribe.
+            logger.warning(
+                "Chunk %d adds %.2f s past the chunks before it, at the end of the "
+                "recording; skipping",
+                spec.index + 1,
+                max(0.0, min(r["seconds"], chunk_end - covered_until)),
+            )
+            Path(r["file"]).unlink(missing_ok=True)
+            continue
+        else:
+            successful.append(r)
+        covered_until = max(covered_until, chunk_end)
+    for r in successful:
+        r.pop("seconds")
+    failed.sort(key=lambda r: r["index"])
 
     logger.info(
         "Chunk splitting complete: %d succeeded, %d failed",
@@ -537,10 +690,16 @@ def split_into_chunks(
         len(failed),
     )
 
-    if not successful:
-        error_msgs = [r["error"] for r in failed]
-        detail = "; ".join(error_msgs[:5]) if error_msgs else "unknown"
-        raise RuntimeError(f"No chunks created. Errors: {detail}")
+    if failed:
+        missing = ", ".join(
+            f"{_clock(spec.actual_start)}-{_clock(spec.actual_start + spec.duration)}"
+            for spec in (specs[r["index"]] for r in failed)
+        )
+        detail = "; ".join(r["error"] for r in failed[:5])
+        raise RuntimeError(
+            f"{len(failed)} of {total_specs} chunks could not be created, so the "
+            f"recording would be transcribed with gaps ({missing}). Errors: {detail}"
+        )
 
     # Save metadata for overlap deduplication
     metadata_path = output_dir / "chunk_metadata.json"

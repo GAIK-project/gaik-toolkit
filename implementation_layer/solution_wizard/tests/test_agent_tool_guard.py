@@ -499,10 +499,59 @@ def test_the_running_pythons_own_folders_are_protected(guard):
 def test_path_forms_windows_reads_differently_are_refused(guard, value):
     assert agent_tool_guard.odd_path_form(value)
     if not set(value) & set("?\\ "):  # those the shell check refuses before
-        command = (
-            f"python scripts/generate_schema.py --output-dir {guard.session.as_posix()}/{value}"
-        )
+        # A drive-relative path is given as it is: behind the session folder it
+        # would no longer be one.
+        drive_relative = re.match(r"^[A-Za-z]:[^\\/]", value)
+        where = value if drive_relative else f"{guard.session.as_posix()}/{value}"
+        command = f"python scripts/generate_schema.py --output-dir {where}"
         assert "output folder" in guard.check("Bash", {"command": command})
+
+
+def test_help_alone_is_allowed_for_the_wizards_own_scripts(guard):
+    assert guard.check("Bash", {"command": "python scripts/generate_schema.py --help"}) is None
+    assert guard.check("Bash", {"command": "python scripts/scaffold_poc.py --help"}) is None
+    for command in (
+        "python scripts/generate_schema.py --help --model m",
+        "python scripts/generate_schema.py --model m --help",
+        "python scripts/promote_template.py --help",
+        "python scripts/refresh_schema_model.py --help",
+        "python scripts/not_listed.py --help",
+        "python ../elsewhere/generate_schema.py --help",
+    ):
+        assert guard.check("Bash", {"command": command}), command
+
+
+def test_a_path_in_the_disks_case_is_inside_a_root_typed_in_another_case(guard):
+    """On macOS realpath keeps the case the output folder was typed in, and Glob
+    returns paths in the disk's case: the same folder where names ignore case."""
+    if not agent_tool_guard._ignores_case(guard.session):
+        pytest.skip("this filesystem tells names apart by case")
+    (guard.session / "poc" / "notes.json").write_text("{}")
+    typed = Path(str(guard.session).swapcase())  # the root as the user typed it
+    on_disk = (guard.session / "poc" / "notes.json").as_posix()
+    assert agent_tool_guard._inside(on_disk, [typed], guard.cwd)
+    assert not agent_tool_guard._inside(guard.other.as_posix(), [typed], guard.cwd)
+
+
+@pytest.mark.parametrize("ignores_case", [True, False])
+def test_macos_paths_in_the_disks_case_are_inside_only_where_names_ignore_case(
+    monkeypatch, ignores_case
+):
+    """As on macOS: POSIX paths, which compare case, and a realpath that keeps the
+    output folder in the case it was typed in. Runs on every system."""
+    from pathlib import PurePosixPath
+
+    typed = PurePosixPath("/Users/me/Projects/Case")
+    opened = {
+        "notes": PurePosixPath("/Users/me/projects/case/poc/notes.json"),
+        "sibling": PurePosixPath("/Users/me/projects/case-b/notes.json"),
+        "parent": PurePosixPath("/Users/me/projects"),
+    }
+    monkeypatch.setattr(agent_tool_guard, "_real", lambda path, cwd: opened[path])
+    monkeypatch.setattr(agent_tool_guard, "_ignores_case", lambda folder: ignores_case)
+    assert agent_tool_guard._inside("notes", [typed], Path()) is ignores_case
+    assert not agent_tool_guard._inside("sibling", [typed], Path())
+    assert not agent_tool_guard._inside("parent", [typed], Path())
 
 
 def test_plain_paths_are_not_odd_forms():
@@ -511,21 +560,198 @@ def test_plain_paths_are_not_odd_forms():
 
 
 def _link_or_skip(link: Path, target: Path) -> None:
+    link.parent.mkdir(parents=True, exist_ok=True)
     try:
         link.symlink_to(target, target_is_directory=True)
-    except OSError:  # Windows without the symlink privilege
+        return
+    except OSError:  # Windows without the symlink privilege: a junction needs none
+        pass
+    try:
+        import _winapi
+
+        _winapi.CreateJunction(str(target.resolve()), str(link))
+    except (ImportError, OSError):
         pytest.skip("this system cannot create the link")
 
 
-def test_a_script_does_not_write_into_an_output_folder_that_holds_a_link(guard, tmp_path):
+def test_a_script_does_not_write_into_a_folder_that_holds_a_link_and_names_it(guard, tmp_path):
     elsewhere = tmp_path / "elsewhere"
     elsewhere.mkdir()
-    bp = guard.session / "use_case.blueprint.json"
-    _blueprint(bp)
+    bp = _blueprint(guard.session / "use_case.blueprint.json")
+    command = (
+        f"python scripts/scaffold_poc.py --blueprint {bp.as_posix()} "
+        f"--output-dir {guard.session.as_posix()}"
+    )
+    assert guard.check("Bash", {"command": command}) is None
+    link = guard.session / "poc" / "out"
+    _link_or_skip(link, elsewhere)
+    reason = guard.check("Bash", {"command": command})
+    assert reason and link.as_posix() in reason
+
+
+def test_a_link_outside_the_folders_a_script_writes_does_not_stop_it(guard, tmp_path):
+    """A virtual environment in the output folder is normal once the user has run the
+    PoC (Phase 11); its links are in no folder a script writes into."""
+    for venv in (guard.session / ".venv", guard.session / "poc" / ".venv"):
+        (venv / "lib").mkdir(parents=True)
+        _link_or_skip(venv / "lib64", venv / "lib")
+    bp = _blueprint(guard.session / "use_case.blueprint.json")
+    out = guard.session.as_posix()
+    for command in (
+        f"python scripts/validate_blueprint.py --blueprint {bp.as_posix()}",
+        f"python scripts/scaffold_poc.py --blueprint {bp.as_posix()} --output-dir {out}",
+        f"python scripts/generate_schema.py --requirements {out}/poc/prompts/r.md "
+        f"--output-dir {out}/poc",
+        f"python scripts/run_wizard.py --blueprint {bp.as_posix()}",
+    ):
+        assert guard.check("Bash", {"command": command}) is None, command
+
+
+def test_a_script_that_writes_nothing_is_not_stopped_by_a_link(guard, tmp_path):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    _link_or_skip(guard.session / "poc" / "out", elsewhere)
+    bp = _blueprint(guard.session / "use_case.blueprint.json")
     command = f"python scripts/validate_blueprint.py --blueprint {bp.as_posix()}"
     assert guard.check("Bash", {"command": command}) is None
-    _link_or_skip(guard.session / "poc" / "out", elsewhere)
-    assert "link" in guard.check("Bash", {"command": command})
+
+
+def test_without_output_dir_the_scaffolders_folder_is_the_blueprints_package_output_dir(
+    guard, tmp_path
+):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    bp = _blueprint(guard.session / "use_case.blueprint.json")
+    data = json.loads(bp.read_text())
+    data["package"] = {"output_dir": (guard.session / "case").as_posix()}
+    bp.write_text(json.dumps(data))
+    command = f"python scripts/scaffold_poc.py --blueprint {bp.as_posix()}"
+    assert guard.check("Bash", {"command": command}) is None
+    link = guard.session / "case" / "poc" / "prompts"
+    _link_or_skip(link, elsewhere)
+    reason = guard.check("Bash", {"command": command})
+    assert reason and link.as_posix() in reason
+
+
+def test_the_writes_table_names_every_listed_script_and_the_folders_of_each_that_writes():
+    assert set(TABLE["writes"]) == set(TABLE["scripts"])
+    for script, options in TABLE["scripts"].items():
+        if "--output-dir" in options:
+            assert TABLE["writes"].get(script), f"{script} writes, but no folders are listed"
+    for folders in TABLE["writes"].values():
+        if not folders:
+            continue  # a script that writes nothing
+        assert "." in folders
+        for folder in folders:
+            parent = folder.rsplit("/", 1)[0] if "/" in folder else "."
+            assert parent in folders, f"{folder} is listed without {parent}"
+
+
+@pytest.mark.parametrize(
+    "writes", [None, ["."], {"scaffold_poc.py": "."}, {"scaffold_poc.py": [1]}]
+)
+def test_a_table_without_a_writes_list_for_each_script_is_refused(tmp_path, writes):
+    """Read as "writes nothing", a missing table would let every script run unchecked."""
+    table = {key: value for key, value in TABLE.items() if key != "writes"}
+    if writes is not None:
+        table["writes"] = writes
+    path = tmp_path / "agent_scripts.json"
+    path.write_text(json.dumps(table), encoding="utf-8")
+    with pytest.raises(ValueError, match="writes"):
+        agent_tool_guard.load_writes(path)
+
+
+@pytest.mark.parametrize("script", ["validate_blueprint.py", "scaffold_poc.py"])
+def test_a_listed_script_without_a_writes_entry_is_not_run(guard, script):
+    bp = _blueprint(guard.session / "use_case.blueprint.json")
+    command = f"python scripts/{script} --blueprint {bp.as_posix()}"
+    assert guard.check("Bash", {"command": command}) is None
+    del guard.writes[script]
+    reason = guard.check("Bash", {"command": command})
+    assert reason and script in reason and "writes" in reason
+    assert guard.check("Bash", {"command": f"python scripts/{script} --help"}) is None
+
+
+def _written_folders(root: Path) -> set[str]:
+    """Every folder under ``root`` that holds something, relative to it."""
+    return {
+        Path(os.path.relpath(path.parent, root)).as_posix()
+        for path in root.rglob("*")
+        if path.is_file()
+    }
+
+
+_POC_TEMPLATES = WIZARD / "templates" / "poc"
+#: The pattern each example blueprint scaffolds with.
+_EXAMPLE_PATTERNS = {
+    "audio_to_structured": "incident_reporting_blueprint.json",
+    "document_to_structured": "document_extraction_blueprint.json",
+    "rag": "rag_workflow_blueprint.json",
+}
+#: Every PoC pattern the scaffolder can write: one folder per template, _common
+#: holding the files every pattern shares. A promoted template added there is
+#: covered below without a change here.
+_SCAFFOLD_PATTERNS = sorted(
+    p.name for p in _POC_TEMPLATES.iterdir() if (p / "run_poc.py.tmpl").is_file()
+)
+
+
+def _pattern_blueprint(pattern: str, monkeypatch):
+    """A blueprint the scaffolder writes with ``pattern``, asking for a PDF report too
+    (pdf_report.py) so every file the scaffolder can add is written."""
+    from solution_wizard import scaffolder
+    from solution_wizard.blueprint import Blueprint
+
+    example = _EXAMPLE_PATTERNS.get(pattern, "incident_reporting_blueprint.json")
+    blueprint = Blueprint.from_file(WIZARD / "examples" / example)
+    if pattern not in _EXAMPLE_PATTERNS:
+        # No single module covers this pipeline: the _generic skeleton, or a
+        # promoted template when one is saved under the pipeline's key.
+        blueprint.components.selected_modules = []
+        blueprint.components.selected_building_blocks = [
+            "Transcriber",
+            "PyMuPDFParser",
+            "DataExtractor",
+            "LLMJudge",
+        ]
+        key = "_generic" if pattern == "_generic" else pattern
+        monkeypatch.setattr(scaffolder, "_derive_pattern_key", lambda _blueprint: key)
+    blueprint.technical_spec["output_types"] = [
+        *blueprint.technical_spec.get("output_types", []),
+        "pdf",
+    ]
+    return blueprint
+
+
+def test_the_coverage_test_below_knows_the_fixed_patterns():
+    assert set(_EXAMPLE_PATTERNS) | {"_generic"} <= set(_SCAFFOLD_PATTERNS)
+    assert len(_SCAFFOLD_PATTERNS) > len(_EXAMPLE_PATTERNS) + 1  # a promoted one too
+
+
+@pytest.mark.parametrize("pattern", _SCAFFOLD_PATTERNS)
+def test_the_scaffolder_and_the_diagram_and_docs_writers_write_only_the_listed_folders(
+    tmp_path, monkeypatch, pattern
+):
+    from solution_wizard.bpmn_generator import write_bpmn
+    from solution_wizard.docs_generator import generate_docs
+    from solution_wizard.scaffolder import scaffold_poc
+    from solution_wizard.visualizer import write_mermaid
+
+    blueprint = _pattern_blueprint(pattern, monkeypatch)
+    out = tmp_path / "scaffold_poc.py"
+    scaffolded = scaffold_poc(blueprint, out, synthetic=True)
+    assert scaffolded["pattern"] == pattern
+    assert (out / "poc" / "pdf_report.py").is_file()
+    assert _written_folders(out) <= set(TABLE["writes"]["scaffold_poc.py"])
+    writers = {
+        "generate_docs.py": lambda out: generate_docs(blueprint, out),
+        "generate_mermaid.py": lambda out: write_mermaid(blueprint, out),
+        "generate_bpmn.py": lambda out: write_bpmn(blueprint, out),
+    }
+    for script, write in writers.items():
+        out = tmp_path / script
+        write(out)
+        assert _written_folders(out) <= set(TABLE["writes"][script]), script
 
 
 def test_a_folder_search_through_a_link_is_refused(guard, tmp_path):

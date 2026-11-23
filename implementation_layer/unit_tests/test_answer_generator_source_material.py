@@ -117,16 +117,26 @@ def test_the_question_is_outside_the_blocks(monkeypatch):
     assert all(QUESTION not in block["body"] for block in _BLOCK.finditer(user))
 
 
-def test_citation_lines_are_unchanged_inside_the_blocks(monkeypatch):
+def test_citation_lines_start_with_the_chunk_reference_inside_the_blocks(monkeypatch):
     generator, completions = _generator(monkeypatch, citations=True)
 
     generator.generate(QUESTION, CHUNKS)
 
     system, user = _system_and_user(completions.calls[0])
-    assert "[document_name, page X]" in system
+    assert "such as [1] or [2][3]" in system
+    bodies = [block["body"] for block in _BLOCK.finditer(user)]
+    assert bodies[0].startswith("[1] [Document: depot_manual.pdf, Page: 7]\n")
+    assert bodies[1].startswith("[2] [Document: visitor_rules.pdf, Page: 2] Visitors\n")
+
+
+def test_citation_lines_have_no_reference_without_citations(monkeypatch):
+    generator, completions = _generator(monkeypatch)
+
+    generator.generate(QUESTION, CHUNKS)
+
+    _, user = _system_and_user(completions.calls[0])
     bodies = [block["body"] for block in _BLOCK.finditer(user)]
     assert bodies[0].startswith("[Document: depot_manual.pdf, Page: 7]\n")
-    assert bodies[1].startswith("[Document: visitor_rules.pdf, Page: 2] Visitors\n")
 
 
 def test_a_string_context_is_one_block_and_an_empty_one_none(monkeypatch):
@@ -225,5 +235,5 @@ def test_header_and_label_agree_when_metadata_is_missing(monkeypatch):
     system, user = _system_and_user(completions.calls[0])
     [block] = _BLOCK.finditer(user)
     assert block["label"] == "unknown, page unknown"
-    assert block["body"].startswith("[Document: unknown, Page: unknown]\n")
-    assert "When a context block starts with [Document: name, Page: X]" in system
+    assert block["body"].startswith("[1] [Document: unknown, Page: unknown]\n")
+    assert "starts with its reference, as in [1] [Document: name, Page: X]" in system

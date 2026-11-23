@@ -70,7 +70,8 @@ who must not reach each other's data separate collections or folders.
 ### Methods
 
 ```python
-store.add(documents: list[Document], embeddings: list[list[float]]) -> None
+store.add(documents: list[Document], embeddings: list[list[float]], *, replace: bool = False) -> None
+store.delete_document(document_id: str | int, *, owner: str | None = None) -> int  # chunks deleted
 
 results = store.search(
     query_embedding: list[float],
@@ -78,6 +79,49 @@ results = store.search(
     filters: dict | None = None
 )  # -> list[tuple[Document, float]]
 ```
+
+#### Chunk ids and re-indexing
+
+A chunk's id comes from its document, its owner and its text. The document is
+`metadata["document_id"]`, else `source`, else `document_name` (the RAG parsers set
+the last two). A `document_id` you set is stored as given, so a filter such as
+`filters={"document_id": 7}` matches it; without one, `add()` sets `document_id` to
+the document. `add()` also records the document as a string under
+`metadata["gaik_document_key"]`, and `replace=True` and `delete_document` match on that
+key only. A `document_id` must be a string or an int; other types raise `ValueError`,
+and document ids are compared exactly (an int as its string). The owner is the store's
+`owner` (recorded as `metadata["gaik_owner"]`).
+
+- Adding a document's chunks again replaces them, metadata included, instead of
+  storing a second copy.
+  A text repeated inside one document keeps one chunk per occurrence, counted within
+  one call: pass all of a document's chunks in one call.
+- `add(..., replace=True)` stores the chunks, then deletes the other stored chunks of
+  each document in the call, so the chunks a changed document no longer has do not
+  stay behind. If storing fails, no stored chunk is lost: the stale chunks are deleted
+  only after every chunk is stored, and in Chroma a slice whose write fails (an
+  embedding of another dimension, say) has its earlier versions put back as they were.
+  Chroma takes the chunks in slices of at most its maximum batch size; slices stored
+  before a failure keep their new version. Chroma 1.x updates a stored chunk in place,
+  so a process that stops partway leaves each chunk old or new; before 1.0 a chunk
+  is deleted and added again, and one can be lost if the process stops in between.
+- Threads can share a store. Writes of one document and owner wait for each other,
+  so two overlapping replacements leave one version: in memory every call waits,
+  and in Chroma the writes of every store in the process on the same folder and
+  collection. Other processes writing to the same Chroma folder are not covered.
+- `delete_document(document_id, owner=...)` deletes one document's chunks and returns
+  how many.
+- Two owners who index a document under the same id keep separate chunks.
+  `replace=True` deletes only chunks of the owner of the chunks added, and
+  `delete_document` only those of the `owner` given; without an owner, both touch
+  only chunks that name no owner.
+- A chunk whose metadata names no document is stored as a new one each time.
+
+A Chroma collection built by an earlier gaik release still loads and searches, but
+its chunks have random ids and no `gaik_document_key`: `delete_document` and
+`replace=True` never delete them, even when their metadata names a `document_id`, and
+adding a document again stores it next to its old copy. Index
+the documents again into a new `collection_name` (or a new `persist_path`).
 
 ---
 

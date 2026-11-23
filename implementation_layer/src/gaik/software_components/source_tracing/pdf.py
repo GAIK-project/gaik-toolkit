@@ -102,10 +102,10 @@ def value_span(page: PageWords, start: int, length: int, value: Any) -> tuple[in
                 return start + index, same
         return None
     text = str(value)
-    parts = date_parts(text)
-    if parts is not None:
-        # The date in another format: the shortest run of words that holds all its parts.
-        run = date_run(window, parts)
+    if date_parts(text) is not None:
+        # The date in another format: the shortest run of words that writes it. The value's
+        # own text is passed, so a zero-padded year (11.04.05) keeps its two digits.
+        run = date_run(window, text)
     else:
         wanted = tokens(text)
         found = find_run(window, wanted)

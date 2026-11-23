@@ -8,6 +8,7 @@ them, so the public import surface is unchanged.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,42 @@ def _slug(text: str, *, max_len: int = 40) -> str:
     while "__" in s:
         s = s.replace("__", "_")
     return s.strip("_")[:max_len] or "section"
+
+
+def _normalize_heading(text: str) -> str:
+    """Normalize a heading for tolerant matching.
+
+    Lowercase; strip leading markdown markers and section numbering; drop
+    punctuation; collapse whitespace.
+    """
+    t = text.strip()
+    t = re.sub(r"^#+\s*", "", t)  # markdown heading markers
+    t = re.sub(r"^\d+([.)]\d*)*[.)]?\s+", "", t)  # leading numbering e.g. "1." / "1.2)"
+    t = t.lower()
+    t = re.sub(r"[^\w\s]", " ", t)  # punctuation -> space
+    t = re.sub(r"\s+", " ", t).strip()
+    return t
+
+
+_HEADING_LINE = re.compile(r"#{1,6}[ \t]+(.*?)[ \t#]*$")
+
+
+def _strip_title_heading(text: str, title: str) -> str:
+    """``text`` without a first line that is a heading repeating the section's ``title``.
+
+    A writer told to leave the heading out sometimes echoes it (``## Findings``, also
+    numbered or as ``SECTION: Findings``). Any other first heading, such as the
+    ``### Roof`` of a section with subsections, is the section's own content and stays.
+    """
+    stripped = text.lstrip()
+    first, _, rest = stripped.partition("\n")
+    match = _HEADING_LINE.fullmatch(first.strip())
+    if match is None:
+        return text
+    heading = re.sub(r"^section\s*:\s*", "", match.group(1).strip(), flags=re.IGNORECASE)
+    if _normalize_heading(heading) != _normalize_heading(title):
+        return text
+    return rest.lstrip()
 
 
 @dataclass

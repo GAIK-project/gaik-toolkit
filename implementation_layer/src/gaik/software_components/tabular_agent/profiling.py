@@ -14,6 +14,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from .._log_names import error_text, file_tag
 from .loader import quote_identifier
 from .models import ColumnProfile, TableProfile, TabularSchema
 
@@ -76,11 +77,17 @@ def profile_tables(
         A schema with one :class:`TableProfile` per table.
     """
     profiles: list[TableProfile] = []
+    # Longest first, so a name inside another is not tagged half-way.
+    names = sorted(tables, key=len, reverse=True)
     for name, source in tables.items():
         try:
             profiles.append(_profile_table(con, name, source, sample_values))
         except Exception as exc:  # a broken profile must not kill the agent
-            logger.warning("Could not profile table '%s': %s", name, exc)
+            # A table is named after its file or sheet, and DuckDB's message can name
+            # it and the other tables, so the log line carries tags instead.
+            logger.warning(
+                "Could not profile table %s: %s", file_tag(name), error_text(exc, *names)
+            )
             profiles.append(TableProfile(name=name, source=source))
     return TabularSchema(tables=profiles)
 

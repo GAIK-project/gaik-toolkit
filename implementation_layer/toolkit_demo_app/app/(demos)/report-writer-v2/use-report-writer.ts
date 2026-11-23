@@ -10,10 +10,13 @@ import {
   STAGES,
   type ModelKey,
   type ReportSpec,
+  type SourceClass,
   type Stage,
   type Staleness,
   parseArtifacts,
   parseSpec,
+  precedenceForSpec,
+  precedenceNotice,
   settingsForSpec,
   type SpecSettings,
   staleAfterEdit,
@@ -113,6 +116,10 @@ export function useReportWriter() {
   const [language, setLanguage] = useState("English");
   const [sections, setSections] = useState<SectionRow[]>(DEFAULT_SECTIONS);
   const [instructions, setInstructions] = useState("");
+  /** Kept from a loaded spec and written back; the form has no control for it. */
+  const [sourcePrecedence, setSourcePrecedence] = useState<SourceClass[]>([]);
+  /** Whether the API's gaik takes `source_precedence`; null until the API says. */
+  const [takesPrecedence, setTakesPrecedence] = useState<boolean | null>(null);
   const [models, setModels] = useState(NO_MODELS);
   const [settings, setSettings] = useState(DEFAULT_SETTINGS);
   const [sources, setSources] = useState<SourceRow[]>([]);
@@ -143,6 +150,8 @@ export function useReportWriter() {
         if (!Array.isArray(data?.examples))
           throw new Error("The examples response has no examples list.");
         setExamples(data.examples);
+        if (typeof data.supports?.source_precedence === "boolean")
+          setTakesPrecedence(data.supports.source_precedence);
         // ?example=<id> opens an example, e.g. from the Construction Report Writing use case.
         const id = new URLSearchParams(window.location.search).get("example");
         if (!id) return;
@@ -157,7 +166,16 @@ export function useReportWriter() {
 
   // -- Spec --
 
-  function buildSpec(): Omit<ReportSpec, "settings"> & {
+  /**
+   * The spec as the form holds it. For a run (`forRun`) on an API whose gaik has no
+   * `source_precedence`, the key is left out, as it refuses a spec with it; the
+   * exported spec keeps it.
+   */
+  function buildSpec(forRun = false): Omit<
+    ReportSpec,
+    "settings" | "source_precedence"
+  > & {
+    source_precedence?: SourceClass[];
     settings: SpecSettings;
   } {
     return {
@@ -174,6 +192,10 @@ export function useReportWriter() {
         depends_on: s.depends_on,
       })),
       instructions,
+      ...precedenceForSpec(
+        sourcePrecedence,
+        !(forRun && takesPrecedence === false),
+      ),
       sources: {
         primary: sources
           .filter((r) => r.sourceClass === "primary")
@@ -197,6 +219,7 @@ export function useReportWriter() {
       spec.sections.map((s, i) => ({ key: `spec-${i}-${Date.now()}`, ...s })),
     );
     setInstructions(spec.instructions);
+    setSourcePrecedence(spec.source_precedence);
     setModels(spec.models);
     setSettings(spec.settings);
     setSources(
@@ -242,6 +265,7 @@ export function useReportWriter() {
     setLanguage("English");
     setSections(DEFAULT_SECTIONS);
     setInstructions("");
+    setSourcePrecedence([]);
     setModels(NO_MODELS);
     setSettings(DEFAULT_SETTINGS);
     setSources([]);
@@ -300,6 +324,9 @@ export function useReportWriter() {
       );
       applySpec(spec, have);
       toast.success("Spec loaded. Add any source files marked missing.");
+      // Before Run: on this API the spec's precedence does not decide conflicts.
+      const notice = precedenceNotice(spec.source_precedence, takesPrecedence);
+      if (notice) toast(notice, { duration: 10000 });
     } catch (e) {
       toast.error(message(e), { duration: 8000 });
     }
@@ -352,7 +379,7 @@ export function useReportWriter() {
     setProgress((p) => [...p, `Phase ${STAGE_LABELS[stage]}`]);
     const form = new FormData();
     form.append("stage", stage);
-    form.append("spec", JSON.stringify(buildSpec()));
+    form.append("spec", JSON.stringify(buildSpec(true)));
     form.append("artifacts", JSON.stringify(ws));
     if (stage === "normalize") {
       // Spec order, as in buildSpec: the backend pairs uploads with spec names by position.
@@ -435,12 +462,30 @@ export function useReportWriter() {
       if (stages.includes("synthesize") || stages.includes("rebuild"))
         toast.success("Report ready");
     } catch (e) {
-      if (e instanceof Error && e.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (e instanceof Error && e.name === "AbortError")
+      )
+        return;
       if (e instanceof RateLimitError) return; // apiFetch already showed a toast
       setError(message(e));
     } finally {
-      setRunning(null);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortRef.current === controller) setRunning(null);
     }
+  }
+
+  /**
+   * Cancels the run in the browser. The workspace keeps the stages that
+   * finished. The Next.js route may still finish the stage on the server, and
+   * it then counts against the user's report quota. A stage's result is
+   * applied only when its stream ends, after the route has recorded the usage,
+   * so a stopped run never keeps a report that was not counted.
+   */
+  function stop() {
+    abortRef.current?.abort();
+    setRunning(null);
+    setProgress([]);
   }
 
   function saveArtifact(path: string, text: string) {
@@ -468,6 +513,8 @@ export function useReportWriter() {
     setSections,
     instructions,
     setInstructions,
+    /** Why the spec's source precedence is not sent with a run, or null. */
+    precedenceNote: precedenceNotice(sourcePrecedence, takesPrecedence),
     models,
     setModels,
     settings,
@@ -499,6 +546,7 @@ export function useReportWriter() {
     downloadAllZip,
     clearAll,
     run,
+    stop,
     saveArtifact,
   };
 }

@@ -84,12 +84,12 @@ class Report(BaseModel):
         ``load(d).save(d)`` rebuilds ``report.md`` and ``report.docx`` from edited sections.
         """
         root = Path(directory)
-        first_line = (root / "report.md").read_text(encoding="utf-8").split("\n", 1)[0]
+        first_line = (root / "report.md").read_text(encoding="utf-8-sig").split("\n", 1)[0]
         if not first_line.startswith("# "):
             raise ValueError(f"{root / 'report.md'} must start with '# <report title>'")
         sections = []
         for path in sorted((root / "sections").glob("*.md")):
-            heading, _, body = path.read_text(encoding="utf-8").partition("\n")
+            heading, _, body = path.read_text(encoding="utf-8-sig").partition("\n")
             if not heading.startswith("## "):
                 raise ValueError(f"{path} must start with '## <section title>'")
             sections.append(
@@ -99,7 +99,7 @@ class Report(BaseModel):
             )
         if not sections:
             raise FileNotFoundError(f"No section files in {root / 'sections'}")
-        review_log = json.loads((root / "review_log.json").read_text(encoding="utf-8"))
+        review_log = json.loads((root / "review_log.json").read_text(encoding="utf-8-sig"))
         return cls(
             title=first_line[2:].strip(),
             sections=sections,

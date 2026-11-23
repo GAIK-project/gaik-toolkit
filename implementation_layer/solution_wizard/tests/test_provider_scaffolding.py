@@ -544,5 +544,50 @@ def test_self_hosted_whisper_stage_needs_no_cloud_audio_credentials(tmp_path, mo
     transcriber = Transcriber(api_config=stage, output_dir=tmp_path / "workspace")
     assert transcriber._resolve_transcription_model() == "whisper_local"
     config["stages"]["transcription"]["transcription_model"] = "gpt-4o-transcribe"
+    # The fork's sandbox runs a stage whose provider has no key on Azure when Azure is
+    # set up (_azure_instead in provider_config); without Azure too, the run stops.
+    monkeypatch.delenv("AZURE_API_KEY")
     with pytest.raises(ValueError, match="OPENAI_API_KEY"):
         runner.get_stage_config(config, "transcription")
+
+
+def test_self_hosted_whisper_with_enhancement_and_no_credentials_stops_before_the_upload(
+    tmp_path, monkeypatch
+):
+    """External model APIs allowed: the PoC enhances the transcript with the stage's
+    Azure chat model, so a missing key stops the run before any audio is sent, not
+    after the transcription."""
+    from gaik.software_components.transcriber import Transcriber
+
+    sent = []
+    monkeypatch.setattr(Transcriber, "transcribe", lambda self, *a, **kw: sent.append(a))
+    monkeypatch.setattr(Transcriber, "_transcribe_input_local", lambda self, *a: sent.append(a))
+    bp = _blueprint(
+        "incident_reporting_blueprint.json",
+        {
+            "provider": "aitta",
+            "extraction_model": MODELS["aitta"],
+            "transcription_config": {"provider": "azure", "transcription_model": "whisper_local"},
+        },
+    )
+    assert bp.governance.data_handling.external_model_api_allowed
+    poc = scaffold_poc(bp, tmp_path)["poc_dir"]
+    (poc / "sample_input" / "note.wav").write_bytes(b"fake audio; never sent")
+    runner = _load_runner(poc, monkeypatch)
+    monkeypatch.delenv("AZURE_API_KEY")
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_BASE", "http://localhost:9000")
+    monkeypatch.setenv("LOCAL_TRANSCRIBER_API_KEY", "fake-whisper")
+    monkeypatch.setattr(sys, "argv", [str(poc / "run_poc.py")])
+
+    with pytest.raises(ValueError, match=r"not set \(AZURE_API_KEY and AZURE_ENDPOINT\)"):
+        runner.main()
+    assert sent == []
+
+    # With the key set, the same configuration reaches the Transcriber.
+    monkeypatch.setenv("AZURE_API_KEY", "fake-azure")
+    config = runner.load_config()
+    audio_config = runner.get_stage_config(config, "transcription")
+    assert runner.local_transcriber_options(config, audio_config) == {
+        "local_api_base": "http://localhost:9000",
+        "local_api_key": "fake-whisper",
+    }

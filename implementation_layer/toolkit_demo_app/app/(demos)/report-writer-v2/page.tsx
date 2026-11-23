@@ -34,7 +34,7 @@ function ReportWriterPage() {
         <div className="space-y-6">
           <DemoPageHeader
             icon={FilePen}
-            title="Report Writer"
+            title="Report writer v2"
             description="Write a source-grounded report from recordings and documents, in three stages: normalize, curate and synthesize"
             className="mb-0"
           >
@@ -45,19 +45,9 @@ function ReportWriterPage() {
 
           <UseCaseChooser
             initialChoice={opensExample ? "example" : null}
-            exampleDescription="Nothing to prepare. Write a construction report from site recordings and customer documents, and check where every statement comes from."
-            examplePoints={[
-              "Play the three site recordings and open the five customer documents",
-              "See the seven sections the report will have",
-              "Write the report and read the evidence behind each section",
-            ]}
+            exampleDescription="Write a construction report from site recordings and customer documents, with evidence for each section."
             createTitle="Test on your own data or examples"
-            createDescription="Write a report from your own sources, with the sections and rules you define."
-            createPoints={[
-              "Add documents, spreadsheets, images or recordings",
-              "Define the sections, the rules and an optional sample report",
-              "Run the stages one at a time and correct the files in between",
-            ]}
+            createDescription="Set your own report sections and rules, and edit the stage outputs before continuing."
             ExampleSection={ExampleSection}
             CreateSection={CreateSection}
           />

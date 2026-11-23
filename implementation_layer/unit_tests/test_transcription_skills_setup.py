@@ -174,10 +174,15 @@ def test_check_folder_prints_the_absolute_folder_or_exits_1(server, tmp_path, mo
 
 def test_a_path_relative_to_a_drive_is_never_approved(server, tmp_path, monkeypatch):
     monkeypatch.setattr(server.Path, "home", classmethod(lambda cls: tmp_path / "home"))
-    monkeypatch.chdir(tmp_path)
+    # Started in a folder that is neither the home folder nor above it, where "C:" and
+    # "C:recordings" would resolve to folders the server would otherwise approve.
+    start = tmp_path / "start"
+    (start / "recordings").mkdir(parents=True)
+    monkeypatch.chdir(start)
+    drive = tmp_path.drive or "C:"
     # 'C:"' is how the answer C:\ arrives when setup.bat passes it as "C:\".
-    for relative in ("C:", "c:recordings", 'C:"'):
-        assert server.approved_folders([relative], env_value="", start=tmp_path) == []
+    for relative in (drive, f"{drive.lower()}recordings", f'{drive}"'):
+        assert server.approved_folders([relative], env_value="", start=start) == []
         with pytest.raises(SystemExit) as done:
             server.main(["--check-folder", relative])
         assert done.value.code == 1
@@ -189,6 +194,21 @@ def test_check_folder_refuses_a_folder_that_holds_the_setup_folder(server, capsy
         with pytest.raises(SystemExit) as done:
             server.main(["--check-folder", str(holding)])
         assert done.value.code == 1 and capsys.readouterr().out == ""
+
+
+def test_check_folder_refuses_a_folder_inside_the_setup_folder(server, capsys):
+    kit = Path(server.__file__).resolve().parent.parent
+    # transcription-MCP holds the server and its virtual environment.
+    for inside in (kit / "transcription-MCP", kit / "reference"):
+        assert inside.is_dir()
+        with pytest.raises(SystemExit) as done:
+            server.main(["--check-folder", str(inside)])
+        assert done.value.code == 1 and capsys.readouterr().out == ""
+    # A folder beside the kit overlaps it in neither direction.
+    beside = kit.parent / "incident-report-writing"
+    with pytest.raises(SystemExit) as done:
+        server.main(["--check-folder", str(beside)])
+    assert done.value.code == 0 and capsys.readouterr().out.strip() == str(beside.resolve())
 
 
 @pytest.mark.parametrize(
@@ -328,6 +348,25 @@ def test_the_file_server_is_installed_from_a_lockfile_and_limited_to_the_chosen_
     for key, entry in packages.items():
         assert entry.get("integrity", "").startswith("sha512-"), key
         assert entry["resolved"].startswith("https://registry.npmjs.org/"), key
+
+
+def test_an_existing_configuration_takes_both_report_writing_entries():
+    # The filesystem entry is the one limited to the chosen folder, so a user who already
+    # has a configuration replaces it along with the transcriber entry.
+    skill = SKILLS / "report-writing"
+    readme = " ".join((skill / "README.md").read_text("utf-8").split())
+    assert "add only the" not in readme
+    assert (
+        'copy both the `"gaik-transcriber": {...}` and the `"filesystem": {...}` entries' in readme
+    )
+    setup = " ".join(
+        line.removeprefix("echo").strip()
+        for line in (skill / "setup.bat").read_text("utf-8").splitlines()
+        if line.startswith("echo ")
+    )
+    assert "add only the gaik-transcriber entry" not in setup
+    assert "copy both the gaik-transcriber and the filesystem entries" in setup
+    assert "replacing any entry with the same name" in setup
 
 
 @pytest.mark.parametrize(

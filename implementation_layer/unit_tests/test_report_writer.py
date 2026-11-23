@@ -114,8 +114,22 @@ def rec(monkeypatch):
         def __init__(self, config, model=None, **kwargs):
             log("KnowledgeCurator", config=config, model=model, **kwargs)
 
-        def curate(self, sources, sections, *, instructions="", progress_callback=None):
-            log("curate", sources=sources, sections=sections, instructions=instructions)
+        def curate(
+            self,
+            sources,
+            sections,
+            *,
+            instructions="",
+            source_precedence=None,
+            progress_callback=None,
+        ):
+            log(
+                "curate",
+                sources=sources,
+                sections=sections,
+                instructions=instructions,
+                source_precedence=source_precedence,
+            )
             return KnowledgeBase(
                 sections=[
                     SectionKnowledge(
@@ -328,6 +342,7 @@ def test_curate(tmp_path, rec):
     assert args["sources"] == NormalizedSources.load(workspace / "normalized")
     assert args["sections"] == spec.sections
     assert args["instructions"] == "Site notes outrank documents."
+    assert args["source_precedence"] == []
     assert [p.name for p in (workspace / "knowledge").iterdir()] == ["roof.json"]
     assert KnowledgeBase.load(workspace / "knowledge") == knowledge
 
@@ -492,16 +507,19 @@ def test_run_single_call(tmp_path, rec):
     assert rec.args("create_llm_client")["config"] == {**CONFIG, "model": "wr-m"}
     assert rec.args("chat")["reasoning_effort"] == "low"
     user = rec.args("chat")["messages"][1]["content"]
+    # One JSON object per source before its block: the name cannot add a class of its own.
     assert re.search(
-        r'Source notes\.txt \(class: primary\):\n<source_material id="\w+" label="notes\.txt">\n'
+        r'\{"label": "notes\.txt", "class": "primary", "type": "text"\}\n'
+        r'<source_material id="\w+" label="notes\.txt">\n'
         r'Text of notes\.txt\.\n</source_material id="\w+">',
         user,
     )
     assert re.search(
-        r"Source old_report\.pdf \(class: secondary\):\n"
+        r'\{"label": "old_report\.pdf", "class": "secondary", "type": "text"\}\n'
         r'<source_material id="\w+" label="old_report\.pdf">\nText of old_report\.pdf\.\n',
         user,
     )
+    assert "Source notes.txt (class:" not in user
     for part in (
         SAMPLE_TEXT,
         "1. Heading: Roof\n   Content to cover: Describe the roof.\n   Required items:\n   - age",
@@ -598,3 +616,71 @@ def test_single_call_prompt_follows_the_citations_setting(tmp_path, rec):
         system = rec.args("chat")["messages"][0]["content"]
         assert ("cite the file and the place" in system) is citations
         assert ("do not cite sources" in system) is (not citations)
+
+
+def test_the_spec_passes_its_source_precedence_to_the_curator(tmp_path, rec):
+    spec = make_spec(tmp_path).model_copy(update={"source_precedence": ["primary", "secondary"]})
+    workspace = tmp_path / "workspace"
+    writer = ReportWriter(CONFIG)
+    writer.normalize(spec, workspace)
+
+    writer.curate(spec, workspace)
+
+    assert rec.args("curate")["source_precedence"] == ["primary", "secondary"]
+
+
+def test_the_single_call_writer_gets_the_source_precedence(tmp_path, rec):
+    spec = make_spec(tmp_path).model_copy(update={"source_precedence": ["primary", "secondary"]})
+
+    ReportWriter(CONFIG).run(spec, tmp_path / "workspace", mode="single_call")
+
+    system, user = (m["content"] for m in rec.args("chat")["messages"])
+    assert "<source_precedence>\nprimary > secondary\n</source_precedence>" in user
+    assert "follow the source whose class ranks highest" in user
+    assert "follow the side the source precedence gives" in " ".join(system.split())
+
+
+def test_the_single_call_prompt_has_no_precedence_block_without_one(tmp_path, rec):
+    ReportWriter(CONFIG).run(make_spec(tmp_path), tmp_path / "workspace", mode="single_call")
+
+    assert "<source_precedence>" not in rec.args("chat")["messages"][1]["content"]
+
+
+@pytest.mark.parametrize(
+    ("precedence", "message"),
+    [(["primary", "notes"], "cannot have: \\['notes'\\]"), (["primary"] * 2, "more than once")],
+)
+def test_the_spec_refuses_a_source_precedence_it_cannot_use(tmp_path, precedence, message):
+    data = make_spec(tmp_path).model_dump()
+    data["source_precedence"] = precedence
+
+    with pytest.raises(ValueError, match=message):
+        ReportSpec.model_validate(data)
+
+
+def test_the_docs_name_gaik_0_12_0_for_source_precedence():
+    """gaik 0.11.1 is released without source_precedence and refuses it: a text that says
+    "newer than 0.11.0" sends an agent on 0.11.1 into a ValidationError or TypeError."""
+    root = Path(__file__).resolve().parents[1]
+    cards = json.loads(
+        (root / "solution_wizard" / "registries" / "component_reference_cards.json").read_text(
+            encoding="utf-8"
+        )
+    )
+    reference = (
+        root
+        / "no-code-assets/agent-skills/skills/generate-structured-reports/references/report-spec.md"
+    ).read_text(encoding="utf-8")
+    texts = [reference] + [
+        json.dumps(cards[name], ensure_ascii=False) for name in ("ReportWriter", "KnowledgeCurator")
+    ]
+
+    for text in texts:
+        assert "source_precedence" in text
+        assert "newer than 0.11.0" not in text and "on 0.11.0 leave" not in text
+        assert "gaik 0.12.0 or later" in text and "a release after 0.11.1" not in text
+
+
+def test_run_settings_review_strictly_by_default():
+    assert RunSettings().strict_review is True
+    assert RunSettings(strict_review=False).strict_review is False

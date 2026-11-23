@@ -31,9 +31,16 @@ export const DEFAULT_OPTIONS: CuratorOptions = {
   max_workers: 4,
 };
 
+export type SourceClass = "primary" | "secondary";
+
+/** Primary sources outrank secondary ones: the precedence the demo's switch sets. */
+export const PRIMARY_FIRST: SourceClass[] = ["primary", "secondary"];
+
 export interface CurateRequest {
   sections: SectionInput[];
   instructions: string;
+  /** Source classes, highest first; sent only when it names a class. */
+  source_precedence?: SourceClass[];
   options: CuratorOptions;
 }
 
@@ -79,6 +86,10 @@ export interface SectionKnowledge {
     description: string;
     status: string;
     unit_ids: string[];
+    /** For a resolved conflict, the units whose side is followed. */
+    preferred_unit_ids?: string[];
+    /** For a resolved conflict, the source class that decided it. */
+    resolved_by?: string | null;
   }[];
 }
 
@@ -90,6 +101,7 @@ export function buildRequest(
   sections: SectionInput[],
   instructions: string,
   options: CuratorOptions,
+  sourcePrecedence: SourceClass[] = [],
 ): CurateRequest {
   const clean = (v: string | null) => (v?.trim() ? v.trim() : null);
   return {
@@ -100,6 +112,8 @@ export function buildRequest(
       required_items: s.required_items.map((x) => x.trim()).filter(Boolean),
     })),
     instructions: instructions.trim(),
+    // Left out when empty, so a gaik release without the option accepts the request.
+    ...(sourcePrecedence.length ? { source_precedence: [...sourcePrecedence] } : {}),
     options: { ...options, model: clean(options.model) },
   };
 }

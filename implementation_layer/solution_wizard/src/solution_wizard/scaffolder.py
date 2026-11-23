@@ -378,23 +378,100 @@ DEFAULT_PROVIDER = "azure"
 # A models.local_endpoints entry: a bare host name, no scheme, port or path.
 _HOST_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
 _HOST_RE = re.compile(rf"{_HOST_LABEL}(?:\.{_HOST_LABEL})*")
+# A last label that is a number: the entry is an IPv4 address in some notation.
+_NUMERIC_LABEL_RE = re.compile(r"\d+|0x[0-9a-f]*")
+
+#: The hosts of the cloud model APIs gaik calls, as in gaik's endpoint allow-list
+#: (gaik.software_components.endpoints.PROVIDER_HOSTS; a test keeps them in step).
+#: ``*`` matches any host ending in the rest of the pattern.
+CLOUD_MODEL_API_HOSTS = (
+    "api.openai.com",
+    "*.openai.azure.com",
+    "*.cognitiveservices.azure.com",
+    "*.services.ai.azure.com",
+    "aitta-api.csc.fi",
+    "api.anthropic.com",
+    "generativelanguage.googleapis.com",
+    "aiplatform.googleapis.com",
+    "*-aiplatform.googleapis.com",
+    "aiplatform.eu.rep.googleapis.com",
+    "aiplatform.us.rep.googleapis.com",
+    "api.typesafe.ai",
+    "gaik-decide.2.rahtiapp.fi",
+)
+
+
+def _cloud_model_api_host(host: str) -> bool:
+    for pattern in CLOUD_MODEL_API_HOSTS:
+        if pattern.startswith("*"):
+            if len(host) > len(pattern) - 1 and host.endswith(pattern[1:]):
+                return True
+        elif host == pattern:
+            return True
+    return False
+
+
+def _local_endpoint_problem(entry: object) -> str | None:
+    """Why a models.local_endpoints entry cannot count as local processing, if it cannot.
+
+    The PoC sends the stage's key to a listed host, over plain http too, and treats
+    a stage there as local. A public IP address or a cloud model API host is never a
+    server of the user's own, and 0.0.0.0 is no server's address; a public domain
+    name cannot be checked here, so a server of the user's own on a public IP
+    address is listed by its DNS name.
+    """
+    import ipaddress
+
+    text = str(entry).strip().lower()
+    if not isinstance(entry, str) or not _HOST_RE.fullmatch(text):
+        return (
+            f"models.local_endpoints entry {entry!r} must be a host name such as "
+            "'gpu.lan', without scheme, port or path"
+        )
+    if _NUMERIC_LABEL_RE.fullmatch(text.rsplit(".", 1)[-1]):
+        try:
+            address = ipaddress.IPv4Address(text)
+        except ValueError:
+            return (
+                f"models.local_endpoints entry {entry!r} reads as an IP address; write it "
+                "as four decimal numbers such as '192.168.1.20'"
+            )
+        if address.is_unspecified:
+            return (
+                f"models.local_endpoints entry {entry!r} is the address a server listens on, "
+                "not one to connect to; list the server's own address or host name "
+                "('localhost' for this machine needs no entry)"
+            )
+        if address.is_global:
+            return (
+                f"models.local_endpoints entry {entry!r} is a public IP address; list only "
+                "servers on your own network. For a server of your own on a public IP "
+                "address, list its DNS name instead"
+            )
+    if _cloud_model_api_host(text):
+        return (
+            f"models.local_endpoints entry {entry!r} is a cloud model API host, not a "
+            "server of your own; it cannot count as local processing"
+        )
+    return None
 
 
 def _declared_local_hosts(blueprint: Blueprint) -> tuple[set[str], list[str]]:
-    """The host names in models.local_endpoints, and the entries that are not host names."""
+    """The hosts in models.local_endpoints, and why the others are refused.
+
+    An entry must be a host name; a public IP address and the host of a cloud model
+    API gaik calls are refused (see :func:`_local_endpoint_problem`).
+    """
     declared = (blueprint.models or {}).get("local_endpoints") or []
     if not isinstance(declared, list):
         return set(), ["models.local_endpoints must be a list of host names"]
     hosts, problems = set(), []
     for entry in declared:
-        text = str(entry).strip().lower()
-        if isinstance(entry, str) and _HOST_RE.fullmatch(text):
-            hosts.add(text)
+        problem = _local_endpoint_problem(entry)
+        if problem:
+            problems.append(problem)
         else:
-            problems.append(
-                f"models.local_endpoints entry {entry!r} must be a host name such as "
-                "'gpu.lan', without scheme, port or path"
-            )
+            hosts.add(str(entry).strip().lower())
     return hosts, problems
 
 
@@ -1070,40 +1147,42 @@ def _build_pdf_report_section(blueprint: Blueprint, schema_name: str) -> str:
     )
 
 
-def _card_import_names(card: dict | None) -> set[str] | None:
-    """The names a reference card's import line imports, or None without a card."""
-    if not card or not card.get("import"):
-        return None
-    names: set[str] = set()
-    for line in card["import"].splitlines():
-        _, sep, imported = line.strip().partition(" import ")
-        if sep:
-            names.update(n.strip() for n in imported.split(",") if n.strip())
-    return names
+#: A reference card's verified import line: ``from <module> import A, B``.
+_CARD_IMPORT_RE = re.compile(r"from (?P<module>[A-Za-z_][\w.]*) import (?P<names>[\w ,]+)")
 
 
-def _component_import_lines(registry, entry: dict, card: dict | None = None) -> list[str]:
-    """The import lines for a registry entry's classes.
+def _component_import_lines(entry: dict) -> list[str]:
+    """The import lines for a registry entry's classes, one name per line.
 
-    Most entries are named after their class, and the classes they list in
-    ``uses_components`` that the same module exports are imported beside it:
-    ``LLMJudgePanel`` is built from ``LLMJudge`` instances. A family entry such
-    as ``Extractor`` is not a class: its module exports ``SchemaGenerator`` and
-    ``DataExtractor``, and importing the family name fails at the run's first
-    line. The entry's reference card tells the two apart: its import line names
-    the entry when the entry is a class, and leaves a family's name out.
+    They come from the entry's reference card, whose import line the _generic
+    skeleton also shows. Most entries are named after their class, but a family
+    entry such as ``Extractor`` is not one: its card imports ``SchemaGenerator``
+    and ``DataExtractor``, and importing the family name would stop the run at
+    its first line. A class that uses another class of its module, such as
+    ``LLMJudgePanel`` with ``LLMJudge``, keeps its own import, and the classes
+    it lists in ``uses_components`` that the same module exports are imported
+    beside it: the panel is built from ``LLMJudge`` instances. Without a card
+    the entry's own name is imported, as before.
     """
-    import_path = entry["import_path"]
-    own = entry["name"]
-    members = [
-        name
-        for name in entry.get("uses_components") or []
-        if name != own and (registry.lookup_by_name(name) or {}).get("import_path") == import_path
+    from .registry import get_reference_cards, get_registry
+
+    card = get_reference_cards().get(entry["name"]) or {}
+    match = _CARD_IMPORT_RE.fullmatch(str(card.get("import", "")).strip())
+    names = [name.strip() for name in match["names"].split(",") if name.strip()] if match else []
+    lines = [f"from {match['module']} import {name}" for name in names] or [
+        f"from {entry['import_path']} import {entry['name']}"
     ]
-    card_names = _card_import_names(card)
-    is_class = card_names is None or own in card_names
-    names = ([own] if is_class else []) + members
-    return [f"from {import_path} import {name}" for name in (names or [own])]
+    import_path = entry["import_path"]
+    registry = get_registry()
+    for member in entry.get("uses_components") or []:
+        if member == entry["name"]:
+            continue
+        if (registry.lookup_by_name(member) or {}).get("import_path") != import_path:
+            continue
+        line = f"from {import_path} import {member}"
+        if line not in lines:
+            lines.append(line)
+    return lines
 
 
 def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
@@ -1149,17 +1228,13 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
     )
 
     # Component imports placeholder for _generic
-    from .registry import get_reference_cards
-
     registry = get_registry()
-    cards = get_reference_cards()
     import_lines = []
     for step in bc.workflow.steps:
         if step.component and step.component not in ("custom", "human_review"):
             entry = registry.lookup_by_name(step.component) or registry.lookup_by_id(step.component)
             if entry and entry.get("import_path"):
-                card = cards.get(entry["name"])
-                for line in _component_import_lines(registry, entry, card):
+                for line in _component_import_lines(entry):
                     if line not in import_lines:
                         import_lines.append(line)
 
@@ -1291,7 +1366,8 @@ def _build_variables(blueprint: Blueprint, pattern: str) -> dict[str, Any]:
         ),
         "sample_field_lines": sample_field_lines,
         "workflow_steps_summary": steps_summary,
-        "component_imports_placeholder": "\n".join(import_lines),
+        # Every line commented out: the agent uncomments each as it wires its step.
+        "component_imports_placeholder": "\n".join(f"# {line}" for line in import_lines),
         "input_instructions": _input_instructions(bc),
         "output_instructions": _output_instructions(bc),
         # technical_spec.external_services: their keys in .env.example, and the README section

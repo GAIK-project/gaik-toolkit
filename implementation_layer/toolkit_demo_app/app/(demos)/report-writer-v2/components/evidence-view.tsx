@@ -4,6 +4,17 @@ import { MessageResponse } from "@/components/ai-elements/message";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  conflictKeys,
+  followedIds,
+  type KnowledgeConflict,
+  namesSides,
+  resolveConflict,
+  resolvedByText,
+  sideProblem,
+  stillChosen,
+  withoutFact,
+} from "@/lib/report-writer/conflicts";
 import { cn } from "@/lib/utils";
 import {
   AlertTriangle,
@@ -31,12 +42,7 @@ interface Unit {
   confidence: string;
 }
 
-interface Conflict {
-  topic: string;
-  description: string;
-  status: string;
-  unit_ids?: string[];
-}
+type Conflict = KnowledgeConflict;
 
 interface Knowledge {
   units: Unit[];
@@ -172,9 +178,10 @@ function UnitCard({
 }
 
 /**
- * A disagreement between sources. A resolved one is settled by the report instructions.
- * An unresolved one is shown with both sides in the report; you can settle it here by
- * saying which side to follow, and the next Stage 3 run writes it that way.
+ * A disagreement between sources. A resolved one is settled by the source precedence or
+ * by hand, and its facts that the report follows are marked. An unresolved one is shown
+ * with both sides in the report; you can settle it here by choosing the fact to follow
+ * and saying why, and the next Stage 3 run writes it that way.
  */
 function ConflictCard({
   conflict,
@@ -185,11 +192,18 @@ function ConflictCard({
   conflict: Conflict;
   units: Unit[];
   disabled: boolean;
-  onResolve: (decision: string) => void;
+  onResolve: (decision: string, preferred: string[]) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  // A fact removed from the Evidence list while this is open is no longer chosen.
+  const preferred = stillChosen(conflict, picked);
+  const sides = namesSides(conflict);
+  const problem = sideProblem(conflict, preferred);
   const unresolved = conflict.status === "unresolved";
   const facts = units.filter((unit) => conflict.unit_ids?.includes(unit.id));
+  const followed = followedIds(conflict);
+  const by = resolvedByText(conflict);
   return (
     <li
       className={cn(
@@ -208,6 +222,7 @@ function ConflictCard({
         >
           {conflict.status}
         </Badge>
+        {by && <span className="text-muted-foreground text-xs">{by}</span>}
       </div>
       <p className="text-muted-foreground">{conflict.description}</p>
       {facts.length > 0 && (
@@ -219,6 +234,15 @@ function ConflictCard({
                 {fact.source.locator ? ` · ${fact.source.locator}` : ""}:
               </span>{" "}
               <span className="italic">{fact.quote}</span>
+              {followed.includes(fact.id) && (
+                <Badge
+                  variant="outline"
+                  className="ml-1.5 px-1.5 py-0 text-[10px] font-normal"
+                  title="The report follows this fact"
+                >
+                  followed
+                </Badge>
+              )}
             </li>
           ))}
         </ul>
@@ -233,7 +257,10 @@ function ConflictCard({
             size="xs"
             variant="outline"
             disabled={disabled}
-            onClick={() => setDraft(conflict.description)}
+            onClick={() => {
+              setDraft(conflict.description);
+              setPicked([]);
+            }}
           >
             <Check />
             Settle it
@@ -242,6 +269,37 @@ function ConflictCard({
       )}
       {draft !== null && (
         <div className="space-y-2">
+          {sides && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-medium">Follow this fact:</p>
+              <div className="flex flex-wrap gap-1.5">
+                {facts.map((fact) => {
+                  const chosen = preferred.includes(fact.id);
+                  return (
+                    <Button
+                      key={fact.id}
+                      size="xs"
+                      variant={chosen ? "default" : "outline"}
+                      aria-pressed={chosen}
+                      onClick={() =>
+                        setPicked(
+                          chosen
+                            ? preferred.filter((id) => id !== fact.id)
+                            : [...preferred, fact.id],
+                        )
+                      }
+                    >
+                      {fact.source.file}
+                      {fact.source.locator ? ` · ${fact.source.locator}` : ""}
+                    </Button>
+                  );
+                })}
+              </div>
+              {problem && (
+                <p className="text-xs text-amber-700">{problem}</p>
+              )}
+            </div>
+          )}
           <Textarea
             value={draft}
             onChange={(event) => setDraft(event.target.value)}
@@ -249,18 +307,18 @@ function ConflictCard({
             aria-label="Which side to follow"
           />
           <p className="text-muted-foreground text-xs">
-            Say which side the report should follow and why. It is saved as
-            resolved, and the next Stage 3 run is told to follow it. The report
-            instructions still apply, so they can override it (for example a
-            rule that an uncertain observation stays <em>Unresolved:</em>). To
-            be sure of the wording, edit the section text yourself.
+            {sides
+              ? "Choose the fact the report should follow and say why. "
+              : "Say which side the report should follow and why. "}
+            It is saved as resolved, and the next Stage 3 run is told to follow
+            it. To be sure of the wording, edit the section text yourself.
           </p>
           <div className="flex gap-2">
             <Button
               size="xs"
-              disabled={!draft.trim()}
+              disabled={!draft.trim() || problem !== null}
               onClick={() => {
-                onResolve(draft.trim());
+                onResolve(draft.trim(), preferred);
                 setDraft(null);
               }}
             >
@@ -357,6 +415,9 @@ function FactList({
             onRemove={() =>
               onSave((data) => {
                 data.units = data.units.filter((u) => u.id !== unit.id);
+                // No conflict may name, or tell the writer to follow, a removed fact.
+                if (Array.isArray(data.conflicts))
+                  data.conflicts = withoutFact(data.conflicts, unit.id);
               })
             }
           />
@@ -482,6 +543,9 @@ export function EvidenceView({
         const knowledgePath = `knowledge/${id}.json`;
         const knowledgeText = artifacts[knowledgePath];
         const knowledge = parseKnowledge(knowledgeText);
+        // Not the index: removing a fact can drop an earlier conflict, and an open
+        // card must keep its own draft and choice.
+        const conflictKey = conflictKeys(knowledge?.conflicts ?? []);
         const derived = section.depends_on.length > 0;
         const isOpen = open === id;
 
@@ -608,17 +672,15 @@ export function EvidenceView({
                     <ul className="space-y-2">
                       {knowledge.conflicts.map((conflict, index) => (
                         <ConflictCard
-                          key={index}
+                          key={conflictKey[index]}
                           conflict={conflict}
                           units={knowledge.units}
                           disabled={disabled}
-                          onResolve={(decision) =>
+                          onResolve={(decision, preferred) =>
                             saveKnowledge((data) => {
                               const target = data.conflicts[index];
-                              if (target) {
-                                target.status = "resolved";
-                                target.description = decision;
-                              }
+                              if (target)
+                                resolveConflict(target, decision, preferred);
                             })
                           }
                         />

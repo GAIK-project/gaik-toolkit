@@ -2,10 +2,28 @@
 
 from __future__ import annotations
 
+import re
+from functools import cache, lru_cache
+from typing import Annotated
+
 from pydantic import BaseModel, Field
+
+from gaik.software_components.llm.base import FIT_TO_BOUNDS
 
 # Maximum characters kept per rendered value when describing a column.
 _VALUE_CHARS = 60
+
+# A name SQL may read without quotes. Any other name a header row can give (with a
+# space, a sign, a leading digit or a letter outside ASCII) is shown quoted, so the
+# model writes it as one name; so is a keyword such as ``from`` or ``limit``.
+_PLAIN_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+
+# Used only if DuckDB's or sqlglot's own keyword lists cannot be read.
+_FALLBACK_KEYWORDS = frozenset(
+    "all and any as asc between by case cast create desc distinct else end except false "
+    "from group having if in intersect is join left like limit not null offset on or "
+    "order right select table then to true union using when where window with".split()
+)
 
 
 class GeneratedSQL(BaseModel):
@@ -15,7 +33,9 @@ class GeneratedSQL(BaseModel):
         ...,
         description="A single read-only DuckDB SELECT (a leading WITH is allowed).",
     )
-    reasoning: str = Field(
+    # The agent's own explanation: a strict Claude tool cannot carry the length
+    # limit, so a longer answer is cut to it instead of failing the query.
+    reasoning: Annotated[str, FIT_TO_BOUNDS] = Field(
         ...,
         max_length=500,
         description="Brief explanation of how the query answers the question.",
@@ -102,13 +122,76 @@ class TabularSchema(BaseModel):
             return "(no tables loaded)"
         blocks: list[str] = []
         for table in self.tables:
-            lines = [f"TABLE {table.name}  -- from {table.source}, {table.row_count} row(s)"]
+            lines = [
+                f"TABLE {_sql_name(table.name)}  -- from {table.source}, {table.row_count} row(s)"
+            ]
             lines.append("(")
             for col in table.columns:
-                lines.append(f"  {col.name} {col.data_type}{_describe_column(col)}")
+                lines.append(f"  {_sql_name(col.name)} {col.data_type}{_describe_column(col)}")
             lines.append(")")
             blocks.append("\n".join(lines))
         return "\n\n".join(blocks)
+
+
+def _sql_name(name: str) -> str:
+    """``name`` as a query writes it: quoted, with ``"`` doubled, unless plain."""
+    if not _needs_quotes(name):
+        return name
+    return '"' + name.replace('"', '""') + '"'
+
+
+@lru_cache(maxsize=4096)
+def _needs_quotes(name: str) -> bool:
+    """Whether a query must quote ``name`` to read it as a column or table.
+
+    Besides a name that is not a plain identifier, that is one DuckDB reserves
+    (``from``, ``select``, ``order``) or one the SQL validator's parser reads as
+    something else (``limit``, ``if``, ``drop``), since the model's query passes both.
+    """
+    if not _PLAIN_NAME.fullmatch(name):
+        return True
+    lower = name.lower()
+    if lower in _duckdb_reserved():
+        return True
+    parsed_as = _sqlglot_reading()
+    if parsed_as is None:
+        return lower in _FALLBACK_KEYWORDS
+    tokenize, var, special = parsed_as
+    try:
+        tokens = tokenize(name)
+    except Exception:
+        return True
+    return len(tokens) != 1 or tokens[0].token_type != var or name.upper() in special
+
+
+@cache
+def _duckdb_reserved() -> frozenset[str]:
+    """Keywords DuckDB does not take as a bare column name."""
+    try:
+        import duckdb
+
+        with duckdb.connect() as con:
+            rows = con.execute(
+                "SELECT keyword_name FROM duckdb_keywords() "
+                "WHERE keyword_category IN ('reserved', 'type_function')"
+            ).fetchall()
+    except Exception:
+        return _FALLBACK_KEYWORDS
+    return frozenset(row[0].lower() for row in rows)
+
+
+@cache
+def _sqlglot_reading():
+    """sqlglot's DuckDB tokenizer, its plain-name token type, and the names its
+    parser reads as syntax without parentheses (``IF``, ``CASE``, ``MAP``)."""
+    try:
+        from sqlglot.dialects.dialect import Dialect
+        from sqlglot.tokens import TokenType
+    except ImportError:
+        return None
+    dialect = Dialect.get_or_raise("duckdb")
+    special = frozenset(n.upper() for n in type(dialect.parser()).NO_PAREN_FUNCTION_PARSERS)
+    return dialect.tokenize, TokenType.VAR, special
 
 
 def _describe_column(col: ColumnProfile) -> str:

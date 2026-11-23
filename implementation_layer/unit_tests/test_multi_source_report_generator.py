@@ -372,15 +372,19 @@ def test_a_saved_config_loads_the_paths_it_was_given(tmp_path, monkeypatch):
     monkeypatch.chdir(work)
     config_path = tmp_path / "configs" / "report.json"
 
-    msrg.save_report_config(
-        config_path,
+    arguments = dict(
         input_paths=["materials", config_path.parent / "inside.txt"],
         sections=[{"title": "Summary", "instructions": "Summarize."}],
         output_dir="out",
         sample_report_path="materials/sample.md",
     )
-    # The working-directory paths lie beside the config's folder, so they load only with a
-    # root that holds both.
+    # The working-directory paths lie beside the config's folder: a plain load would
+    # refuse them, so a plain save does too, and writes nothing.
+    with pytest.raises(msrg.SourcePathError, match="outside the folder"):
+        msrg.save_report_config(config_path, **arguments)
+    assert not config_path.exists()
+    # Saved with a root that holds both, the config loads with that root.
+    msrg.save_report_config(config_path, root=tmp_path, **arguments)
     with pytest.raises(msrg.SourcePathError, match="outside the folder"):
         msrg.load_report_config(config_path)
     loaded = msrg.load_report_config(config_path, root=tmp_path)
@@ -396,6 +400,46 @@ def test_a_saved_config_loads_the_paths_it_was_given(tmp_path, monkeypatch):
     assert saved["input_paths"] == ["../work/materials", "inside.txt"]
     assert saved["output_dir"] == "../work/out"
     assert str(tmp_path) not in config_path.read_text(encoding="utf-8")
+
+
+def test_a_config_saved_without_a_root_loads_without_one(tmp_path):
+    project = tmp_path / "project"
+    (project / "inputs").mkdir(parents=True)
+    (project / "inputs" / "notes.txt").write_text("alpha", encoding="utf-8")
+    config_path = msrg.save_report_config(
+        project / "report.json",
+        input_paths=[project / "inputs"],
+        sections=[{"title": "Summary"}],
+        output_dir=project / "out",
+    )
+    loaded = msrg.load_report_config(config_path)
+    assert loaded["input_paths"] == [(project / "inputs").resolve()]
+
+
+def test_save_report_config_keeps_a_links_name_and_refuses_what_load_refuses(tmp_path, symlink):
+    project = tmp_path / "project"
+    real = project / "real_inputs"
+    real.mkdir(parents=True)
+    (real / "a.txt").write_text("alpha", encoding="utf-8")
+    symlink(project / "inputs", real)
+    config_path = msrg.save_report_config(
+        project / "report.json", input_paths=[project / "inputs"], sections=[{"title": "S"}]
+    )
+    # Stored under the link's own name, as ReportSpec.save stores a linked source.
+    assert json.loads(config_path.read_text(encoding="utf-8"))["input_paths"] == ["inputs"]
+    assert msrg.load_report_config(config_path)["input_paths"] == [real.resolve()]
+
+    # A link that leads out of the folder, or a file in an input folder that does.
+    (tmp_path / "elsewhere").mkdir()
+    (tmp_path / "secret.txt").write_text("Outside.", encoding="utf-8")
+    symlink(project / "away", tmp_path / "elsewhere")
+    symlink(real / "notes.txt", tmp_path / "secret.txt")
+    for inputs, match in (([project / "away"], "outside the folder"), ([real], "notes.txt")):
+        with pytest.raises(msrg.SourcePathError, match=match):
+            msrg.save_report_config(
+                project / "other.json", input_paths=inputs, sections=[{"title": "S"}]
+            )
+    assert not (project / "other.json").exists()
 
 
 def _config(folder: Path, **paths) -> Path:
@@ -420,6 +464,12 @@ def test_load_report_config_reads_nested_relative_paths(tmp_path):
     assert loaded["input_paths"] == [root / "inputs/site/day1", root / "inputs/notes.txt"]
     assert loaded["sample_report_path"] == root / "templates/old/sample.md"
     assert loaded["output_dir"] == root / "out/report"
+
+
+def test_a_config_without_strict_review_loads_with_strict_review_on(tmp_path):
+    loaded = msrg.load_report_config(_config(tmp_path))
+    assert loaded["strict_review"] is True
+    assert msrg.load_report_config(_config(tmp_path, strict_review=False))["strict_review"] is False
 
 
 @pytest.mark.parametrize(

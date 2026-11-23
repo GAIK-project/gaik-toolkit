@@ -11,10 +11,8 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard.blueprint import Blueprint
-from solution_wizard.registry import get_reference_cards, get_registry
 from solution_wizard.scaffolder import (
     _build_variables,
-    _component_import_lines,
     _derive_pattern_key,
     _determine_pattern,
     scaffold_poc,
@@ -466,61 +464,107 @@ def test_legacy_promoted_template_requires_explicit_provider_migration(tmp_path,
     assert candidate.read_text() == "# existing specialized pipeline\n"
 
 
-def test_generic_imports_name_classes_not_component_families():
-    """'Extractor' is a family: its module exports SchemaGenerator and DataExtractor."""
+def _generic_import_lines() -> list[str]:
+    """The hybrid blueprint's import lines, without the comment marks they carry."""
     imports = _build_variables(_hybrid_blueprint(), "_generic")["component_imports_placeholder"]
     lines = imports.splitlines()
+    assert lines and all(line.startswith("# from ") for line in lines), lines
+    return [line.removeprefix("# ") for line in lines]
+
+
+def _import_or_none(module: str):
+    """The module, or None when only an optional extra it needs is missing.
+
+    A gaik module path that does not exist fails the test instead.
+    """
+    import importlib
+
+    try:
+        return importlib.import_module(module)
+    except ImportError as exc:
+        missing = getattr(exc, "name", None) or ""
+        if missing == module or missing.startswith("gaik"):
+            raise
+        return None
+
+
+def test_generic_imports_name_classes_not_component_families():
+    """'Extractor' is a family: its module exports SchemaGenerator and DataExtractor."""
+    lines = _generic_import_lines()
     assert "from gaik.software_components.extractor import Extractor" not in lines
     assert "from gaik.software_components.extractor import DataExtractor" in lines
     assert "from gaik.software_components.extractor import SchemaGenerator" in lines
     assert len(lines) == len(set(lines))
 
 
-def _entry_import_lines(name: str) -> list[str]:
-    registry = get_registry()
-    entry = registry.lookup_by_name(name)
-    return _component_import_lines(registry, entry, get_reference_cards().get(name))
+def test_generic_imports_are_all_commented_out_until_wired():
+    """The skeleton says to uncomment each import as its step is wired: none runs before."""
+    imports = _build_variables(_hybrid_blueprint(), "_generic")["component_imports_placeholder"]
+    assert len(imports.splitlines()) > 1
+    assert not ast.parse(imports).body, "an import line is live in the generated skeleton"
 
 
-def test_generic_imports_keep_a_class_entry_beside_its_members():
-    """'LLMJudgePanel' is a class built from LLMJudge, which its module also exports."""
-    lines = _entry_import_lines("LLMJudgePanel")
+def test_generic_imports_exist_in_gaik():
+    """Every generated import names something its module really exports."""
+    checked = 0
+    for line in _generic_import_lines():
+        module, name = line.removeprefix("from ").split(" import ")
+        mod = _import_or_none(module)
+        if mod is None:
+            continue
+        assert hasattr(mod, name), line
+        checked += 1
+    if not checked:
+        pytest.skip("no gaik module could be imported")
+
+
+def test_a_class_that_uses_a_class_of_its_module_keeps_its_own_import():
+    """LLMJudgePanel lists LLMJudge, from the same module, and is a class itself."""
+    from solution_wizard.registry import get_registry
+    from solution_wizard.scaffolder import _component_import_lines
+
+    lines = _component_import_lines(get_registry().lookup_by_name("LLMJudgePanel"))
     assert lines == [
         "from gaik.software_components.validators.llm_judge import LLMJudgePanel",
         "from gaik.software_components.validators.llm_judge import LLMJudge",
     ]
 
 
-def test_generic_imports_only_change_family_and_member_entries():
-    """Only entries with same-module members gain imports; only families lose their name."""
+def test_every_same_module_class_an_entry_uses_is_imported_beside_it():
+    """A class an entry is built from, exported by the same module, gets its import too."""
+    from solution_wizard.registry import get_registry
+    from solution_wizard.scaffolder import _component_import_lines
+
     registry = get_registry()
-    changed = {}
+    checked = 0
     for entry in registry.all():
-        lines = _entry_import_lines(entry["name"])
-        if lines != [f"from {entry['import_path']} import {entry['name']}"]:
-            changed[entry["name"]] = lines
-    assert set(changed) == {"Extractor", "LLMJudgePanel"}
-
-
-def test_generic_imports_exist_in_gaik():
-    """Every generated import names something its module really exports.
-
-    A module whose extra is missing is left out and the other lines are still
-    checked; the test skips only when no line could be checked at all.
-    """
-    import importlib
-
-    imports = _build_variables(_hybrid_blueprint(), "_generic")["component_imports_placeholder"]
-    lines = imports.splitlines() + _entry_import_lines("LLMJudgePanel")
-    checked, missing = 0, []
-    for line in lines:
-        module, name = line.removeprefix("from ").split(" import ")
-        try:
-            mod = importlib.import_module(module)
-        except ImportError:
-            missing.append(module)
+        if not entry.get("import_path"):
             continue
-        assert hasattr(mod, name), line
-        checked += 1
+        lines = _component_import_lines(entry)
+        for member in entry.get("uses_components") or []:
+            member_entry = registry.lookup_by_name(member) or {}
+            if member == entry["name"] or member_entry.get("import_path") != entry["import_path"]:
+                continue
+            assert f"from {entry['import_path']} import {member}" in lines, entry["name"]
+            checked += 1
+    assert checked, "no entry lists a class of its own module"
+
+
+def test_every_registry_entry_imports_only_what_gaik_exports():
+    """A step of any component gets imports that load, not only the hybrid blueprint's."""
+    from solution_wizard.registry import get_registry
+    from solution_wizard.scaffolder import _component_import_lines
+
+    checked = 0
+    for entry in get_registry().all():
+        if not entry.get("import_path"):
+            continue
+        for line in _component_import_lines(entry):
+            module, name = line.removeprefix("from ").split(" import ")
+            mod = _import_or_none(module)
+            if mod is None:
+                continue
+            assert hasattr(mod, name), f"{entry['name']}: {line}"
+            checked += 1
     if not checked:
-        pytest.skip(f"no module could be imported (extras missing: {sorted(set(missing))})")
+        pytest.skip("no gaik module could be imported")

@@ -57,6 +57,7 @@ import json
 import keyword
 import re
 import types
+import warnings
 from decimal import Decimal, InvalidOperation
 from enum import Enum
 from pathlib import Path
@@ -194,13 +195,22 @@ def _describe_enum(enum_cls: type[Enum]) -> dict:
     }
 
 
+_DECIMAL_CLEANER_NAME = "_clean_decimal_string"
+# A refusal that already names its field (from a nested model, or a model's own
+# check), so the outer field is not added to it again.
+_NAMES_A_FIELD = re.compile(r"(?:Field|Model) '")
+
+
 def _check_decimal_metadata(metadata: list, decimal_kind: str) -> None:
     """A Decimal field holds what DecimalField / OptionalDecimalField carry, and nothing more.
 
     That is one ``WithJsonSchema`` with the alias's JSON schema and one
     ``BeforeValidator`` for the amount text; the rebuild restores both. Any
     other metadata (``ge``, ``max_digits``, more validators) is refused, since
-    the rebuilt field would not have it.
+    the rebuilt field would not have it. So is a cleaner that is not gaik's
+    ``_clean_decimal_string`` (or a copy under that name, as a saved schema.py
+    holds): the rebuild would replace it with gaik's, and a cleaner that refuses
+    negative amounts, say, would be lost.
     """
     alias = OptionalDecimalField if decimal_kind == "OptionalDecimalField" else DecimalField
     expected_schema = next(m for m in get_args(alias)[1:] if isinstance(m, WithJsonSchema))
@@ -211,6 +221,12 @@ def _check_decimal_metadata(metadata: list, decimal_kind: str) -> None:
         if isinstance(m, BeforeValidator) and m.json_schema_input_type is PydanticUndefined
     ]
     if len(metadata) == 2 and schemas == [expected_schema] and len(cleaners) == 1:
+        name = getattr(cleaners[0].func, "__name__", None)
+        if name != _DECIMAL_CLEANER_NAME:
+            raise SavedSchemaError(
+                f"Decimal field cleaner {name!r} cannot be saved as data: the rebuilt field "
+                f"would use gaik's {_DECIMAL_CLEANER_NAME} instead"
+            )
         return
     other = [m for m in metadata if not isinstance(m, (WithJsonSchema, BeforeValidator))]
     if other:
@@ -288,9 +304,20 @@ def _describe_one(model: type[BaseModel], collect) -> dict:
             raise SavedSchemaError(
                 f"Field {name!r} has options that cannot be saved as data: {sorted(options)}"
             )
-        type_node = _describe_type(info.annotation, collect)
-        decimal_kind = decimal_field_repr(info.annotation)
-        pattern = _pattern_from_metadata(list(info.metadata), decimal_kind)
+        try:
+            type_node = _describe_type(info.annotation, collect)
+            decimal_kind = decimal_field_repr(info.annotation)
+            pattern = _pattern_from_metadata(list(info.metadata), decimal_kind)
+            default = (
+                _encode_default(info.default)
+                if info.default_factory is None and info.default is not PydanticUndefined
+                else PydanticUndefined
+            )
+        except SavedSchemaError as exc:
+            if _NAMES_A_FIELD.match(str(exc)):
+                raise  # a nested model's field, already named
+            # The refusal names the field, so the person can find it.
+            raise SavedSchemaError(f"Field {name!r} of {model.__name__!r}: {exc}") from exc
         if pattern is not None:
             if type_node != {"type": "str"}:
                 raise SavedSchemaError(f"Pattern on non-text field {name!r}")
@@ -305,8 +332,8 @@ def _describe_one(model: type[BaseModel], collect) -> dict:
             if info.default_factory not in (list, dict):
                 raise SavedSchemaError(f"Default factory of {name!r} cannot be saved as data")
             entry["default_factory"] = factory
-        elif info.default is not PydanticUndefined:
-            entry["default"] = _encode_default(info.default)
+        elif default is not PydanticUndefined:
+            entry["default"] = default
         fields.append(entry)
 
     # Validators, serializers, computed fields, model_post_init and config
@@ -662,15 +689,17 @@ def save_model_file(model: type[BaseModel], path: Path) -> bool:
     The schema-saving callers use this one rule: when ``model`` cannot be
     saved as data, an older file at ``path`` (from a previous model) is
     removed, so a later load does not rebuild that model next to the new
-    requirements. A notice is printed and ``False`` returned; the load then
-    rebuilds the model from the requirements, or refuses.
+    requirements. A ``UserWarning`` says why and ``False`` is returned; the load
+    then rebuilds the model from the requirements, or refuses.
     """
     path = Path(path)
     try:
         description = describe_model(model)
     except SavedSchemaError as exc:
         path.unlink(missing_ok=True)
-        print(f"Schema {model.__name__!r} not saved as data: {exc}")
+        warnings.warn(
+            f"Schema {model.__name__!r} not saved as data: {exc}", UserWarning, stacklevel=2
+        )
         return False
     tmp_path = path.with_name(path.name + ".tmp")
     try:
@@ -724,9 +753,11 @@ def load_saved_model(
 
     When ``model_path`` is missing (a folder saved by an older gaik that has
     only the ``.py`` file), the model is rebuilt from ``requirements`` and the
-    description is written to ``model_path`` for the next load. When neither
-    works, :class:`SavedSchemaError` names the folder and how to convert it:
-    the schema is not generated again over the saved one.
+    description is written to ``model_path`` for the next load; a
+    ``UserWarning`` says so, since edits made only in the ``.py`` file are not in
+    the rebuilt model. When neither works, :class:`SavedSchemaError` names the
+    folder and how to convert it: the schema is not generated again over the
+    saved one.
     """
     model_path = Path(model_path)
     if model_path.exists():
@@ -754,9 +785,11 @@ def load_saved_model(
         saved = f"and saved it as {model_path.name}"
     except (OSError, SavedSchemaError) as exc:
         saved = f"but could not save it as {model_path.name} ({type(exc).__name__})"
-    print(
+    warnings.warn(
         f"Rebuilt saved schema {model_name!r} in {model_path.parent} from its requirements "
-        f"{saved}; edits made only in the folder's .py file are not in it."
+        f"{saved}; edits made only in the folder's .py file are not in it.",
+        UserWarning,
+        stacklevel=2,
     )
     return model
 

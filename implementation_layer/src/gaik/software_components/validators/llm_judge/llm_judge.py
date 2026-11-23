@@ -6,9 +6,11 @@ import base64
 import json
 import logging
 import os
+import threading
 import time
 from typing import Any, Literal
 
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.llm import create_llm_client, get_llm_config, resolve_provider
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.source_material import SourceMaterial
@@ -34,6 +36,9 @@ from .schema import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Guards building a judge's Vertex AI provider (see _vertex_provider).
+_VERTEX_PROVIDER_LOCK = threading.Lock()
 
 ModelProvider = Literal["openai", "azure", "anthropic", "google"]
 
@@ -466,6 +471,7 @@ class LLMJudge:
         user_prompt: str,
         system_prompt: str,
     ) -> tuple[str, int, int]:
+        load_env_file()
         from google import genai
         from google.genai import types
 
@@ -477,26 +483,7 @@ class LLMJudge:
             retry_options=types.HttpRetryOptions(attempts=DEFAULT_MAX_RETRIES + 1),
         )
         if self.use_vertexai:
-            # The EU multi-region unless a location is set (llm/config.py). A model
-            # the EU does not serve is retried on the global endpoint below.
-            location = os.environ.get("GOOGLE_VERTEXAI_LOCATION")
-            # The default location is asked once and for at most two minutes: the
-            # SDK otherwise waits without a limit and would never reach the fallback.
-            bounded = (
-                {"http_options": limited}
-                if location
-                else {
-                    "http_options": types.HttpOptions(
-                        timeout=120_000, retry_options=types.HttpRetryOptions(attempts=1)
-                    )
-                }
-            )
-            client = genai.Client(
-                vertexai=True,
-                project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
-                location=location or "eu",
-                **bounded,
-            )
+            return _call_vertex(self, source_pages, user_prompt, system_prompt)
         else:
             api_key = os.environ.get("GOOGLE_GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
             if not api_key:
@@ -522,40 +509,94 @@ class LLMJudge:
                 ),
             )
 
-        try:
-            resp = generate(client)
-        except Exception as exc:
-            # The default location falls back when it does not serve the model
-            # (404) or does not answer; one set in the environment does not.
-            code = getattr(exc, "code", None)
-            moves = (
-                isinstance(exc, genai.errors.ServerError)
-                or (isinstance(exc, genai.errors.ClientError) and code in {404, 429})
-                or "Timeout" in type(exc).__name__
-            )
-            if not self.use_vertexai or os.environ.get("GOOGLE_VERTEXAI_LOCATION") or not moves:
-                raise
-            logger.warning(
-                "Vertex AI location 'eu' did not serve %s (%s). Using 'global', which is "
-                "not tied to a region. Set GOOGLE_VERTEXAI_LOCATION to choose the location.",
-                self.model,
-                type(exc).__name__,
-            )
-            resp = generate(
-                genai.Client(
-                    vertexai=True,
-                    project=os.environ["GOOGLE_VERTEXAI_PROJECT"],
-                    location="global",
-                    http_options=limited,
-                )
-            )
-        text = resp.text or ""
-        meta = getattr(resp, "usage_metadata", None)
+        resp = generate(client)
+        # The provider's count, which holds the thinking tokens Gemini bills as output.
+        from gaik.software_components.llm.google_provider import _usage as google_usage
+
+        usage = google_usage(resp)
         return (
-            text,
-            getattr(meta, "prompt_token_count", 0) or 0,
-            getattr(meta, "candidates_token_count", 0) or 0,
+            resp.text or "",
+            usage.get("prompt_tokens", 0),
+            usage.get("completion_tokens", 0),
         )
+
+
+def _vertex_provider(judge: Any) -> Any:
+    """The judge's :class:`GoogleProvider` for the current Vertex AI settings.
+
+    The EU multi-region unless ``GOOGLE_VERTEXAI_LOCATION`` is set, and the global
+    endpoint for a model the EU does not serve or while the EU does not answer.
+    The provider is built once per project and location and kept on the judge, so
+    its clients are not built again for each call; what the EU was found not to
+    serve is shared by every provider in the process. Threads that share a judge
+    get the one provider published under a lock; it is built outside the lock, so
+    building one (which may load credentials) does not hold up other judges, and
+    a thread that loses the race closes the one it built. A provider replaced
+    after the settings changed is not closed, since another thread may still be
+    using it; it is collected once unused.
+    """
+    from gaik.software_components.llm.google_provider import GoogleProvider
+
+    settings = (
+        os.environ["GOOGLE_VERTEXAI_PROJECT"],
+        os.environ.get("GOOGLE_VERTEXAI_LOCATION") or None,
+    )
+
+    def published():
+        provider = getattr(judge, "_vertex_provider", None)
+        same = provider is not None and getattr(judge, "_vertex_settings", None) == settings
+        return provider if same else None
+
+    with _VERTEX_PROVIDER_LOCK:
+        provider = published()
+    if provider is not None:
+        return provider
+    built = GoogleProvider(
+        {
+            "provider": "vertex",
+            "project_id": settings[0],
+            "location": settings[1],
+            "model": judge.model,
+            "_location_env": "GOOGLE_VERTEXAI_LOCATION",
+        }
+    )
+    with _VERTEX_PROVIDER_LOCK:
+        provider = published()
+        if provider is None:
+            judge._vertex_provider, judge._vertex_settings = built, settings
+            return built
+    # Another thread published first; this one was never used.
+    built.close()
+    return provider
+
+
+def _call_vertex(
+    judge: Any, source_pages: list[bytes], user_prompt: str, system_prompt: str
+) -> tuple[str, int, int]:
+    """The judge's call on Vertex AI, through its :func:`_vertex_provider`."""
+    provider = _vertex_provider(judge)
+    content: list[dict] = [{"type": "text", "text": user_prompt}]
+    content.extend(
+        {
+            "type": "image_url",
+            "image_url": {"url": f"data:image/png;base64,{base64.b64encode(page).decode()}"},
+        }
+        for page in source_pages
+    )
+    response = provider.chat(
+        [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": content},
+        ],
+        model=judge.model,
+        response_mime_type="application/json",
+        max_output_tokens=judge.max_tokens,
+    )
+    return (
+        response.text,
+        response.usage.get("prompt_tokens", 0),
+        response.usage.get("completion_tokens", 0),
+    )
 
 
 def _strip_json_fences(raw_text: str) -> str:

@@ -1,5 +1,6 @@
 """PoC package endpoints (#151): listing and zip download."""
 
+import importlib.util
 import io
 import os
 import uuid
@@ -271,8 +272,11 @@ def test_generate_produces_the_v1_scaffolder_file_set(client, db_session) -> Non
     assert body["regenerated"] is False
 
     # The same set scaffold_poc writes — the endpoint adds nothing of its own
-    # beyond the manifest, which is hidden from the listing.
-    assert set(body["files"]) == {
+    # beyond the manifest, which is hidden from the listing. The model file is
+    # written exactly where gaik can describe the schema (gaik installed).
+    model_file = "schemas/output_schema_model.json"
+    assert (model_file in body["files"]) == (importlib.util.find_spec("gaik") is not None)
+    assert set(body["files"]) - {model_file} == {
         ".env.example",
         "README.md",
         "app.py",

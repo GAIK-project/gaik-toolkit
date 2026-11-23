@@ -12,6 +12,7 @@ release without the curator's drop-unverified support breaks only this router.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
 import logging
 import queue
@@ -22,7 +23,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError, field_validator
 
 try:
     from utils import get_api_config, sse_event
@@ -69,7 +70,16 @@ class _Request(BaseModel):
 
     sections: list[_Section] = Field(min_length=1, max_length=MAX_SECTIONS)
     instructions: str = Field(default="", max_length=10000)
+    source_precedence: list[Literal["primary", "secondary"]] = Field(default=[], max_length=2)
+    """Source classes, highest first: which side of a conflict the curator follows."""
     options: _Options = _Options()
+
+    @field_validator("source_precedence")
+    @classmethod
+    def _distinct(cls, value: list[str]) -> list[str]:
+        if len(set(value)) != len(value):
+            raise ValueError("names a class more than once")
+        return value
 
 
 def _errors(exc: ValidationError) -> str:
@@ -138,8 +148,9 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
     """Curate the sections. Returns a Server-Sent Events stream.
 
     ``request`` is JSON: ``{"sections": [{"id", "title", "instructions",
-    "required_items"}], "instructions", "options": {"model", "reasoning_effort",
-    "max_workers"}}``. ``artifacts`` is a JSON file of the ``normalized/`` files.
+    "required_items"}], "instructions", "source_precedence", "options": {"model",
+    "reasoning_effort", "max_workers"}}``. ``artifacts`` is a JSON file of the
+    ``normalized/`` files.
 
     Events:
         ``progress``  {"message": str}  — section starts and ends, dropped facts
@@ -175,16 +186,32 @@ async def run(request: str = Form(...), artifacts: UploadFile = File(...)):
 
     def work() -> None:
         try:
-            knowledge = gaik.KnowledgeCurator(
+            curator = gaik.KnowledgeCurator(
                 config,
                 options.model,
                 max_workers=options.max_workers,
                 chat_options=chat_options,
-            ).curate(
+            )
+            precedence = {}
+            if parsed.source_precedence:
+                # The image installs gaik from PyPI: a release before source_precedence
+                # refuses the keyword, so it is passed only where curate() takes it.
+                if "source_precedence" in inspect.signature(curator.curate).parameters:
+                    precedence = {"source_precedence": parsed.source_precedence}
+                else:
+                    # Such a release (0.11.1) has the model decide a conflict from the
+                    # source hierarchy that the instructions describe.
+                    messages.put(
+                        "This gaik release cannot rank sources by class, so the switch "
+                        "has no effect: the model resolves a conflict where the "
+                        "instructions rank the sources, and leaves the rest for you"
+                    )
+            knowledge = curator.curate(
                 sources,
                 sections,
                 instructions=parsed.instructions,
                 progress_callback=progress,
+                **precedence,
             )
             outcome["result"] = {
                 "artifacts": {

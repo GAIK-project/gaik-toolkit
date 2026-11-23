@@ -2,29 +2,39 @@
 genericized.
 
 A mandatory fact/format repair pass for one section: the LLM returns a
-structured ``CorrectionList`` of ``{search, replace, reason}`` edits, which are
-applied with exact then fuzzy (>= 0.9) string matching; unapplied edits are
-retried (up to ``MAX_ATTEMPTS``). Whatever cannot be applied is returned as
-human-readable warnings rather than raising. An optional style-only ``polish``
-pass reuses the same editor.
+structured ``CorrectionList`` of ``{search, replace, reason}`` edits. Each is
+applied where its search occurs once, or else at the one passage it means once case,
+quotes, dashes and whitespace are ignored, or at the one passage within 10% of it and
+with the same numbers (``_span.locate``); an edit that fits no passage, or more than
+one, is retried (up
+to ``MAX_ATTEMPTS``). Whatever cannot be applied is returned as human-readable
+warnings rather than raising. An optional style-only ``polish`` pass reuses the
+same editor.
 
 Uses GAIK's ``ProviderClient.chat_parsed(messages, response_format=...)`` for
-structured output and the stdlib ``difflib`` for fuzzy matching (no extra deps).
+structured output; the matching needs no extra dependencies.
 """
 
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from difflib import SequenceMatcher
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
+from gaik.software_components.draft_reviewer.draft_reviewer import (
+    LEFT_OUT,
+    _owners,
+    _split_ids,
+)
+from gaik.software_components.draft_reviewer.models import Edit
+from gaik.software_components.draft_reviewer.prompts import retry_prompt
 from gaik.software_components.source_material import (
     SourceMaterial,
     with_source_material_instruction,
 )
 
 from .._material import Evidence
+from ._span import Span, locate
 from .prompts import build_polish_instruction, build_reviewer_instruction
 
 MAX_ATTEMPTS = 5
@@ -56,6 +66,18 @@ class Correction(BaseModel):
     search: str = Field(description="Letter-for-letter exact string to find in the text.")
     replace: str = Field(description="Replacement string to apply.")
     reason: str = Field(description="Why this correction is needed (1-2 sentences).")
+    answers: list[str] = Field(
+        default_factory=list,
+        description="In a retry: the ids of the failed edits this correction makes, such "
+        'as ["F1"], or ["F1", "F2"] when one correction makes both, copied from the '
+        "failed_edits block; an empty list for a correction that makes none of them.",
+    )
+
+    @field_validator("answers", mode="before")
+    @classmethod
+    def _ids(cls, value):
+        # One id written as a string ("F1", or "F1, F2") is taken as before.
+        return _split_ids(value) if isinstance(value, str) else value
 
 
 class CorrectionList(BaseModel):
@@ -71,34 +93,22 @@ class CorrectionList(BaseModel):
 
 
 def _find_search_string(text: str, search: str, threshold: float = FUZZY_THRESHOLD) -> str | None:
-    """Return the actual substring of ``text`` matching ``search``, or None.
+    """Return the passage of ``text`` that ``search`` means, or None.
 
-    Handles exact, case-insensitive, and (for longer strings) fuzzy matches.
+    Exact first, then ignoring case, quote and dash styles and whitespace runs, then
+    (for 10 characters or more) a close match; a loose match must be the only one.
     """
-    if search in text:
-        return search
+    span = locate(text, search, threshold)
+    return text[span.start : span.end] if isinstance(span, Span) else None
 
-    low = search.lower()
-    text_low = text.lower()
-    if low in text_low:
-        pos = text_low.find(low)
-        return text[pos : pos + len(search)]
 
-    # Too short to fuzzy-match reliably.
-    if len(search) < 10:
-        return None
-
-    n = len(search)
-    best: str | None = None
-    best_ratio = threshold
-    step = max(1, n // 4)
-    for i in range(0, max(1, len(text) - n + 1), step):
-        cand = text[i : i + n]
-        ratio = SequenceMatcher(None, low, cand.lower()).ratio()
-        if ratio >= best_ratio:
-            best_ratio = ratio
-            best = cand
-    return best
+def _replacement(span: Span, replace: str) -> str:
+    """``replace`` without the edge whitespace of the search that the text lacks there."""
+    if span.lead and replace.startswith(span.lead):
+        replace = replace[len(span.lead) :]
+    if span.trail and replace.endswith(span.trail):
+        replace = replace[: len(replace) - len(span.trail)]
+    return replace
 
 
 def _apply_corrections(
@@ -107,18 +117,21 @@ def _apply_corrections(
     current = text
     successful: list[dict] = []
     failed: list[dict] = []
-    for c in corrections:
-        target = c.search if c.search in current else _find_search_string(current, c.search)
-        if target:
-            current = current.replace(target, c.replace, 1)
-            successful.append({"search": target, "replace": c.replace, "reason": c.reason})
+    for index, c in enumerate(corrections):
+        span = locate(current, c.search, FUZZY_THRESHOLD)
+        if isinstance(span, Span):
+            target = current[span.start : span.end]
+            replace = _replacement(span, c.replace)
+            current = current[: span.start] + replace + current[span.end :]
+            successful.append({"search": target, "replace": replace, "reason": c.reason})
         else:
             failed.append(
                 {
                     "search": c.search,
                     "replace": c.replace,
                     "reason": c.reason,
-                    "error": "search string not found in text",
+                    "error": span,
+                    "index": index,
                 }
             )
     return current, successful, failed
@@ -137,7 +150,8 @@ def _request_corrections(
         return result
     # Defensive: some clients may hand back a dict / other BaseModel.
     if isinstance(result, BaseModel):
-        return CorrectionList.model_validate(result.model_dump())
+        # Unset fields stay unset: a correction without "answers" is paired by its text.
+        return CorrectionList.model_validate(result.model_dump(exclude_unset=True))
     return CorrectionList.model_validate(result)
 
 
@@ -151,19 +165,14 @@ def _check_prompt(text: str, blocks: SourceMaterial) -> str:
 
 
 def _retry_prompt(text: str, failed: list[dict], attempt: int, blocks: SourceMaterial) -> str:
-    failed_info = "\n\n".join(
-        f"  search: {f['search']!r}\n  replace: {f['replace']!r}\n  error: {f['error']}"
-        for f in failed
-    )
-    return (
-        f"You have attempted to correct this text {attempt} time(s), but the edits in the "
-        "source_material block labelled failed_edits could not be applied because their "
-        "search strings were not found.\n\n"
-        + blocks.wrap(failed_info, label="failed_edits")
-        + "\n\nRe-read the instructions and decide whether these changes are still needed. "
-        "If so, produce NEW corrections whose 'search' strings EXACTLY match the current "
-        "text below.\n\n" + blocks.wrap(text, label="text")
-    )
+    """The DraftReviewer's retry request: every failed edit must be made again or it
+    stays unresolved (and fails a strict review), so the two reviewers ask alike."""
+    listed = [(f["id"], Edit(**_edit_fields(f)), f["error"]) for f in failed]
+    return retry_prompt(text, listed, attempt, blocks)
+
+
+def _edit_fields(failed: dict) -> dict:
+    return {key: failed[key] for key in ("search", "replace", "reason")}
 
 
 Instruction = str | Callable[[SourceMaterial], str]
@@ -201,16 +210,34 @@ def diff_editor_run(
     pending = first.corrections
 
     attempt = 0
+    # Each failed edit keeps one id until a correction that makes it applies. A failed
+    # edit that a retry answer leaves out stays failed, so it is asked for again and
+    # ends in ``warnings`` (and fails a strict review) rather than disappearing.
     failed: list[dict] = []
+    made = 0
     while pending:
-        current, successful, failed = _apply_corrections(current, pending)
+        previous = {f["id"]: Correction(**_edit_fields(f)) for f in failed}
+        owner = _owners(previous, pending) if previous else {}
+        claimed = {fid for ids in owner.values() for fid in ids}
+        current, successful, missed = _apply_corrections(current, pending)
         applied.extend(successful)
+        failed = [{**f, "error": LEFT_OUT} for f in failed if f["id"] not in claimed]
+        for f in missed:
+            # A retry correction that makes several failed edits and fails too is
+            # carried once, under the first id it names.
+            ids = owner.get(f.pop("index"))
+            if ids:
+                fid = ids[0]
+            else:
+                made += 1
+                fid = f"F{made}"
+            failed.append({**f, "id": fid})
         attempt += 1
         if not failed:
             break
         if attempt >= MAX_ATTEMPTS:
             break
-        sent = [current] + [f"{f['search']}\n{f['replace']}" for f in failed]
+        sent = [current] + [f"{f['search']}\n{f['replace']}\n{f['reason']}" for f in failed]
         if any(blocks.boundary in piece for piece in sent):
             blocks = SourceMaterial()
         pending = _request_corrections(
@@ -221,8 +248,7 @@ def diff_editor_run(
         ).corrections
 
     warnings = [
-        f"Unresolved reviewer edit (search text not found after {attempt} attempt(s)): "
-        f"{f['search'][:80]!r}"
+        f"Unresolved reviewer edit ({f['error']}; after {attempt} attempt(s)): {f['search'][:80]!r}"
         for f in failed
     ]
     return current, applied, warnings, num_proposed

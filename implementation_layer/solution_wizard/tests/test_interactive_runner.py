@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import inspect
+import io
 import json
 import os
 import sys
@@ -111,8 +112,221 @@ def test_the_session_loads_no_user_settings_and_no_mcp_servers(output) -> None:
 
     assert options.setting_sources == []
     assert options.mcp_servers in ({}, None)
-    assert "strict-mcp-config" in options.extra_args
+    assert options.strict_mcp_config is True
+    assert "strict-mcp-config" not in options.extra_args  # the documented field instead
     assert set(options.tools) == set(runner.TOOLS)
+    assert options.max_budget_usd is None  # no limit unless --max-budget-usd is given
+
+
+def _cli_command(options: ClaudeAgentOptions, monkeypatch) -> list[str]:
+    """The command line the SDK starts the CLI with, captured without starting it."""
+    seen: list[str] = []
+
+    async def open_process(command, *_args, **_kwargs):
+        seen.extend(command)
+        raise _CLIStartError
+
+    monkeypatch.setattr(anyio, "open_process", open_process)
+
+    async def go() -> None:
+        try:
+            await ClaudeSDKClient(options=options).connect()
+        except Exception:  # noqa: BLE001 - the SDK wraps the stop above in its own error
+            pass
+
+    asyncio.run(go())
+    assert seen, "the SDK did not reach the point where it starts the CLI"
+    return seen
+
+
+def test_the_cli_is_started_with_strict_mcp_config_and_the_budget(output, tmp_path, monkeypatch):
+    cli = tmp_path / "claude"
+    cli.write_text("")
+    env = {"PATH": os.environ.get("PATH", "")}
+    options = runner.build_session_options(output, env, "m", cli_path=str(cli))
+    command = _cli_command(options, monkeypatch)
+    assert command.count("--strict-mcp-config") == 1
+    assert "--max-budget-usd" not in command
+
+    options = runner.build_session_options(output, env, "m", max_budget_usd=2.5, cli_path=str(cli))
+    command = _cli_command(options, monkeypatch)
+    assert command[command.index("--max-budget-usd") + 1] == "2.5"
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "five"])
+def test_the_budget_must_be_a_positive_amount(monkeypatch, value) -> None:
+    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py", "--max-budget-usd", value])
+    with pytest.raises(SystemExit):
+        runner.parse_args()
+
+
+@pytest.mark.parametrize(
+    ("given", "on_the_command_line", "shown"),
+    [("2.5", "2.5", "$2.50"), ("1000000", "1000000.0", "$1,000,000.00"), (None, None, None)],
+)
+def test_the_budget_option_reaches_the_cli_through_main(
+    tmp_path, monkeypatch, capsys, shell_env, given, on_the_command_line, shown
+) -> None:
+    """main -> run_interactive -> build_session_options -> the CLI's --max-budget-usd."""
+    _temp_is_an_ordinary_folder(monkeypatch, tmp_path)
+    env_file = tmp_path / ".env"
+    env_file.write_text(
+        "CLAUDE_CODE_USE_FOUNDRY=1\nANTHROPIC_FOUNDRY_API_KEY=k\nANTHROPIC_FOUNDRY_RESOURCE=r\n"
+    )
+    # The .env file is the only source: load_dotenv keeps a variable already set, and
+    # CI sets the Foundry ones to "" where it has no secret for them.
+    for name in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", *_FOUNDRY_NAMES):
+        os.environ.pop(name, None)
+    cli = tmp_path / "claude"
+    cli.write_text("")
+    build = runner.build_session_options
+    monkeypatch.setattr(
+        runner, "build_session_options", lambda *a, **k: build(*a, cli_path=str(cli), **k)
+    )
+    command: list[str] = []
+
+    async def open_process(cmd, *_args, **_kwargs):
+        command.extend(cmd)
+        raise _CLIStartError
+
+    monkeypatch.setattr(anyio, "open_process", open_process)
+    argv = ["run_wizard_interactive.py", "--output-dir", str(tmp_path / "out")]
+    argv += ["--env-file", str(env_file)]
+    if given is not None:
+        argv += ["--max-budget-usd", given]
+    monkeypatch.setattr(sys, "argv", argv)
+
+    with pytest.raises(SystemExit):
+        runner.main()
+
+    assert command, "main did not reach the point where the SDK starts the CLI"
+    printed = capsys.readouterr().out
+    if given is None:
+        assert "--max-budget-usd" not in command
+        assert "Budget:" not in printed
+    else:
+        assert command[command.index("--max-budget-usd") + 1] == on_the_command_line
+        assert f"Budget: {shown} for the whole session" in printed
+        assert "a little over" in printed
+        assert "e+" not in printed
+
+
+@pytest.mark.parametrize(
+    ("amount", "shown"),
+    [(2.5, "$2.50"), (5, "$5.00"), (1e6, "$1,000,000.00"), (0.125, "$0.125"), (0.5, "$0.50")],
+)
+def test_a_budget_is_shown_as_money(amount, shown) -> None:
+    assert runner._money(amount) == shown
+
+
+class _OneResult:
+    """A client whose turn ends with one result message."""
+
+    def __init__(self, message) -> None:
+        self.message = message
+
+    async def receive_response(self):
+        yield self.message
+
+
+def test_a_session_stopped_by_its_budget_says_so(capsys) -> None:
+    from claude_agent_sdk import ResultMessage
+
+    stopped = ResultMessage(
+        subtype="error_max_budget_usd",
+        duration_ms=1,
+        duration_api_ms=1,
+        is_error=True,
+        num_turns=7,
+        session_id="s",
+        total_cost_usd=2.5123,
+    )
+
+    assert asyncio.run(runner._drain_response(_OneResult(stopped))) is stopped
+
+    printed = capsys.readouterr().out
+    assert "Session stopped: the --max-budget-usd limit was reached ($2.5123)" in printed
+    assert "Session ended with error" not in printed
+
+
+def test_output_to_a_file_or_a_pipe_takes_any_character(tmp_path, monkeypatch, shell_env):
+    """On Windows a redirected stream is cp1252, which has no ≥ or →: the runner's own
+    error message (Copy .env.example → .env) stopped it with a UnicodeEncodeError."""
+    import io
+
+    out, err = io.BytesIO(), io.BytesIO()
+    monkeypatch.setattr(sys, "stdout", io.TextIOWrapper(out, encoding="cp1252"))
+    monkeypatch.setattr(sys, "stderr", io.TextIOWrapper(err, encoding="cp1252"))
+    for name in _FOUNDRY_NAMES:
+        os.environ.pop(name, None)
+    missing = tmp_path / "no.env"
+    monkeypatch.setattr(sys, "argv", ["run_wizard_interactive.py", "--env-file", str(missing)])
+
+    with pytest.raises(SystemExit) as stopped:
+        runner.main()
+
+    assert stopped.value.code == 1
+    sys.stderr.flush()
+    assert "Copy .env.example → .env" in err.getvalue().decode("utf-8")
+    print("≥ 0.5")
+    sys.stdout.flush()
+    assert out.getvalue().decode("utf-8").strip() == "≥ 0.5"
+
+
+class _Terminal(io.BytesIO):
+    def isatty(self) -> bool:
+        return True
+
+
+def _terminal(monkeypatch, encoding: str):
+    raw = _Terminal()
+    stream = io.TextIOWrapper(raw, encoding=encoding)
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setattr(sys, "stderr", io.TextIOWrapper(_Terminal(), encoding=encoding))
+    return stream, raw
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "UTF8", "cp65001"])
+def test_a_utf8_terminal_is_left_as_it_is(monkeypatch, encoding) -> None:
+    stream, raw = _terminal(monkeypatch, encoding)
+    before = (stream.encoding, stream.errors)
+
+    runner.use_utf8_output()
+
+    assert (sys.stdout.encoding, sys.stdout.errors) == before == (encoding, "strict")
+    print("≥ ä")
+    sys.stdout.flush()
+    assert raw.getvalue().decode("utf-8").strip() == "≥ ä"
+
+
+def test_a_terminal_in_another_encoding_keeps_it_and_replaces_what_it_cannot_show(
+    monkeypatch,
+) -> None:
+    """Writing UTF-8 to a cp850 console would turn every ä into two wrong signs."""
+    stream, raw = _terminal(monkeypatch, "cp850")
+
+    runner.use_utf8_output()
+
+    assert (sys.stdout.encoding, sys.stdout.errors) == ("cp850", "replace")
+    print("≥ ä")
+    sys.stdout.flush()
+    assert raw.getvalue().decode("cp850").strip() == "? ä"
+
+
+@pytest.mark.parametrize("stream", [None, "string", "closed"])
+def test_output_that_is_no_text_stream_is_left_as_it_is(monkeypatch, stream) -> None:
+    """pythonw has no stdout at all, and a caller may give one without reconfigure."""
+    if stream == "string":
+        stream = io.StringIO()
+    elif stream == "closed":
+        stream = io.TextIOWrapper(io.BytesIO(), encoding="cp1252")
+        stream.close()
+    monkeypatch.setattr(sys, "stdout", stream)
+    monkeypatch.setattr(sys, "stderr", stream)
+
+    runner.use_utf8_output()
+
+    assert sys.stdout is stream
 
 
 # --- the guard through the SDK's own control protocol ------------------------
@@ -395,7 +609,12 @@ def test_the_cli_gets_only_the_env_files_names_and_the_system_basics(
     assert seen["DOCLING_API_BASE"] == "https://x"
     assert seen["ANTHROPIC_FOUNDRY_API_KEY"] == "k"
     assert "MY_SHELL_VAR" not in seen
-    added = set(seen) - set(os.environ)
+    # Compared with what the runner may hand on, not with os.environ, which main
+    # has already narrowed to the same names.
+    may_pass = runner.SYSTEM_ENV_VARS | set(runner.AGENT_ENV_DEFAULTS)
+    may_pass |= {"CLAUDE_CODE_USE_FOUNDRY", "ANTHROPIC_FOUNDRY_API_KEY"}
+    may_pass |= {"ANTHROPIC_FOUNDRY_RESOURCE", "DOCLING_API_BASE"}  # the .env file's names
+    added = {name for name in seen if name.upper() not in {n.upper() for n in may_pass}}
     assert all(name == "PWD" or name.startswith("CLAUDE") for name in added), added
 
 

@@ -19,7 +19,10 @@ text in the judged content reads as data to assess, not as instructions to the j
 
 from __future__ import annotations
 
+import datetime as _dt
 import json
+from decimal import Decimal
+from typing import Any
 
 from gaik.software_components.source_material import (
     SourceMaterial,
@@ -152,6 +155,29 @@ JUDGE_SYSTEM_PROMPT = build_system_prompt("severity")
 """Backward-compatible default system prompt (severity mode)."""
 
 
+def _json_value(value: Any) -> Any:
+    """A value ``json`` cannot write, in a form it can.
+
+    A :class:`~decimal.Decimal` (``DataExtractor`` returns them for money) is written as a
+    number when a float holds it exactly, else as its digits in a string; a date or a time
+    as ISO 8601; a set as a list; anything else as its ``str()``.
+    """
+    if isinstance(value, Decimal):
+        if value.is_finite() and Decimal(repr(float(value))) == value:
+            return float(value) if value != value.to_integral_value() else int(value)
+        return str(value)
+    if isinstance(value, _dt.date | _dt.time):
+        return value.isoformat()
+    if isinstance(value, set | frozenset):
+        return sorted(value, key=str)
+    return str(value)
+
+
+def _judged_json(value: Any) -> str:
+    """``value`` as indented JSON for a judge prompt, Decimals and dates included."""
+    return json.dumps(value, indent=2, ensure_ascii=False, default=_json_value)
+
+
 def _flag_dict(flag: ValidationFlag) -> dict:
     out: dict = {
         "item_index": flag.item_index,
@@ -171,7 +197,7 @@ def _render_few_shot_block(examples: list[FewShotExample]) -> str:
         return ""
     blocks = ["Reference examples (use these to calibrate your judgements):"]
     for i, ex in enumerate(examples, start=1):
-        extracted_json = json.dumps(ex.extracted, indent=2, ensure_ascii=False)
+        extracted_json = _judged_json(ex.extracted)
         flags_json = json.dumps(
             {"flags": [_flag_dict(f) for f in ex.expected_flags]},
             indent=2,
@@ -329,7 +355,7 @@ def build_hallucination_prompt(
     so every block of the call shares its id.
     """
     material = material or SourceMaterial()
-    extracted_json = json.dumps(extracted, indent=2, ensure_ascii=False)
+    extracted_json = _judged_json(extracted)
     parts = [
         _render_field_rules(field_descriptions),
         "Flag any field value in the block labelled answer that the block "
@@ -416,7 +442,7 @@ def build_user_prompt(
     so every block of the call shares its id.
     """
     material = material or SourceMaterial()
-    extracted_json = json.dumps(extracted, indent=2, ensure_ascii=False)
+    extracted_json = _judged_json(extracted)
     parts = [
         _render_rubric(rubric) if rubric is not None else "",
         "Compare the extractor output in the block labelled answer against the "

@@ -278,16 +278,32 @@ def test_agentic_strict_review_raises_before_writing(tmp_path, patch_llm):
     assert not (out / "report.md").exists()
 
 
-def test_agentic_warnings_returned_by_default(tmp_path, patch_llm):
+def test_agentic_warnings_returned_without_strict_review(tmp_path, patch_llm):
     patch_llm(_FakeClient(review_mode="fail"))
     (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
 
     result = _gen().run(
         input_paths=[tmp_path / "src.txt"],
         sections=[{"title": "A", "instructions": "a"}],
-        agentic=True,  # strict_review defaults to False
+        agentic=True,
+        strict_review=False,
     )
     assert result.sections[0].revision_warnings  # unresolved edit -> warning
+
+
+def test_agentic_review_is_strict_by_default(tmp_path, patch_llm):
+    patch_llm(_FakeClient(review_mode="fail"))
+    (tmp_path / "src.txt").write_text("The sky is blue.", encoding="utf-8")
+    out = tmp_path / "out"
+
+    with pytest.raises(RuntimeError, match="unresolved reviewer edits remain"):
+        _gen().run(
+            input_paths=[tmp_path / "src.txt"],
+            sections=[{"title": "A", "instructions": "a"}],
+            output_dir=out,
+            agentic=True,
+        )
+    assert not (out / "report.md").exists()
 
 
 def test_agentic_polish_runs_after_review_and_adds_no_content(tmp_path, patch_llm):
@@ -578,3 +594,219 @@ def test_without_langgraph_the_agentic_run_says_how_to_install_it(tmp_path, patc
             output_dir=tmp_path / "out",
             agentic=True,
         )
+
+
+# ---------------------------------------------------------------------------
+# diff_editor_run: failed edits keep their ids across retries
+# ---------------------------------------------------------------------------
+
+
+class _ScriptedEditor:
+    """Returns scripted CorrectionLists in order and records each request's text prompt."""
+
+    def __init__(self, *answers: CorrectionList):
+        self.answers = list(answers)
+        self.prompts: list[str] = []
+
+    def chat_parsed(self, messages, response_format, **kwargs):
+        assert response_format is CorrectionList
+        self.prompts.append(messages[-1]["content"])
+        return self.answers.pop(0)
+
+
+TEXT = "The bridge opened in 1999. It was painted blue and white near the centre."
+MISSING_YEAR = Correction(search="opened in 1990 exactly", replace="opened in 1998", reason="r")
+MISSING_PAINT = Correction(search="painted red and black", replace="painted grey", reason="p")
+
+
+def _run(editor: _ScriptedEditor):
+    from gaik.software_modules.multi_source_report_generator.agentic.reviewer import (
+        diff_editor_run,
+    )
+
+    return diff_editor_run(text=TEXT, instruction="Check.", client=editor, chat_kwargs={})
+
+
+def test_diff_editor_keeps_a_failed_edit_the_retry_leaves_out():
+    year = Correction(search="1999", replace="1998", reason="other words", answers="F1")
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR, MISSING_PAINT]),
+        CorrectionList(corrections=[year]),
+        CorrectionList(corrections=[]),
+    )
+    text, applied, warnings, _ = _run(editor)
+    assert "opened in 1998" in text
+    assert [a["replace"] for a in applied] == ["1998"]
+    assert len(warnings) == 1 and "painted red" in warnings[0]
+    assert "id: F1" in editor.prompts[1] and "id: F2" in editor.prompts[1]
+    assert "id: F2" in editor.prompts[2] and "id: F1" not in editor.prompts[2]
+
+
+def test_diff_editor_retry_naming_the_id_resolves_it_whatever_its_wording():
+    year = Correction(search="1999", replace="1998", reason="The source says so.", answers="F1")
+    centre = Correction(search="centre", replace="center", reason="Spelling.", answers="")
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]),
+        CorrectionList(corrections=[year, centre]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998").replace("centre", "center")
+    assert warnings == []
+    assert len(editor.prompts) == 2
+
+
+def test_diff_editor_an_unrelated_retry_with_the_same_reason_leaves_the_failed_edit():
+    # The retry's correction names no failed edit ('answers' is an explicit empty
+    # list), so its shared generic reason does not let it stand for the failed one.
+    paint = Correction(search=" It was painted red.", replace="", reason="Not in the evidence.")
+    centre = Correction(
+        search=" near the centre", replace="", reason="Not in the evidence.", answers=[]
+    )
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[paint]),
+        CorrectionList(corrections=[centre]),
+        CorrectionList(corrections=[]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace(" near the centre", "")
+    assert len(warnings) == 1 and "painted red" in warnings[0]
+
+
+def test_diff_editor_one_correction_can_make_two_failed_edits():
+    both = Correction(
+        search="opened in 1999. It was painted blue",
+        replace="opened in 1998. It was painted grey",
+        reason="The evidence gives 1998 and grey.",
+        answers=["F1", "F2"],
+    )
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR, MISSING_PAINT]),
+        CorrectionList(corrections=[both]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998").replace("painted blue", "painted grey")
+    assert warnings == []
+    assert len(editor.prompts) == 2
+
+
+def test_diff_editor_retry_asks_like_the_draft_reviewer():
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]), CorrectionList(corrections=[])
+    )
+    _, _, warnings, _ = _run(editor)
+    retry = editor.prompts[1]
+    assert "decide whether these changes are still needed" not in retry
+    assert "search strings were not found" not in retry
+    assert "stays unresolved" in retry
+    assert '["F1", "F2"] when one edit makes both' in retry
+    assert "reason: r" in retry
+    assert warnings == [
+        "Unresolved reviewer edit (not found in the text; after 1 attempt(s)): "
+        "'opened in 1990 exactly'"
+    ]
+
+
+def test_diff_editor_warning_names_a_left_out_edit_as_left_out():
+    year = Correction(search="1999", replace="1998", reason="other words", answers=["F1"])
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR, MISSING_PAINT]),
+        CorrectionList(corrections=[year]),
+        CorrectionList(corrections=[]),
+    )
+    _, _, warnings, _ = _run(editor)
+    assert len(warnings) == 1
+    assert warnings[0].startswith("Unresolved reviewer edit (left out of the last answer")
+    assert "painted red" in warnings[0]
+
+
+class _SubheadingClient(_FakeClient):
+    """Writes each section as the given body: a sample with subsections is mirrored."""
+
+    def __init__(self, body: str):
+        super().__init__(review_mode="none")
+        self.body = body
+
+    def chat(self, messages, **kwargs):
+        super().chat(messages, **kwargs)
+        return _FakeResponse(self.body)
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "### Roof\n\nThe roof is old.\n\n### Walls\n\nBrick.",
+        "## Findings\n\n### Roof\n\nThe roof is old.\n\n### Walls\n\nBrick.",
+        "## 1. FINDINGS\n### Roof\n\nThe roof is old.\n\n### Walls\n\nBrick.",
+    ],
+    ids=["sub-heading-first", "echoed-title-then-sub-heading", "numbered-echo"],
+)
+def test_agentic_keeps_a_first_sub_heading_and_strips_only_the_echoed_title(
+    tmp_path, patch_llm, body
+):
+    patch_llm(_SubheadingClient(body))
+    (tmp_path / "src.txt").write_text("The roof is old. The walls are brick.", encoding="utf-8")
+    result = _gen().run(
+        input_paths=[tmp_path / "src.txt"],
+        sections=[{"title": "Findings", "instructions": "Describe each part."}],
+        report_title="R",
+        agentic=True,
+    )
+    content = result.sections[0].content_markdown
+    assert content.startswith("### Roof\n\nThe roof is old.")
+    assert result.markdown.count("## Findings") == 1
+
+
+def test_strip_title_heading_takes_only_the_section_title():
+    from gaik.software_modules.multi_source_report_generator.models import _strip_title_heading
+
+    assert _strip_title_heading("## SECTION: Key Findings\nBody.", "Key findings") == "Body."
+    assert _strip_title_heading("# Key findings!\n\nBody.", "Key Findings") == "Body."
+    assert _strip_title_heading("### Roof\nBody.", "Key Findings") == "### Roof\nBody."
+    assert (
+        _strip_title_heading("Body.\n## Key Findings", "Key Findings") == "Body.\n## Key Findings"
+    )
+    assert _strip_title_heading("", "Key Findings") == ""
+
+
+def test_diff_editor_a_retry_without_answers_is_matched_by_its_text():
+    fixed = Correction(search="opened in 1999", replace="opened in 1998", reason="r")
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]), CorrectionList(corrections=[fixed])
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998")
+    assert warnings == []
+    assert len(editor.prompts) == 2
+
+
+def test_diff_editor_a_retry_with_empty_answers_makes_no_failed_edit():
+    fixed = Correction(search="opened in 1999", replace="opened in 1998", reason="r", answers=[])
+    editor = _ScriptedEditor(
+        CorrectionList(corrections=[MISSING_YEAR]),
+        CorrectionList(corrections=[fixed]),
+        CorrectionList(corrections=[]),
+    )
+    text, _, warnings, _ = _run(editor)
+    assert text == TEXT.replace("1999", "1998")
+    assert len(warnings) == 1 and "opened in 1990" in warnings[0]
+
+
+def test_a_correction_revalidated_from_another_model_keeps_answers_unset():
+    from gaik.software_modules.multi_source_report_generator.agentic import reviewer
+    from pydantic import BaseModel
+
+    class Item(BaseModel):
+        search: str
+        replace: str
+        reason: str
+        answers: list[str] = []
+
+    class Other(BaseModel):
+        corrections: list[Item]
+
+    class Client:
+        def chat_parsed(self, messages, response_format, **kwargs):
+            return Other(corrections=[Item(search="a", replace="b", reason="r")])
+
+    [correction] = reviewer._request_corrections(Client(), "Check.", "text", {}).corrections
+    assert "answers" not in correction.model_fields_set

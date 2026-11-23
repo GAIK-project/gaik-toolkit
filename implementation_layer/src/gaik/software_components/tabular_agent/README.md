@@ -80,10 +80,16 @@ the sheet, so cross-sheet joins work out of the box.
 | Parquet | `.parquet` | Types come from the file |
 | JSON | `.json`, `.ndjson` | Records auto-detected |
 
-**Nordic number formats work.** A column of `1 234,56` values is detected and
+**Nordic number formats work.** A column of `1 234,56` values (thousands
+grouped by a space, a no-break space or a dot, or not grouped) is detected and
 converted to a real number, so `SUM()` behaves. The conversion only fires when
 *every* value in the column is a comma-decimal number, so free text containing
-commas is left alone.
+commas is left alone, and when at least one value cannot be a thousands
+separator (`3,5`, `0,250`, `1 234,56`): a column holding only values like
+`1,200` and `12,000` may be US thousands grouping, so it stays text rather than
+becoming 1.2 and 12.0. That holds for a column of three-decimal values such as
+`1,500` and `2,250` too. A sign (`+1,5`) is fine; a value with a unit
+(`12,5 %`, `1 234,56 €`) stays text, so the unit is not dropped from it.
 
 ## Messy spreadsheets
 
@@ -93,7 +99,9 @@ tiers handle that, and the expensive one only runs when it is needed:
 
 1. **Deterministic clean-up** (always, no LLM call). Blank edges are trimmed,
    the header row is found by looking for the first mostly-populated,
-   mostly-textual row, and columns are named. On sheets that look messy,
+   mostly-textual row, and columns are named after the header text as a CSV's
+   are (`Määrä` stays `Määrä`; a blank header becomes `column_<n>`, a repeat
+   gets a suffix). On sheets that look messy,
    interleaved subtotal and section rows are then removed *structurally* -- a
    subtotal blanks the descriptive columns but keeps the numbers, which is
    recognisable without matching words like "total" or "yhteensä", so it works
@@ -150,10 +158,10 @@ earlier CTE the name is a table and must be one of the loaded ones.
 The SQL that runs is rendered from the checked syntax tree. A query that
 `sqlglot` cannot render without dropping part of it, or that it reads without
 one of a function's arguments (such as a time zone given to `date_trunc`), is
-rejected, so the agent asks the LLM for another one. The argument check leaves
-out functions `sqlglot` reads with a parser of their own (such as `arg_max` and
-`quantile_cont`), and it is skipped, with a warning, when sqlglot's compiled
-build (`sqlglot[c]`) is installed; the other checks run either way.
+rejected, so the agent asks the LLM for another one. The argument check also
+covers functions `sqlglot` reads with a parser of their own (such as `arg_max`
+and `quantile_cont`), and it runs the same with sqlglot's compiled build
+(`sqlglot[c]`).
 
 **2. A locked-down engine.** External access is enabled only while *our own*
 loader reads the paths you passed in. Before a single generated query runs, the
@@ -286,7 +294,11 @@ TABLE sales  -- from sales_clean.csv, 24 row(s)
 
 Listing the values a low-cardinality column actually holds is what stops the
 model from filtering on categories that do not exist, and is the single biggest
-accuracy lever in the component.
+accuracy lever in the component. A table or column name that is not a plain
+identifier (with a space, a sign, a leading digit or a letter outside ASCII, such
+as `"Hinta (€)"` or `"Määrä"`), or that is an SQL keyword (`"order"`, `"from"`,
+`"limit"`), is shown in double quotes, so the model writes it as one name that
+the query reads as a column.
 
 ## Configuration
 

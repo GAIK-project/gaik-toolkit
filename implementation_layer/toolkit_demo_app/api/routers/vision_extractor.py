@@ -105,8 +105,21 @@ PROVIDER_MODELS: dict[str, tuple[str, ...]] = {
     "claude": tuple(
         os.getenv("DEMO_CLAUDE_MODELS", "claude-sonnet-5-5,claude-haiku-5-5").split(",")
     ),
-    "google": tuple(os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.8-flash").split(",")),
+    # Gemini 4 Argon and Carbon are team-only (utils/model_settings.py). Of the
+    # Gemini 4 models, Neon and Hydrogen left line prices empty on test receipts
+    # (2026-11-19, docs/MODEL_REQUIREMENTS.md) and are not offered.
+    "google": tuple(
+        os.getenv("DEMO_GOOGLE_MODELS", "gemini-3.8-flash,gemini-4-argon,gemini-4-carbon").split(
+            ","
+        )
+    ),
 }
+
+AITTA_REFUSAL = (
+    "The Vision Extractor does not run on CSC Aitta: its models took 5 to 15 minutes per "
+    "receipt here and refused scanned pages as too large. Pick a GPT, Claude or Gemini "
+    "model in the model menu."
+)
 
 
 EXAMPLE_SCHEMA_ID = "example"
@@ -227,6 +240,21 @@ class VisionExtractResponse(BaseModel):
     documents_processed: int
     duration_s: float
     usage: UsageMetadata | None = None
+
+
+def _with_uploaded_names(node: Any, uploaded_names: dict[str, str]) -> Any:
+    """Verification entries with ``file`` as the uploaded name, not the temporary one.
+
+    Only an entry of the text-layer check (it has ``found_in_text``) is changed, so
+    an extracted field that happens to be called ``file`` keeps its value.
+    """
+    if isinstance(node, list):
+        return [_with_uploaded_names(item, uploaded_names) for item in node]
+    if not isinstance(node, dict):
+        return node
+    if "found_in_text" in node and isinstance(node.get("file"), str):
+        return {**node, "file": uploaded_names.get(node["file"], node["file"])}
+    return {key: _with_uploaded_names(value, uploaded_names) for key, value in node.items()}
 
 
 def _usage_from(usage: Any) -> UsageMetadata | None:
@@ -521,6 +549,8 @@ async def extract_vision(
     model = model or _server_model()
     request_config = get_request_api_config()
     if request_config is not None:
+        if request_config.get("provider") == "aitta":
+            raise HTTPException(status_code=400, detail=AITTA_REFUSAL)
         require_vision(request_config)
         model = request_config["model"]
         lib_provider, use_azure, vertex_ai = "openai", request_config["provider"] == "azure", False
@@ -534,6 +564,7 @@ async def extract_vision(
 
     temp_paths: list[Path] = []
     documents: list[UploadedDocument] = []
+    uploaded_names: dict[str, str] = {}
     try:
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
@@ -544,6 +575,7 @@ async def extract_vision(
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))
             documents.append(UploadedDocument(uploaded_file.filename or "", Path(tmp.name)))
+            uploaded_names[Path(tmp.name).name] = uploaded_file.filename or ""
 
         try:
             from gaik.software_components.vision_extractor import VisionExtractor
@@ -602,8 +634,10 @@ async def extract_vision(
                 status_code=500, detail=f"Vision extraction failed: {provider_error_detail(exc)}"
             ) from exc
 
-        data = dict(result.data)
-        verification = result.verification
+        # The text-layer check names the file a value is in; the extractor read
+        # the server's temporary copy, so give the user's file name back.
+        data = _with_uploaded_names(dict(result.data), uploaded_names)
+        verification = _with_uploaded_names(result.verification, uploaded_names)
         sources = None
         if include_sources:
             raw_sources = data.pop(SOURCES_FIELD, None)

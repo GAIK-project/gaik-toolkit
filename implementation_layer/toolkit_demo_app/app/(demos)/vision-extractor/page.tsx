@@ -26,6 +26,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
+import { RunButton } from "@/components/demo/run-button";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
@@ -276,7 +277,11 @@ export default function VisionExtractorPage() {
       setGeneratedSchema(data);
       return data;
     } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return null;
+      if (
+        abortControllerRef.current?.signal.aborted ||
+        (err instanceof Error && err.name === "AbortError")
+      )
+        return null;
       if (err instanceof RateLimitError) return null;
       toast.error(
         err instanceof Error ? err.message : "Failed to generate schema",
@@ -394,7 +399,8 @@ export default function VisionExtractorPage() {
     }
 
     abortControllerRef.current?.abort();
-    abortControllerRef.current = new AbortController();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     setIsLoading(true);
     setResult(null);
@@ -417,7 +423,7 @@ export default function VisionExtractorPage() {
         return apiFetch("/api/extract-vision", {
           method: "POST",
           body: formData,
-          signal: abortControllerRef.current?.signal,
+          signal: controller.signal,
         });
       };
 
@@ -451,12 +457,24 @@ export default function VisionExtractorPage() {
         example: exampleId,
       });
     } catch (error) {
-      if (error instanceof Error && error.name === "AbortError") return;
+      if (
+        controller.signal.aborted ||
+        (error instanceof Error && error.name === "AbortError")
+      )
+        return;
       if (error instanceof RateLimitError) return;
       toast.error(error instanceof Error ? error.message : "An error occurred");
     } finally {
-      setIsLoading(false);
+      // A run that a newer one replaced leaves the newer one's state alone.
+      if (abortControllerRef.current === controller) setIsLoading(false);
     }
+  }
+
+  /** Cancels the schema preview or the run in the browser; the input is kept. */
+  function stopRun(): void {
+    abortControllerRef.current?.abort();
+    setIsGeneratingSchema(false);
+    setIsLoading(false);
   }
 
   return (
@@ -674,24 +692,20 @@ export default function VisionExtractorPage() {
                   schemaCurrent && generatedSchema?.schema_source === "example"
                 ) && (
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-                    <Button
-                      type="button"
+                    <RunButton
+                      running={isGeneratingSchema && !isLoading}
+                      onRun={() => void handleGenerateSchema()}
+                      onStop={stopRun}
+                      icon={FileCode2}
+                      spinner
                       variant="outline"
                       size="sm"
-                      onClick={() => void handleGenerateSchema()}
                       disabled={busy || !userRequirements.trim()}
                     >
-                      {isGeneratingSchema && !isLoading ? (
-                        <Loader2 className="animate-spin" aria-hidden />
-                      ) : (
-                        <FileCode2 aria-hidden />
-                      )}
-                      {isGeneratingSchema && !isLoading
-                        ? "Generating the schema…"
-                        : schemaCurrent
-                          ? "Generate the schema again"
-                          : "Preview the schema"}
-                    </Button>
+                      {schemaCurrent
+                        ? "Generate the schema again"
+                        : "Preview the schema"}
+                    </RunButton>
                     <span className="text-muted-foreground text-xs">
                       {schemaCurrent
                         ? "Makes a new schema from the same text."
@@ -776,23 +790,17 @@ export default function VisionExtractorPage() {
                   <RunBlockedButton />
                 </div>
               ) : (
-                <Button
-                  onClick={() => void handleSubmit()}
+                <RunButton
+                  running={isLoading}
+                  onRun={() => void handleSubmit()}
+                  onStop={stopRun}
+                  icon={Sparkles}
                   disabled={!run.ready}
                   size="lg"
                   className="w-full sm:w-auto sm:min-w-44"
                 >
-                  {isLoading ? (
-                    <Loader2 className="animate-spin" aria-hidden />
-                  ) : (
-                    <Sparkles aria-hidden />
-                  )}
-                  {isLoading
-                    ? isGeneratingSchema
-                      ? "Generating schema…"
-                      : "Extracting…"
-                    : "Extract data"}
-                </Button>
+                  Extract data
+                </RunButton>
               )}
               <p
                 role="status"

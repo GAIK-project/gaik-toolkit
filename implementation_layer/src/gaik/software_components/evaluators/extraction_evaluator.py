@@ -15,7 +15,10 @@ Two matching modes:
 from __future__ import annotations
 
 import logging
+import math
+import re
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING, Any, Literal
 
 from .dataset import EvaluationDataset
@@ -231,6 +234,14 @@ class ExtractionEvaluator:
         )
 
     def _exact_eq(self, a: Any, b: Any) -> bool:
+        """Whether two values are equal after light normalisation.
+
+        Strings compare stripped and case-folded (as configured). A number compares as a
+        number with a number of another type or a numeric string, also inside lists and
+        dicts: ``Decimal("19.99")`` equals ``19.99`` and ``"19.99"``. Two strings stay
+        strings, so ``"007"`` is not ``"7"``, and a string with a leading zero is a code, so
+        ``"007"`` is not ``7`` either.
+        """
         if isinstance(a, str) and isinstance(b, str):
             if self.strip_whitespace:
                 a = a.strip()
@@ -238,35 +249,87 @@ class ExtractionEvaluator:
             if self.case_insensitive:
                 return a.casefold() == b.casefold()
             return a == b
-        return a == b
+        return _values_equal(a, b)
 
     def _semantic_match(self, field_name: str, expected: Any, extracted: Any) -> tuple[int, str]:
         """Use ``LLMJudge.judge_text_pair`` to grade ambiguous matches on a 1-5 Likert scale.
 
         Replaces an older empty-bytes ``validate(source_pages=[b""])`` workaround
         with a clean text-only call. Returns ``(score, reason)`` where
-        ``score >= 4`` is the conventional "equivalent" cut-off.
+        ``score >= 4`` is the conventional "equivalent" cut-off. Two empty values match
+        without a call; a call that raises is a failed match (score 0), whatever the error.
         """
         assert self.judge is not None
+        extracted_text = str(extracted) if extracted is not None else ""
+        expected_text = str(expected) if expected is not None else ""
+        if not extracted_text.strip() and not expected_text.strip():
+            return 5, "both empty"
         try:
             judgement = self.judge.judge_text_pair(
-                extracted_text=str(extracted) if extracted is not None else "",
-                expected_text=str(expected) if expected is not None else "",
+                extracted_text=extracted_text,
+                expected_text=expected_text,
                 field_name=field_name,
             )
-        except ValueError:
-            # Both sides empty — caller should have short-circuited already.
-            return 5, "both empty"
-        except Exception:  # pragma: no cover - judge / network failure
+        except Exception as error:
             logger.exception(
                 "Semantic match judge call failed for field %r; falling back to non-match",
                 field_name,
             )
-            return 0, "judge call failed"
+            return 0, f"judge call failed ({type(error).__name__})"
         return judgement.score, judgement.reason or "judge graded"
 
 
 _MISSING = object()
+_NUMERIC_TEXT = re.compile(r"[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?")
+
+
+def _as_decimal(value: Any) -> Decimal | None:
+    """A number (not a bool) or a numeric string as an exact :class:`Decimal`, else None.
+
+    A float goes through its shortest repr, so ``19.99`` is ``Decimal("19.99")``. A string
+    with a leading zero (``"007"``, ``"00100"``) is a code, not a number.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, int):
+        return Decimal(value)
+    if isinstance(value, float):
+        return Decimal(repr(value)) if math.isfinite(value) else None
+    if (
+        isinstance(value, str)
+        and _NUMERIC_TEXT.fullmatch(value.strip())
+        # A leading zero makes it a code (a postal code, a phone number), not a number:
+        # "007" is not 7. "0" and "0.5" are numbers.
+        and not re.match(r"[+-]?0\d", value.strip())
+    ):
+        try:
+            return Decimal(value.strip())
+        except InvalidOperation:
+            return None
+    return None
+
+
+def _values_equal(a: Any, b: Any) -> bool:
+    """``a == b``, with numbers compared as numbers when at least one side is a number.
+
+    Whatever ``==`` already called equal stays equal; a list still differs from a tuple.
+    """
+    if isinstance(a, dict) and isinstance(b, dict):
+        return a.keys() == b.keys() and all(_values_equal(a[key], b[key]) for key in a)
+    if (isinstance(a, list) and isinstance(b, list)) or (
+        isinstance(a, tuple) and isinstance(b, tuple)
+    ):
+        return len(a) == len(b) and all(_values_equal(x, y) for x, y in zip(a, b))
+    if a == b:
+        return True
+    is_number = (isinstance(x, int | float | Decimal) and not isinstance(x, bool) for x in (a, b))
+    if any(is_number):
+        left, right = _as_decimal(a), _as_decimal(b)
+        if left is not None and right is not None:
+            return left == right
+    return a == b
 
 
 def _compute_metrics(verdicts: list[FieldVerdict]) -> ExtractionMetrics:

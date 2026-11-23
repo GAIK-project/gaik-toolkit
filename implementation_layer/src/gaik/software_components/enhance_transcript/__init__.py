@@ -13,12 +13,14 @@ except ImportError:
 
 try:
     from .enhance_transcript import (
+        DEFAULT_MAX_CHANGE_RATIO,
         DEFAULT_MODEL_AZURE,
         DEFAULT_MODEL_OPENAI,
         PASS1_SYSTEM_PROMPT,
         PASS2_SYSTEM_PROMPT,
         CorrectionSummary,
         DiffChunk,
+        RefusedPass,
         TranscriptEnhancer,
         TranscriptEnhancerResult,
     )
@@ -29,6 +31,8 @@ try:
             "TranscriptEnhancerResult",
             "CorrectionSummary",
             "DiffChunk",
+            "RefusedPass",
+            "DEFAULT_MAX_CHANGE_RATIO",
             "DEFAULT_MODEL_AZURE",
             "DEFAULT_MODEL_OPENAI",
             "PASS1_SYSTEM_PROMPT",

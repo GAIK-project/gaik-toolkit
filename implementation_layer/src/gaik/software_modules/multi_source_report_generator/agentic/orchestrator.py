@@ -13,10 +13,8 @@ The report is always assembled in the user's original section order.
 
 from __future__ import annotations
 
-import re
-
 from .._material import Evidence
-from ..models import GeneratedSection, ReportSectionSpec
+from ..models import GeneratedSection, ReportSectionSpec, _strip_title_heading
 from .section_writer import _merge_usage, create_section_writer_graph
 from .state import ReportState
 
@@ -135,16 +133,20 @@ def build_orchestrator_graph(
     _require_langgraph()
     from langgraph.graph import END, START, StateGraph
 
+    # Nodes are named by position, not by section id: LangGraph reserves ':' and '|'
+    # in node names, and a section id may hold any character.
+    node = {spec.id: f"sec_{n}" for n, spec in enumerate(s for layer in phases for s in layer)}
+
     graph = StateGraph(ReportState)
     for layer in phases:
         for spec in layer:
-            graph.add_node(f"sec_{spec.id}", _make_section_runner(spec, section_graph, id_to_title))
+            graph.add_node(node[spec.id], _make_section_runner(spec, section_graph, id_to_title))
 
     # Single layer: identical to the original parallel fan-out (no barriers).
     if len(phases) == 1:
         for spec in phases[0]:
-            graph.add_edge(START, f"sec_{spec.id}")
-            graph.add_edge(f"sec_{spec.id}", END)
+            graph.add_edge(START, node[spec.id])
+            graph.add_edge(node[spec.id], END)
         return graph.compile()
 
     total = len(phases)
@@ -152,17 +154,17 @@ def build_orchestrator_graph(
         graph.add_node(f"join_{j}", _make_join_node(reporter, j, phases[j + 1], total))
 
     for spec in phases[0]:
-        graph.add_edge(START, f"sec_{spec.id}")
-        graph.add_edge(f"sec_{spec.id}", "join_0")
+        graph.add_edge(START, node[spec.id])
+        graph.add_edge(node[spec.id], "join_0")
 
     for li in range(1, total):
         join_in = f"join_{li - 1}"
         for spec in phases[li]:
-            graph.add_edge(join_in, f"sec_{spec.id}")
+            graph.add_edge(join_in, node[spec.id])
             if li < total - 1:
-                graph.add_edge(f"sec_{spec.id}", f"join_{li}")
+                graph.add_edge(node[spec.id], f"join_{li}")
             else:
-                graph.add_edge(f"sec_{spec.id}", END)
+                graph.add_edge(node[spec.id], END)
     return graph.compile()
 
 
@@ -187,11 +189,13 @@ def run_agentic_report(
     polish: bool,
     strict_review: bool,
     reporter,
+    written_files: list | None = None,
 ) -> tuple[str, list[GeneratedSection], dict]:
     """Run sections in dependency layers, review each, and assemble the report.
 
     ``evidence_pack`` is one ``EvidenceSource`` per source, each sent in its own
-    labelled block, or one text sent as a single block.
+    labelled block, or one text sent as a single block. Each curated brief saved
+    under ``output_dir`` is added to ``written_files``.
 
     Returns ``(markdown, generated_sections, usage)``. When ``strict_review`` is
     True and any section has unresolved reviewer edits, raises **before** the
@@ -207,6 +211,7 @@ def run_agentic_report(
         curate_evidence=curate_evidence,
         polish=polish,
         reporter=reporter,
+        written_files=written_files,
     )
 
     phases = build_phases(specs)
@@ -266,9 +271,9 @@ def run_agentic_report(
     total_usage: dict = {}
     for spec in specs:
         body = (section_content.get(spec.id) or "").strip()
-        # Strip any leading heading the LLM echoed despite being told not to,
-        # so the orchestrator-added "## title" below is never duplicated.
-        body = re.sub(r"^#{1,6}\s+.*\n*", "", body, count=1).strip()
+        # Strip a heading that repeats the section title, so the "## title" added
+        # below is never duplicated; a sub-heading such as "### Roof" stays.
+        body = _strip_title_heading(body, spec.title).strip()
         warnings = list(section_warnings.get(spec.id, []))
         usage = section_usage.get(spec.id, {})
         total_usage = _merge_usage(total_usage, usage)

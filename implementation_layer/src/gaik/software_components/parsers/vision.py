@@ -17,12 +17,16 @@ import base64
 import logging
 import mimetypes
 import os
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from gaik.software_components._log_names import file_tag
 from gaik.software_components.endpoints import check_openai_endpoint
+from gaik.software_components.env_file import load_env_file
+from gaik.software_components.file_type import IMAGE_TYPES, MIME_TYPES, check_file_type
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
@@ -34,10 +38,7 @@ from gaik.software_components.source_material import (
     source_material_messages,
 )
 
-try:  # Optional dependency, documented via extra: gaik[vision]
-    from dotenv import load_dotenv as _load_dotenv  # type: ignore
-except ImportError:  # pragma: no cover - optional dependency
-    _load_dotenv = None
+from ._cut_off import Reply, reply_cut_off
 
 try:
     from openai import AzureOpenAI, OpenAI
@@ -58,15 +59,67 @@ __all__ = ["OpenAIConfig", "VisionParser", "get_openai_config"]
 
 logger = logging.getLogger(__name__)
 
+# A fence line: three or more backticks or tildes, with an optional language tag such
+# as markdown or python (a backtick fence's tag holds no backtick).
+_FENCE = re.compile(r"(?P<marks>`{3,}(?=[^`]*\Z)|~{3,})(?P<info>.*)\Z")
+# Tags a model puts on a fence around the whole document.
+_DOCUMENT_TAGS = frozenset({"markdown", "md"})
+
+
+def _closes(fence: re.Match, opening: re.Match) -> bool:
+    """A bare fence of the opening's character, at least as long, closes it."""
+    marks, opened = fence["marks"], opening["marks"]
+    return not fence["info"].strip() and marks[0] == opened[0] and len(marks) >= len(opened)
+
+
+def _unwrap_fence(text: str) -> str:
+    """The text without a code fence the model put around all of it.
+
+    Fences are paired by nesting: one with a language tag opens a block, and a bare one
+    closes the innermost open block when it has that block's character and at least
+    its length; a shorter bare fence is text of the block. When the first fence closes
+    on the last line, or the first fence is tagged markdown and the last line would
+    close it, the pair wraps the whole text and is taken off. A first fence that closes
+    earlier opens a code block of the document, which is kept; one that never closes is
+    taken off.
+    """
+    lines = text.split("\n")
+    fences = [_FENCE.match(line.strip()) for line in lines]
+    if fences[0] is None:
+        return text
+    open_blocks, closed_at = [fences[0]], None
+    for number, fence in enumerate(fences[1:], start=1):
+        if fence is None:
+            continue
+        if _closes(fence, open_blocks[-1]):
+            open_blocks.pop()
+            if not open_blocks:
+                closed_at = number
+                break
+        elif fence["info"].strip():
+            open_blocks.append(fence)
+    last = len(lines) - 1
+    if closed_at is None:
+        body = lines[1:]
+    elif closed_at == last or (
+        fences[0]["info"].strip().lower() in _DOCUMENT_TAGS
+        and fences[last] is not None
+        and _closes(fences[last], fences[0])
+    ):
+        body = lines[1:last]
+    else:
+        return text
+    return "\n".join(body).strip()
+
+
 # mimetypes maps .webp only from Python 3.13 on (or via the OS type table).
 _IMAGE_MIME_TYPES = {".webp": "image/webp"}
 
 
 def _load_env() -> None:
-    """Load environment variables from ``.env`` if python-dotenv is available."""
+    """Load ``.env`` once, as the other configuration helpers do (``env_file``)."""
 
-    if _load_dotenv is not None:
-        _load_dotenv()
+    load_env_file()
 
 
 def _first_env(*keys: str) -> str | None:
@@ -215,7 +268,8 @@ class VisionParser:
             Rendering resolution for the PDF to image conversion (default ``200``).
         clean_output:
             When ``True`` merge and clean multi-page output via a post-processing
-            LLM call.
+            LLM call. If that reply stops at ``max_tokens``, the per-page Markdown
+            is returned instead, with a warning in the log, so no page is lost.
         first_pages:
             Convert only this many pages from the start, e.g. ``1`` to read the
             first page. The ``max_pages`` limit then applies to these pages, not
@@ -226,11 +280,15 @@ class VisionParser:
         InputLimitError
             If the PDF is over ``max_file_bytes`` or ``max_pages``, or a page
             rendered at ``dpi`` is over ``max_image_pixels``.
+        FileTypeMismatchError
+            If the content is another known type, or not the type the file's
+            extension says (a ``ValueError``).
         """
 
         if first_pages is not None and first_pages < 1:
             raise ValueError("first_pages must be at least 1")
         self.limits.check_file_size(pdf_path)
+        check_file_type(pdf_path, {"pdf"})
         images = self._pdf_to_images(pdf_path, dpi=dpi, first_pages=first_pages)
         markdown_pages: list[str] = []
 
@@ -240,7 +298,9 @@ class VisionParser:
             markdown_pages.append(markdown)
 
         if clean_output and len(markdown_pages) > 1:
-            return [self._clean_markdown(markdown_pages)]
+            merged = self._clean_markdown(markdown_pages)
+            if merged is not None:
+                return [merged]
         return markdown_pages
 
     def convert_image(self, image_path: str | Path) -> str:
@@ -264,6 +324,9 @@ class VisionParser:
         ------
         InputLimitError
             If the file is over ``max_file_bytes`` or ``max_image_pixels``.
+        FileTypeMismatchError
+            If the content is not a PNG, JPEG, GIF, WebP, TIFF or BMP image, or
+            not the type the file's extension says (a ``ValueError``).
         """
 
         image_path = Path(image_path)
@@ -271,12 +334,12 @@ class VisionParser:
             _IMAGE_MIME_TYPES.get(image_path.suffix.lower())
             or mimetypes.guess_type(image_path.name)[0]
         )
-        if mime_type is None:
-            # An unknown or missing suffix (e.g. a temporary upload) was sent as
-            # PNG before 0.8.0; keep that. Known non-image types still fail.
-            mime_type = "image/png"
-        if not mime_type.startswith("image/"):
+        if mime_type is not None and not mime_type.startswith("image/"):
             raise ValueError(f"Unsupported image type: {image_path.suffix}")
+        # The content decides the type sent to the model, also for an unknown or
+        # missing suffix (e.g. a temporary upload).
+        self.limits.check_file_size(image_path)
+        mime_type = MIME_TYPES[check_file_type(image_path, IMAGE_TYPES)]
         self.limits.check_image_file(image_path)
         image_bytes = image_path.read_bytes()
         return self._parse_image(image_bytes, page=1, previous_context=None, mime_type=mime_type)
@@ -298,7 +361,7 @@ class VisionParser:
         os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as handle:
             handle.write(payload)
-        logger.info("Markdown saved to %s", output_path)
+        logger.info("Markdown saved to %s", file_tag(output_path))
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -306,6 +369,9 @@ class VisionParser:
     def _initialize_client(self) -> AzureOpenAI | OpenAI | ProviderClient:
         if self._use_shared_client:
             return create_llm_client(self._request_config)
+        # Without a base_url the endpoint check and the SDK read OPENAI_BASE_URL (and
+        # the Azure ones) from the environment, so a value kept in .env must be there.
+        _load_env()
         config = self.config
 
         if not config.api_key:
@@ -412,7 +478,7 @@ class VisionParser:
 
         Returns a list of PNG image data as bytes objects.
         """
-        logger.info("Converting PDF %s to images at %s DPI", pdf_path, dpi)
+        logger.info("Converting PDF %s to images at %s DPI", file_tag(pdf_path), dpi)
         images: list[bytes] = []
         name = Path(pdf_path).name
 
@@ -421,6 +487,9 @@ class VisionParser:
         mat = fitz.Matrix(zoom, zoom)
 
         with fitz.open(pdf_path) as doc:
+            # PyMuPDF opens other formats too; ask what it opened.
+            if not doc.is_pdf:
+                raise ValueError(f"The content of '{name}' is not a PDF document.")
             page_count = doc.page_count
             if first_pages is not None:
                 page_count = min(page_count, first_pages)
@@ -482,11 +551,19 @@ class VisionParser:
         # message next to an image.
         payload[0]["text"] = f"{SOURCE_MATERIAL_INSTRUCTION}\n\n{payload[0]['text']}"
         content = self._chat_content([{"role": "user", "content": payload}])
-        if content is None:
-            raise RuntimeError("Vision model returned empty content")
-        return content
+        cut_off = getattr(content, "cut_off", False)
+        if content is None or (cut_off and not content):
+            # A reasoning model can spend the whole budget before it writes anything.
+            raise RuntimeError(
+                "Vision model returned empty content"
+                + (f": the reply stopped at max_tokens={self.max_tokens}" if cut_off else "")
+            )
+        if cut_off:
+            logger.warning("Page %s: the reply stopped at max_tokens=%s", page, self.max_tokens)
+        return str(content)
 
-    def _clean_markdown(self, markdown_pages: Sequence[str]) -> str:
+    def _clean_markdown(self, markdown_pages: Sequence[str]) -> str | None:
+        """The merged Markdown, or None when the reply stopped at ``max_tokens``."""
         logger.info("Cleaning and merging markdown output")
 
         combined = "\n\n---PAGE_BREAK---\n\n".join(markdown_pages)
@@ -496,15 +573,24 @@ class VisionParser:
                 self._cleanup_prompt(), material.wrap(combined, label="markdown pages")
             )
         )
+        if getattr(content, "cut_off", False):
+            # A cut-off merge would replace every page with a document missing its end.
+            logger.warning(
+                "The cleanup reply stopped at max_tokens=%s; returning the %d pages unmerged",
+                self.max_tokens,
+                len(markdown_pages),
+            )
+            return None
         if not content:
             raise RuntimeError("Cleanup LLM returned empty output")
 
-        trimmed = material.strip_echo(content).strip()
-        if trimmed.startswith("```"):
-            trimmed = trimmed.strip("`").strip()
-        return trimmed
+        return _unwrap_fence(material.strip_echo(content).strip())
 
     def _chat_content(self, messages: list[dict]) -> str | None:
+        """The reply's text as a :class:`Reply`, which says whether it was cut off.
+
+        None when the model returned no content and was not cut off.
+        """
         if isinstance(self._client, ProviderClient):
             chat = self._client.chat(
                 messages,
@@ -513,7 +599,7 @@ class VisionParser:
                 **self._sampling_kwargs(),
             )
             self.usage.add(chat.usage)
-            return chat.text
+            return Reply(chat.text or "", reply_cut_off(chat.raw))
         options = normalize_chat_kwargs(
             self.config.model,
             {"max_completion_tokens": self.max_tokens, **self._sampling_kwargs()},
@@ -526,7 +612,9 @@ class VisionParser:
             self.usage.add(
                 {k: v for k, v in response.usage.model_dump().items() if isinstance(v, int)}
             )
-        return response.choices[0].message.content
+        content = response.choices[0].message.content
+        cut_off = reply_cut_off(response)
+        return None if content is None and not cut_off else Reply(content or "", cut_off)
 
     def _build_prompt(self, previous_context: str | None, material: SourceMaterial) -> str:
         if not (previous_context and self.use_context):

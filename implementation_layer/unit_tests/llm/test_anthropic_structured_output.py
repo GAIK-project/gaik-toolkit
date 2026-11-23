@@ -97,10 +97,23 @@ def test_strict_tool_drops_bounds_and_pydantic_still_checks_them():
 
     assert result == Scored.model_validate(answer)
     schema = bodies[0]["tools"][0]["input_schema"]
+    # The bounds are stated in words instead (see test_anthropic_strict_bounds.py).
     assert schema["properties"] == {
-        "label": {"title": "Label", "type": "string"},
-        "confidence": {"title": "Confidence", "type": "number"},
-        "maximum": {"title": "Maximum", "type": "integer"},
+        "label": {
+            "title": "Label",
+            "type": "string",
+            "description": "At least 1 character. At most 40 characters.",
+        },
+        "confidence": {
+            "title": "Confidence",
+            "type": "number",
+            "description": "At least 0. At most 1.",
+        },
+        "maximum": {
+            "title": "Maximum",
+            "type": "integer",
+            "description": "Greater than 0. A multiple of 2.",
+        },
     }
     with pytest.raises(ValidationError):
         Scored.model_validate({**answer, "confidence": 2})

@@ -3,14 +3,25 @@
 from __future__ import annotations
 
 import csv
+import io
 import math
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import datetime, time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any, NamedTuple
 
+from ...file_type import TEXT_TYPES, check_file_type
 from ...input_limits import InputLimits, count_table_rows
+from .._text import decode_text
+
+# CSV delimiters, in the order a tie between them goes (see _csv_delimiter).
+_CSV_DELIMITERS = ("\t", ";", "|", ",")
+# How much of a CSV its delimiter is read from.
+_CSV_SAMPLE_CHARS = 64 * 1024
+# The share of rows that must have the header's field count for a delimiter to count.
+_CSV_CONSISTENT_ROWS = 0.8
 
 # Characters a number format shows as they are, without quotes.
 _PLAIN_TEXT = frozenset("  -+()$€£¥")
@@ -27,8 +38,38 @@ class _NumberLayout(NamedTuple):
     percent: bool
 
 
+def _sections(number_format: str) -> list[str] | None:
+    """The ``;``-separated sections of a number format: positive, negative, zero, text.
+
+    None for a format with a condition (``[>100]``), which picks its sections by value
+    rather than by sign, or with an unterminated quote or bracket.
+    """
+    sections: list[str] = []
+    start = index = 0
+    while index < len(number_format):
+        char = number_format[index]
+        if char in '"[':
+            end = number_format.find('"' if char == '"' else "]", index + 1)
+            if end < 0:
+                return None
+            if char == "[" and number_format[index + 1 : index + 2] in ("<", ">", "="):
+                return None
+            index = end + 1
+            continue
+        if char in "\\_*":
+            # An escaped character, room for one or a fill with one: never a separator.
+            index += 2
+            continue
+        if char == ";":
+            sections.append(number_format[start:index])
+            start = index + 1
+        index += 1
+    sections.append(number_format[start:])
+    return sections
+
+
 def _number_layout(number_format: str) -> _NumberLayout | None:
-    """Read the first section of an Excel number format, the one for positive numbers.
+    """Read one section of an Excel number format (see :func:`_sections`).
 
     None for a format this parser does not render: scientific notation, fractions,
     conditions, digits scaled by a trailing comma or split by text (``000-000``).
@@ -41,8 +82,6 @@ def _number_layout(number_format: str) -> _NumberLayout | None:
     while index < len(number_format):
         char = number_format[index]
         index += 1
-        if char == ";":
-            break
         if char in "_*":
             # Room for the next character, or a fill with it: neither is text.
             index += 1
@@ -95,25 +134,50 @@ def _number_layout(number_format: str) -> _NumberLayout | None:
     )
 
 
+def _section_text(layout: _NumberLayout) -> str:
+    """The text a section shows around the digits, without spacing or a percent sign."""
+    return " ".join(f"{layout.before} {layout.after}".replace("%", " ").split())
+
+
+def _laid_out(value: int | float, layout: _NumberLayout, sign: str = "") -> str:
+    """The absolute value laid out as ``layout`` says, after ``sign``."""
+    number = abs(Decimal(repr(value))) * (100 if layout.percent else 1)
+    whole, _, fraction = format(number, "f").partition(".")
+    fraction = fraction.rstrip("0").ljust(layout.decimal_digits, "0")
+    text = whole.zfill(layout.integer_digits) + (f".{fraction}" if fraction else "")
+    return " ".join(f"{sign}{layout.before}{text}{layout.after}".split())
+
+
 def _formatted_number(value: int | float, number_format: str) -> str | None:
     """The number as its format shows it, or None when the format is not rendered.
 
     Nothing of the stored value is lost: digits the format would round away are kept, and
     no thousands separator is added, since its character depends on the reader's locale.
+    A negative number takes the format's second section when it has one, as Excel does
+    (``-1200`` with ``0.00" Cr";0.00" Dr"`` is ``1200.00 Dr``). Excel adds no minus there,
+    so a section whose own text shows no sign and does not differ from the positive
+    section's (``0;0``, ``0.00;[Red]0.0``, where only a colour or the decimals differ) is
+    not rendered: the plain value keeps the sign. Zero takes the first section, not the
+    third: a zero section mostly shows a dash or nothing in place of the value.
     """
-    layout = _number_layout(number_format)
-    if layout is None or not math.isfinite(value):
+    sections = _sections(number_format)
+    if sections is None or not math.isfinite(value):
         return None
-    signs = set(layout.before + layout.after) & set("+-()")
-    if value < 0 and signs:
+    positive = _number_layout(sections[0])
+    if positive is None:
+        return None
+    if value < 0 and len(sections) > 1:
+        negative = _number_layout(sections[1])
+        if negative is None:
+            return None
+        text = _section_text(negative)
+        if not set(text) & set("-()") and text == _section_text(positive):
+            return None
+        return _laid_out(value, negative)
+    if value < 0 and set(positive.before + positive.after) & set("+-()"):
         # The format's own sign is for a positive number.
         return None
-    number = Decimal(repr(value)) * (100 if layout.percent else 1)
-    whole, _, fraction = format(abs(number), "f").partition(".")
-    fraction = fraction.rstrip("0").ljust(layout.decimal_digits, "0")
-    text = whole.zfill(layout.integer_digits) + (f".{fraction}" if fraction else "")
-    sign = "-" if number < 0 else ""
-    return " ".join(f"{sign}{layout.before}{text}{layout.after}".split())
+    return _laid_out(value, positive, "-" if value < 0 else "")
 
 
 def _number(value: int | float, number_format: str | None) -> str:
@@ -173,6 +237,10 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
     try:
         blocks, results = [], []
         for sheet, formula_sheet in zip(values.worksheets, formulas.worksheets):
+            # Read-only mode trusts the size a sheet states (<dimension ref>), which a
+            # writer can leave stale ("A1" over six rows); read the rows themselves.
+            sheet.reset_dimensions()
+            formula_sheet.reset_dimensions()
             rows, number_formats = [], []
             sheet_rows = count_table_rows(sheet.iter_rows(), limits, f"{path.name} / {sheet.title}")
             for row, formula_cells in zip(sheet_rows, formula_sheet.iter_rows()):
@@ -198,29 +266,89 @@ def _xlsx_blocks(path: Path, limits: InputLimits) -> list[str]:
     return blocks
 
 
+def _csv_delimiter(text: str) -> str:
+    """The delimiter that splits the CSV's rows into the same number of fields, at least two.
+
+    The header is the first non-empty row that the delimiter splits; rows above it with
+    one field, such as an unpadded title ("Sales report"), are skipped. A delimiter
+    counts only when the header has the most common field count of the rows from it on,
+    and at least ``_CSV_CONSISTENT_ROWS`` of those rows have it. After skipped rows, two
+    data rows must agree with the header, so a one-column file whose cells hold an odd
+    ``;`` stays one column. Delimiters are then compared by how many rows have that
+    count, then by the count. A tie goes to tab, then ``;``, ``|`` and ``,``: a
+    semicolon CSV, which Excel writes in a locale with a decimal comma, often has commas
+    in its cells, while a comma CSV seldom has semicolons. ``,`` when no delimiter counts.
+    """
+    sample = text[:_CSV_SAMPLE_CHARS]
+    best, best_score = ",", None
+    for preference, delimiter in enumerate(_CSV_DELIMITERS):
+        rows = list(csv.reader(io.StringIO(sample, newline=""), delimiter=delimiter))
+        if len(sample) < len(text) and rows:
+            rows.pop()  # The sample may end inside this row.
+        counts = [len(row) for row in rows if any(cell.strip() for cell in row)]
+        header = next((n for n, count in enumerate(counts) if count >= 2), None)
+        if header is None or (header and len(counts) - header < 3):
+            continue
+        counts = counts[header:]
+        fields = Counter(counts).most_common(1)[0][0]
+        consistency = counts.count(fields) / len(counts)
+        if counts[0] != fields or consistency < _CSV_CONSISTENT_ROWS:
+            continue
+        score = (consistency, fields, -preference)
+        if best_score is None or score > best_score:
+            best, best_score = delimiter, score
+    return best
+
+
 class SpreadsheetParser:
     """Convert an .xlsx workbook or a .csv file to Markdown tables.
 
     The first non-empty row of each sheet is the header. A ``Row`` column holds the
     1-based sheet or CSV row number of each data row, so a citation can name the row.
 
+    A CSV's delimiter (``,``, ``;``, tab or ``|``) is read from its rows, and its text
+    from UTF-8, UTF-16 with a byte order mark or, failing those, Windows-1252, the
+    "ANSI" code page Excel saves a plain CSV in on Western-European Windows.
+
     A file over its input limits (size, unpacked size, rows per sheet) is refused
     with ``InputLimitError``; the size is checked before the file is opened.
     """
 
-    def __init__(self, *, limits: InputLimits | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        limits: InputLimits | None = None,
+        csv_delimiter: str | None = None,
+        csv_encoding: str | None = None,
+    ) -> None:
         """
         Args:
             limits: Size and row limits; defaults to
                 :class:`~gaik.software_components.input_limits.InputLimits`.
+            csv_delimiter: The CSV field delimiter, one character; ``None`` (default)
+                reads it from the file's rows.
+            csv_encoding: The CSV's text encoding, such as ``"utf-8"`` or ``"cp1252"``;
+                ``None`` (default) reads it as the class docstring says.
+
+        Raises:
+            ValueError: If ``csv_delimiter`` is not one character, or is a quote or a
+                line break.
         """
+        if csv_delimiter is not None and (len(csv_delimiter) != 1 or csv_delimiter in '"\r\n'):
+            raise ValueError(f"csv_delimiter must be one character, got {csv_delimiter!r}")
         self.limits = limits or InputLimits()
+        self.csv_delimiter = csv_delimiter
+        self.csv_encoding = csv_encoding
 
     def parse_spreadsheet(self, file_path: str | Path) -> str:
         """Return the spreadsheet as Markdown: one ``## Sheet: <name>`` table per sheet.
 
         Raises:
-            ValueError: For an unsupported type or a spreadsheet without rows.
+            ValueError: For an unsupported type, a spreadsheet without rows, or a
+                CSV whose text cannot be decoded (the message names the fix).
+            FileTypeMismatchError: If the content is not the type the file's
+                extension says: an .xlsx that is no XLSX workbook, a .csv that is
+                not text (a ``ValueError``).
             InputLimitError: If the file is over ``max_file_bytes``, an .xlsx unpacks
                 to more than ten times that, or a sheet has more than ``max_table_rows``.
         """
@@ -228,12 +356,21 @@ class SpreadsheetParser:
         suffix = path.suffix.lower()
         if suffix == ".xlsx":
             self.limits.check_zip_container(path)
+            check_file_type(path, {"xlsx"})
             blocks = _xlsx_blocks(path, self.limits)
         elif suffix == ".csv":
             self.limits.check_file_size(path)
-            with path.open(encoding="utf-8-sig", newline="") as handle:
-                rows = count_table_rows(csv.reader(handle), self.limits, path.name)
-                blocks = [table] if (table := _table(rows)) else []
+            check_file_type(path, TEXT_TYPES)
+            text = decode_text(
+                path.read_bytes(),
+                path,
+                self.csv_encoding,
+                advice="save it as UTF-8 (in Excel: CSV UTF-8) or pass csv_encoding",
+            )
+            delimiter = self.csv_delimiter or _csv_delimiter(text)
+            reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
+            rows = count_table_rows(reader, self.limits, path.name)
+            blocks = [table] if (table := _table(rows)) else []
         else:
             raise ValueError(f"{path.name}: unsupported spreadsheet type {suffix}")
         if not blocks:

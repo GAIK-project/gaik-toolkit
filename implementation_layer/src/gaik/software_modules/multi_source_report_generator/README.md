@@ -268,8 +268,8 @@ result = generator.run(
     parser_choice="auto",  # auto, pymupdf, vision, multimodal, docling
     parser_options={
         "ctor": {
-            # "use_markdown": True,  # PyMuPDFParser: Markdown-formatted output (default True)
-            # "use_ocr": True,       # DoclingParser: enable OCR for scanned pages
+            # "enable_ocr": True,    # DoclingParser: OCR for scanned pages (default True)
+            # pymupdf takes no ctor options here and always writes Markdown.
         },
         # "openai_config": custom_config,  # override API config for VisionParser / MultimodalParser
     },
@@ -308,7 +308,7 @@ result = generator.run(
     agentic=False,
     review_options=None,
     polish=False,
-    strict_review=False,
+    strict_review=True,
     curate_evidence=False,
     verbose=False,
     progress_callback=None,
@@ -345,10 +345,10 @@ for section in result.sections:
 | `agentic` | `False` | If `False`, writes the whole report in one LLM call. If `True`, uses per-section agentic drafting and review. |
 | `review_options` | `None` | Optional separate LLM options for the agentic reviewer. If `None`, reviewer reuses the writer client/config. |
 | `polish` | `False` | Agentic only. Runs a final style/proofreading pass after mandatory review repair. |
-| `strict_review` | `False` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written. |
+| `strict_review` | `True` | Agentic only. If unresolved reviewer edits remain, raise before final report outputs are written; `False` returns them as revision warnings. |
 | `curate_evidence` | `False` | Agentic only. Creates one section-specific evidence brief before drafting each section. |
 | `verbose` | `False` | Agentic only. Prints workflow progress events. |
-| `progress_callback` | `None` | Agentic only. Callable receiving progress strings. Overrides default printing behavior. |
+| `progress_callback` | `None` | Callable receiving progress strings: source normalization in both modes, and the agentic workflow's handovers. Overrides default printing behavior. Without it, normalization progress is printed with each file named by a tag (`file 3f9a1c2b.pdf`, as the parsers' log lines do), not its name; the callback gets the file names. |
 | `output_docx` | `False` | Also write `report.docx` alongside `report.md` when `output_dir` is set. Requires the `multi-source-report-generator-docx` extra and the Pandoc system binary. |
 
 ## Separate providers for each stage
@@ -395,13 +395,13 @@ the credential-bearing stage configs when running the report.
 |---|---|---|
 | Text | `.txt` | Read directly |
 | Markdown | `.md`, `.markdown` | Read directly |
-| CSV | `.csv` | Converted to Markdown table with Python stdlib `csv` |
-| Excel | `.xlsx`, `.xls` | Converted to Markdown table with `openpyxl` |
+| CSV | `.csv` | Converted to Markdown table with Python stdlib `csv`; a `\|` in a cell is escaped and a line break becomes a space, as `SpreadsheetParser` writes them |
+| Excel | `.xlsx` | Converted to Markdown table with `openpyxl`, cells as for CSV. An old `.xls` is refused before any source is read, also inside a folder; save it as `.xlsx` |
 | PDF | `.pdf` | Parsed by `parser_choice` |
-| Word | `.docx` | Parsed by `DocxParser` |
+| Word | `.docx` | Parsed by `DocxParser` with `keep_structure=True`: document order, headings and every table cell |
 | Audio | `.mp3`, `.wav`, `.m4a`, `.aac`, `.flac`, `.ogg` | Transcribed by `Transcriber` |
 | Video | `.mp4`, `.mov`, `.mkv`, `.avi`, `.webm` | Transcribed by `Transcriber` |
-| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor` |
+| Images | `.png`, `.jpg`, `.jpeg`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.gif` | Parsed by `VisionParser` or extracted by `VisionExtractor`. A TIFF or BMP image (by its content, whatever its extension) is converted to PNG first, one image per page of a multi-page TIFF, with a 16-bit or float scan scaled to 8 bits, since the providers take PNG, JPEG, GIF and WebP only |
 
 ## Agentic Mode Details
 
@@ -467,12 +467,16 @@ The reviewer:
 - checks section instruction coverage
 - checks sample-section format/style when a matching sample section exists
 - proposes targeted search/replace corrections
-- applies corrections locally with exact and fuzzy matching
+- applies corrections locally: where the search occurs once as written, else at the one
+  passage it matches once case, quote and dash styles and whitespace are ignored, else
+  at the one passage that differs from it by at most 10% (a typo or a letter left out),
+  never in a number. A correction that fits no passage, or more than one (also a search
+  that occurs twice as written), is not applied
 - retries failed corrections up to the configured retry limit
 
-Unresolved reviewer edits become `section.revision_warnings` by default.
+With `strict_review=False`, unresolved reviewer edits become `section.revision_warnings` and the report is written.
 
-With `strict_review=True`, unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
+By default (`strict_review=True`), unresolved reviewer edits raise before final report files such as `report.md` and `sections/` are written. Intermediate curation artifacts may already exist if `curate_evidence=True`.
 
 ### Agentic Curation
 
@@ -664,7 +668,9 @@ If `review_options=None`, the reviewer and polish pass reuse the writer client/c
 ## Source material as data
 
 Each source reaches the writer, the curator and the reviewer in its own
-`<source_material>` block, labelled with its file name, the name the citations use; the
+`<source_material>` block, labelled with its file name, the name the citations use.
+Before each block, one JSON object gives the source's number, label and type, so a file
+name cannot add a type of its own, and the request says a label is data. The
 format reference, a curated brief and every already-written section a dependent section
 builds on get blocks of their own. The block id is random and new for every call, and a
 closing tag written in a source is escaped, so the source cannot end its block
@@ -693,7 +699,25 @@ output_dir/
         curated_sections/       # only agentic=True and curate_evidence=True
             background.md       # filename = section id (auto-derived from title if not set)
             findings.md
+    .gaik_report_files.json # the files this run wrote, with their SHA-256
 ```
+
+**Reusing an `output_dir`.** One output folder holds one report: the one written last.
+Each run records the files it wrote in `.gaik_report_files.json`. After a later run into
+the same folder has written all its outputs, it removes the files of the run before
+that it did not write again (the file of a section you removed or renamed, a curated
+brief, `evidence_index.json`, `usage.json`, or a `report.docx` from a run with
+`output_docx=True`). A second, different report written into the folder therefore
+replaces the first one's generated files; to keep both, give each report its own
+folder. A file is removed only if the record lists it, it is one of the names the
+generator writes (`report.md`, `report.docx`, `usage.json`, `evidence_index.json`,
+`evidence/normalized_sources.md`, `sections/*.md`, `evidence/curated_sections/*.md`),
+its content is still what that run wrote, no part of its path under the folder is a
+link or junction, it resolves inside the
+folder, and it is not a file this run wrote. Your own files, a file you edited, and
+files from a run before the record existed stay, and a warning counts them. A run that
+fails removes nothing; with `curate_evidence=True` its curated briefs may already have
+replaced the earlier ones, as intermediate files.
 
 The returned `ReportGenerationResult` contains:
 
@@ -734,8 +758,10 @@ from gaik.software_modules.multi_source_report_generator import (
 # Paths (input_paths, output_dir, sample_report_path) are stored relative to
 # the config file so it is portable. All option dicts are stored as-is.
 # load_report_config refuses a path that is absolute or leads out of the config's
-# folder (through ".." or a symbolic link) with SourcePathError; pass
-# root="<a folder that holds both>" for a config that names files beside its folder.
+# folder (through ".." or a symbolic link) with SourcePathError, and so does
+# save_report_config, before it writes anything: a config it saves loads back as
+# saved. A path that is a link is stored under its own name. For a config that names
+# files beside its folder, pass root="<a folder that holds both>" to both calls.
 save_report_config(
     "my_report_config.json",
     input_paths=["materials/"],
@@ -762,7 +788,8 @@ result = gen.run(**config)
 `save_report_config` accepts the same keyword arguments as `run()`, minus
 `verbose`, `progress_callback`, and `section_context_mode` (runtime preferences
 that are not part of the use-case definition). These can still be passed
-directly to `run()`.
+directly to `run()`. It also takes `root`, the folder every stored path must stay
+inside (the config's folder by default), as `load_report_config` does.
 
 ## Example
 

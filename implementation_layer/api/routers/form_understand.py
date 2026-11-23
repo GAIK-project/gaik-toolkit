@@ -6,6 +6,7 @@ Thin HTTP wrapper around
 
 from __future__ import annotations
 
+from collections import Counter
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -33,8 +34,22 @@ class UnderstandRequest(BaseModel):
     languageHint: LanguageHint | None = None
 
 
+class UnderstoodLabel(BaseModel):
+    id: str
+    label: str
+    """The cleaned label."""
+    pageLabel: str  # noqa: N815 - public JSON field, camelCase like the request
+    """The label the page itself gave the field, trimmed."""
+    changed: bool
+    """True when ``label`` has other words than ``pageLabel``: show both."""
+    truncated: bool = False
+    """True when ``label`` is ``pageLabel`` cut to 60 characters: show both."""
+
+
 class UnderstandResponse(BaseModel):
     mapping: dict[str, str]
+    """Each id's cleaned label, as before; ``labels`` adds the page's own label."""
+    labels: list[UnderstoodLabel] = []
 
 
 @router.post(
@@ -46,17 +61,25 @@ class UnderstandResponse(BaseModel):
         "Given a list of form-field identifiers with their raw labels and "
         "optional parent HTML snippets, returns a short cleaned label per id. "
         "Useful when a form (e.g. Sympa HR) uses generated identifiers that "
-        "users cannot read."
+        "users cannot read. `labels` gives, in input order, each cleaned label "
+        "with the page's own label and whether the model changed its words; "
+        "show `pageLabel` beside `label` when `changed` or `truncated` is true."
     ),
 )
 async def understand_form(payload: UnderstandRequest):
     if not payload.fields:
         return UnderstandResponse(mapping={})
+    repeated = sorted(i for i, n in Counter(f.id for f in payload.fields).items() if n > 1)
+    if repeated:
+        # One label comes back per id, so two fields with one id cannot both be named.
+        raise HTTPException(
+            status_code=422, detail=f"Field ids must be unique; repeated: {repeated}"
+        )
 
     try:
         config = get_form_config()
         understander = FormUnderstander(config=config)
-        mapping = understander.clean_labels(
+        described = understander.describe_labels(
             fields=[
                 {
                     "id": f.id,
@@ -69,8 +92,20 @@ async def understand_form(payload: UnderstandRequest):
             ],
             language_hint=payload.languageHint,
         )
-        return UnderstandResponse(mapping=mapping)
     except HTTPException:
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Label cleanup failed: {exc}") from exc
+    return UnderstandResponse(
+        mapping={d.id: d.label for d in described},
+        labels=[
+            UnderstoodLabel(
+                id=d.id,
+                label=d.label,
+                pageLabel=d.original,
+                changed=d.changed,
+                truncated=d.truncated,
+            )
+            for d in described
+        ],
+    )

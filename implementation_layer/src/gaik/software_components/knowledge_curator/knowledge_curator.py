@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from gaik.software_components.llm import create_llm_client
 from gaik.software_components.llm.base import usage_since
 from gaik.software_components.source_material import (
+    _ANGLE,
     SourceMaterial,
     clean_label,
     source_material_messages,
@@ -63,13 +64,7 @@ class CuratedConflict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     topic: str = Field(description="The topic the sources disagree on.")
-    description: str = Field(
-        description="What each source says and, if resolved, which side the source "
-        "hierarchy follows and why."
-    )
-    status: Literal["resolved", "unresolved"] = Field(
-        description="'resolved' if the source hierarchy decides the conflict, else 'unresolved'."
-    )
+    description: str = Field(description="What each source says, without deciding between them.")
     unit_numbers: list[int] = Field(
         description="1-based positions in units of the units that disagree, both sides."
     )
@@ -120,12 +115,14 @@ def _verbatim_quote(quote: str, squashed_text: str) -> str | None:
     """The source's own words for a quote that holds an escaped closing tag, or None.
 
     A closing block tag written in a source reaches the model with its bracket escaped
-    as ``&lt;``. Each ``&lt;`` of the quote may stand for one such bracket, any character
-    that is neither a letter, a digit nor a space (or for itself); the span found is
-    copied from the source, so it is verbatim.
+    as ``&lt;``. Each ``&lt;`` of the quote may stand for one such bracket, ``<`` or one
+    of its look-alikes (or for itself); the span found is copied from the source, so it
+    is verbatim. A quote with nothing but ``&lt;`` stands for no words of the source.
     """
     parts = _squash(quote).split("&lt;")
-    found = re.search(r"(?:&lt;|[^\w\s])".join(re.escape(p) for p in parts), squashed_text)
+    if not any(part.strip() for part in parts):
+        return None
+    found = re.search(f"(?:&lt;|[{_ANGLE}])".join(re.escape(p) for p in parts), squashed_text)
     return found.group(0) if found else None
 
 
@@ -155,8 +152,235 @@ def _as_cited(answer: CurationResponse, cited: _Cited) -> CurationResponse:
     return answer.model_copy(update={"units": units})
 
 
+# A number: a digit run, or groups of three digits with one thousands separator between
+# them ("1 200", "1,200", "1.200", "1,250,500"). Any other separator splits numbers, so a
+# date such as 14.3.2026 is 14, 3 and 2026, a decimal 1,5 is 1 and 5, and 1,250.500 is
+# 1250 and 500, however a source writes it.
+_NUMBER = re.compile(
+    r"(?<![^\W_])(?:\d{1,3}(?P<sep>[.,\u00a0\u202f ])\d{3}(?:(?P=sep)\d{3})*(?!\d)|\d+)"
+)
+# A number glued to letters before it, such as the 2 in m2, CO2 or ISO9001, is part of a
+# unit or a name, not a figure of the fact: the lookbehind above leaves it out, and it
+# never starts inside a digit run, so it does not take the 001 of ISO9001 either.
+_SEPARATORS = re.compile(r"[.,\u00a0\u202f ]")
+# Every digit run, glued to letters or not: what a quote gives. "ISO9001" in a quote
+# supports "ISO 9001" in the summary.
+_DIGIT_RUN = re.compile(r"\d+")
+# A date: the day, the month and the year; None for a day or a year it does not give
+# ("March 2026" has no day).
+_Date = tuple[int | None, int, int | None]
+
+_ENGLISH_MONTHS = {
+    name: n
+    for n, names in enumerate(
+        [
+            ("january", "jan"),
+            ("february", "feb"),
+            ("march", "mar"),
+            ("april", "apr"),
+            ("may",),
+            ("june", "jun"),
+            ("july", "jul"),
+            ("august", "aug"),
+            ("september", "sep", "sept"),
+            ("october", "oct"),
+            ("november", "nov"),
+            ("december", "dec"),
+        ],
+        start=1,
+    )
+    for name in names
+}
+# Also ordinary words ("may", "mar"): they count only next to a day before or a year after.
+_AMBIGUOUS_MONTHS = frozenset({"may", "mar"})
+_FINNISH_MONTHS = ("tammi helmi maalis huhti touko kesä heinä elo syys loka marras joulu").split()
+_WORD = re.compile(r"[^\W\d_]+")
+# The day before a month name: "14 March", "14th of March", "14.maaliskuuta",
+# "14. päivänä maaliskuuta".
+_DAY_BEFORE = re.compile(
+    r"(?<!\d)(\d{1,2})(?:st|nd|rd|th)?(?:\.\s*|\s+)(?:(?:of|p\u00e4iv\u00e4n\u00e4)\s+)?$",
+    re.IGNORECASE,
+)
+_DAY_AFTER = re.compile(r"\.?\s+(\d{1,2})(?:st|nd|rd|th)?(?!\d)")
+_YEAR_AFTER = re.compile(r"\.?\s+(?:\d{1,2}(?:st|nd|rd|th)?,?\s+)?(\d{4})(?!\d)")
+# A date written with numbers: 14.3.2026, 14.3. (the closing dot tells it from 14.3, a
+# decimal), 2026-03-14, or a month and a year, 3/2026.
+_NUMERIC_DATE = re.compile(
+    r"(?<![\d.])(?P<d>\d{1,2})\.(?P<m>\d{1,2})\.(?P<y>\d{4}(?!\d))?"
+    r"|(?<![\d-])(?P<iy>\d{4})-(?P<im>\d{1,2})-(?P<id>\d{1,2})(?!\d)"
+    r"|(?<![\d./])(?P<mm>\d{1,2})/(?P<my>\d{4})(?!\d)"
+)
+
+
+def _month_number(word: str) -> int | None:
+    """The number of a month name, English or Finnish, in any case or inflection
+    ("March", "MARCH", "maaliskuuta", "maaliskuussa"); None for any other word."""
+    lower = word.lower()
+    if lower in _ENGLISH_MONTHS:
+        return _ENGLISH_MONTHS[lower]
+    for n, stem in enumerate(_FINNISH_MONTHS, start=1):
+        if lower.startswith(stem + "kuu"):
+            return n
+    return None
+
+
+def _word_dates(text: str) -> set[_Date]:
+    """Every date in ``text`` whose month is a word: "14 March 2026", "the 14th of March",
+    "14. maaliskuuta", "March 14, 2026", and a month with a year, "maaliskuussa 2026". A
+    month name with neither a day nor a year beside it gives none; "may" and "mar" count
+    only after a day or before a year, since they are also words."""
+    dates: set[_Date] = set()
+    for match in _WORD.finditer(text):
+        word = match.group(0)
+        month = _month_number(word)
+        if month is None:
+            continue
+        before = _DAY_BEFORE.search(text, 0, match.start())
+        after = _DAY_AFTER.match(text, match.end())
+        year = _YEAR_AFTER.match(text, match.end())
+        if word.lower() in _AMBIGUOUS_MONTHS and not before and not year:
+            continue  # "May 2 units fail": a day after "May" alone is not a date
+        day = int(before.group(1)) if before else int(after.group(1)) if after else None
+        if day is not None and not 1 <= day <= 31:
+            continue
+        if day is None and not year:
+            continue
+        dates.add((day, month, int(year.group(1)) if year else None))
+    return dates
+
+
+def _numeric_dates(text: str) -> list[tuple[_Date, list[tuple[int, int]], int | None]]:
+    """Every date in ``text`` written with numbers, with the spans of its day and month
+    and the start of its year (None without one)."""
+    found: list[tuple[_Date, list[tuple[int, int]], int | None]] = []
+    for match in _NUMERIC_DATE.finditer(text):
+        if match.group("mm") is not None:
+            month = int(match.group("mm"))
+            if 1 <= month <= 12:
+                year = int(match.group("my"))
+                found.append(((None, month, year), [match.span("mm")], match.start("my")))
+            continue
+        if match.group("d") is not None:
+            d, m, y = "d", "m", "y"
+        else:
+            d, m, y = "id", "im", "iy"
+        day, month = int(match.group(d)), int(match.group(m))
+        if not (1 <= day <= 31 and 1 <= month <= 12):
+            continue
+        year = int(match.group(y)) if match.group(y) else None
+        spans = [match.span(d), match.span(m)]
+        found.append(((day, month, year), spans, match.start(y) if year is not None else None))
+    return found
+
+
+def _dates(text: str) -> set[_Date]:
+    """Every date in ``text``, its month written as a word or as a number."""
+    return _word_dates(text) | {date for date, _, _ in _numeric_dates(text)}
+
+
+def _same_day(date: _Date, given: set[_Date]) -> _Date | None:
+    """A date of ``given`` on the same day and month as ``date``, with the same year if
+    both have one; one with the same year first. A month and a year (no day) needs the
+    same month and year."""
+    day, month, year = date
+    if day is None:
+        matches = [g for g in given if g[1] == month and g[2] == year]
+    else:
+        matches = [
+            g for g in given if g[:2] == (day, month) and (year is None or g[2] in (year, None))
+        ]
+    return max(matches, key=lambda g: g[2] == year, default=None)
+
+
+def _confirmed(date: _Date, in_source: set[_Date]) -> _Date | None:
+    """``date`` as far as the source has it: its day and month, and its year only when
+    the source's date has the same year; None when the source has no such date."""
+    match = _same_day(date, in_source)
+    if match is None:
+        return None
+    return date if match[2] == date[2] else (date[0], date[1], None)
+
+
+def _digits(number: str) -> str:
+    """A number's digits without separators or leading zeros: "1 200,50" -> "120050"."""
+    return _SEPARATORS.sub("", number).lstrip("0") or "0"
+
+
+def _numbers(text: str) -> list[str]:
+    """Every number in ``text`` as written, by :data:`_NUMBER`."""
+    return [m.group(0) for m in _NUMBER.finditer(text)]
+
+
+def _given_numbers(text: str) -> set[str]:
+    """The digits of every number in ``text``, of each group of a grouped one, and of
+    every digit run glued to letters.
+
+    "4 120" may be one figure or two (a count and an area), so both readings count; the
+    9001 of "ISO9001" counts too, so a summary may write it "ISO 9001". A month written as
+    a word gives no number here: it supports only the same date (:func:`_dated_numbers`).
+    """
+    given = {_digits(run) for run in _DIGIT_RUN.findall(text)}
+    for n in _numbers(text):
+        given.add(_digits(n))
+        given.update(_digits(part) for part in _SEPARATORS.split(n) if part)
+    return given
+
+
+def _dated_numbers(summary: str, given: set[_Date]) -> set[int]:
+    """The start of each number in ``summary`` that a date of ``given`` supports.
+
+    A date the summary writes with numbers, 14.3.2026 or 14.3., is supported by the same
+    day and month in ``given``, however the source writes it ("14 March 2026"); its year
+    only when that date has the same year, otherwise the year is checked like any number.
+    """
+    starts: set[int] = set()
+    for date, spans, year_start in _numeric_dates(summary):
+        match = _same_day(date, given)
+        if match is None:
+            continue
+        starts.update(start for start, _ in spans)
+        if year_start is not None and match[2] == date[2]:
+            starts.add(year_start)
+    return starts
+
+
+def _unsupported_numbers(unit: CuratedUnit, source_text: str | None = None) -> list[str]:
+    """The numbers of the summary that neither the quote nor the time qualifier gives.
+
+    The quote check confirms only that the quote is in its source; this confirms that the
+    summary states no number of its own, such as an age computed from a year or a figure
+    copied from another part of the source. Numbers are compared by their digits, so
+    "1 200" in the quote supports "1200" and "03" supports "3". A date the summary writes
+    with numbers (14.3.2026) is also supported by the same date with its month as a word
+    ("14 March 2026"); the month's number supports nothing else. A number the summary
+    writes in words is not checked.
+    """
+    given = _given_numbers(unit.quote)
+    dates = _dates(unit.quote)
+    # The time qualifier is the model's own text: its numbers and dates count only where
+    # the cited source has them too.
+    qualifier = _given_numbers(unit.time_qualifier or "")
+    qualifier_dates = _dates(unit.time_qualifier or "")
+    if source_text is not None:
+        qualifier &= _given_numbers(source_text)
+        in_source = _dates(source_text)
+        qualifier_dates = {
+            confirmed
+            for date in qualifier_dates
+            if (confirmed := _confirmed(date, in_source)) is not None
+        }
+    given |= qualifier
+    dated = _dated_numbers(unit.summary, dates | qualifier_dates)
+    return [
+        m.group(0)
+        for m in _NUMBER.finditer(unit.summary)
+        if m.start() not in dated and _digits(m.group(0)) not in given
+    ]
+
+
 def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, str, str]]:
-    """``(position, reason, message)`` of every unit whose quote fails the check.
+    """``(position, reason, message)`` of every unit whose quote fails the check, or
+    whose summary states a number its quote does not give.
 
     The message names a source by the label the model saw it under.
     """
@@ -177,6 +401,15 @@ def _failing_units(answer: CurationResponse, cited: _Cited) -> list[tuple[int, s
                     "quote not found in source",
                     f'unit {n}: quote "{unit.quote}" not found in '
                     f'"{cited.label(unit.source.file)}"',
+                )
+            )
+        elif unsupported := _unsupported_numbers(unit, cited.texts[unit.source.file]):
+            failures.append(
+                (
+                    n,
+                    "summary states a number the quote does not",
+                    f"unit {n}: the summary states {unsupported}, which the quote "
+                    f'"{unit.quote}" does not give',
                 )
             )
     return failures
@@ -235,8 +468,58 @@ def _without_units(answer: CurationResponse, dropped: set[int]) -> CurationRespo
     )
 
 
+def _check_precedence(source_precedence: Sequence[str] | None) -> tuple[str, ...]:
+    """The precedence as a tuple; raise ``ValueError`` on a blank, a repeat or a bare string."""
+    if source_precedence is None:
+        return ()
+    if isinstance(source_precedence, str):
+        raise ValueError(
+            "source_precedence takes a list of source classes, highest first, "
+            "e.g. ['primary', 'secondary']"
+        )
+    ranked = tuple(source_precedence)
+    if any(not isinstance(c, str) or not c.strip() for c in ranked):
+        raise ValueError("source_precedence entries must be non-blank source class names")
+    repeated = sorted({c for c in ranked if ranked.count(c) > 1})
+    if repeated:
+        raise ValueError(f"source_precedence names a class more than once: {repeated}")
+    return ranked
+
+
+def _decide(
+    units: Sequence[FactUnit], source_precedence: tuple[str, ...]
+) -> tuple[Literal["resolved", "unresolved"], list[str], str | None]:
+    """``(status, preferred_unit_ids, resolved_by)`` of one conflict, decided in code.
+
+    Resolved only when every unit's source class is in ``source_precedence`` and exactly
+    one unit has the highest-ranked class among them: that unit is the side the report
+    follows. Two units of the top class may disagree with each other, so they leave the
+    conflict unresolved, as do units of one class only, a class the precedence does not
+    name, or no precedence at all: a person decides. So does a top unit of ``low``
+    confidence, a source that is itself unsure: the class does not make it right.
+    """
+    # Fewer than two distinct units (an empty unit_numbers list, or one unit named twice)
+    # is no disagreement to rank: a person decides.
+    if not source_precedence or len(units) < 2:
+        return "unresolved", [], None
+    rank = {c: i for i, c in enumerate(source_precedence)}
+    classes = [u.source_class for u in units]
+    if any(c not in rank for c in classes):
+        return "unresolved", [], None
+    top = min(classes, key=rank.__getitem__)
+    preferred = [u.id for u in units if u.source_class == top]
+    if len(preferred) != 1:
+        return "unresolved", [], None
+    if next(u for u in units if u.source_class == top).confidence == "low":
+        return "unresolved", [], None
+    return "resolved", preferred, top
+
+
 def _to_knowledge(
-    section: SectionSpec, answer: CurationResponse, sources: NormalizedSources
+    section: SectionSpec,
+    answer: CurationResponse,
+    sources: NormalizedSources,
+    source_precedence: tuple[str, ...] = (),
 ) -> SectionKnowledge:
     _check_conflicts(section, answer)
     ids = [f"{section.id}-{n:02d}" for n in range(1, len(answer.units) + 1)]
@@ -246,12 +529,16 @@ def _to_knowledge(
     ]
     conflicts = []
     for c in answer.conflicts:
+        involved = [units[n - 1] for n in dict.fromkeys(c.unit_numbers)]
+        status, preferred, resolved_by = _decide(involved, source_precedence)
         conflicts.append(
             Conflict(
                 topic=c.topic,
                 description=c.description,
-                status=c.status,
+                status=status,
                 unit_ids=[ids[n - 1] for n in c.unit_numbers],
+                preferred_unit_ids=preferred,
+                resolved_by=resolved_by,
             )
         )
     return SectionKnowledge(
@@ -295,6 +582,7 @@ class KnowledgeCurator:
         sections: Sequence[SectionSpec],
         *,
         instructions: str = "",
+        source_precedence: Sequence[str] | None = None,
         progress_callback: Callable[[str], None] | None = None,
     ) -> KnowledgeBase:
         """Curate every non-derived section, one LLM call per section, in parallel.
@@ -302,16 +590,24 @@ class KnowledgeCurator:
         Args:
             sources: The normalized sources.
             sections: The report sections; derived sections are skipped.
-            instructions: Report-level instructions: source hierarchy, scope and style.
+            instructions: Report-level instructions: scope, style and how the report
+                words each kind of source. They do not decide conflicts.
+            source_precedence: Source classes, highest first, e.g.
+                ``["primary", "secondary"]``. A conflict is resolved in code when one
+                unit of the conflict has the highest-ranked class among them; the report
+                then follows that side. Without it, or when the classes do not decide,
+                every conflict is unresolved and the report gives both sides.
             progress_callback: Called with a status line when a section starts and ends,
                 possibly from a worker thread. An exception it raises stops the run.
 
         Raises:
-            ValueError: If there are no sources or no section to curate, or, with
+            ValueError: If there are no sources or no section to curate,
+                ``source_precedence`` is a bare string or names a class twice, or, with
                 `drop_unverified=False`, a quote still fails the check or a conflict still
                 refers to a unit that does not exist after one retry.
         """
         check_sections(sections)
+        precedence = _check_precedence(source_precedence)
         if not sources.sources:
             raise ValueError("No sources to curate from")
         curated = [s for s in sections if not s.derived]
@@ -323,7 +619,13 @@ class KnowledgeCurator:
             cited = _Cited(sources)
             futures = [
                 pool.submit(
-                    self._curate_section, sources, cited, s, instructions, progress_callback
+                    self._curate_section,
+                    sources,
+                    cited,
+                    s,
+                    instructions,
+                    precedence,
+                    progress_callback,
                 )
                 for s in curated
             ]
@@ -342,6 +644,7 @@ class KnowledgeCurator:
         cited: _Cited,
         section: SectionSpec,
         instructions: str,
+        source_precedence: tuple[str, ...],
         progress_callback: Callable[[str], None] | None,
     ) -> tuple[SectionKnowledge, list[DroppedUnit]]:
         if progress_callback:
@@ -380,7 +683,7 @@ class KnowledgeCurator:
             if not self.drop_unverified:
                 if failing:
                     raise ValueError(
-                        f"Section {section.id!r}: quotes not found in their sources after one "
+                        f"Section {section.id!r}: units failed the quote check after one "
                         f"retry: {[message for _, _, message in failing]}"
                     )
                 _check_conflicts(section, answer)
@@ -410,7 +713,7 @@ class KnowledgeCurator:
                 for n, reason, _ in failing
             ]
             logger.warning(
-                "Section %r: dropped %d unit(s) whose quote failed the check after the retry: %s",
+                "Section %r: dropped %d unit(s) that failed the quote check after the retry: %s",
                 section.id,
                 len(dropped),
                 _log_summary(failing, []),
@@ -418,11 +721,11 @@ class KnowledgeCurator:
             if progress_callback:
                 progress_callback(
                     f"Dropped {len(dropped)} fact(s) of {section.title}: "
-                    "the quote is not in its source"
+                    "the quote is not in its source or does not give the summary's numbers"
                 )
         if failing or bad_conflicts:
             answer = _without_units(answer, {n for n, _, _ in failing})
-        knowledge = _to_knowledge(section, answer, sources)
+        knowledge = _to_knowledge(section, answer, sources, source_precedence)
         if progress_callback:
             progress_callback(
                 f"Curated {section.title}: {len(knowledge.units)} units, "

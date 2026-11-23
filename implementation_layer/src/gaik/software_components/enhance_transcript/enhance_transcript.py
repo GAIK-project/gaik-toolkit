@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+import re
+import unicodedata
+from collections.abc import Callable, Iterator
 from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Any
@@ -15,6 +17,7 @@ from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import resolve_provider
+from gaik.software_components.source_material import SourceMaterial, source_material_messages
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,9 @@ Invoked four times per ``enhance_text`` call:
 Errors raised by the callback are swallowed so a misbehaving observer
 can never break the enhancement run.
 """
+
+DEFAULT_MAX_CHANGE_RATIO = 0.25
+"""Largest share of the input's letters one pass may change before the pass is refused."""
 
 DEFAULT_MODEL_AZURE = "gpt-6-luna"
 DEFAULT_MODEL_OPENAI = "gpt-6-luna"
@@ -206,16 +212,139 @@ class DiffChunk(BaseModel):
     corrected: str = ""
 
 
+class RefusedPass(BaseModel):
+    """A pass whose answer was not used, and why; its input was kept instead."""
+
+    pass_name: str
+    reason: str
+
+
 class TranscriptEnhancerResult(BaseModel):
     original_text: str
+    """The transcript as it came in, always kept next to the enhanced one."""
     enhanced_text: str
     source_file: str | None = None
     correction_summary: CorrectionSummary | None = None
+    """Word-level changes between ``original_text`` and ``enhanced_text``; always set."""
     diff_chunks: list[DiffChunk] | None = None
+    refused_passes: list[RefusedPass] = []
+    """Passes whose answer changed digits or too many letters, so their input was kept."""
+
+
+_DIGITS = re.compile(r"\d+")
+
+
+def _digit_runs(text: str) -> list[str]:
+    """The digit runs of ``text``, and every other number character, in order.
+
+    NFKD turns superscripts and full-width digits into plain ones; characters Unicode
+    counts as numbers but not digits (½, Ⅸ) are listed too, so adding one is seen.
+    """
+    folded = unicodedata.normalize("NFKD", text)
+    runs = _DIGITS.findall(folded)
+    others = [ch for ch in text if unicodedata.category(ch) in ("Nl", "No")]
+    return runs + others
+
+
+_NOT_LETTER = re.compile(r"[\W_]+")
+_MAX_SPAN_LETTERS = 2000
+_MAX_REALIGN_WORDS = 2000
+
+
+def _letters(text: str) -> str:
+    """``text`` as lowercase letters and digits only, with accents folded (ä -> a).
+
+    What an editor is meant to fix leaves this unchanged: case, punctuation, spacing
+    (a split or merged compound) and the a/ä, o/ö an ASR without them writes.
+    """
+    folded = unicodedata.normalize("NFKD", text.lower())
+    folded = "".join(ch for ch in folded if not unicodedata.combining(ch))
+    return _NOT_LETTER.sub("", folded)
+
+
+def _changed_spans(
+    a: list[str], b: list[str], *, autojunk: bool = True
+) -> Iterator[tuple[list[str], list[str]]]:
+    """The spans of words where ``a`` and ``b`` differ, as ``(a_words, b_words)``.
+
+    The words both lists start and end with are set aside first, so a repeated phrase
+    cannot pull the alignment off by a repeat. The first alignment skips the most
+    common words (``autojunk``), which keeps a long transcript fast; each span it
+    leaves is aligned again with every word counted, so a note with a small
+    vocabulary, whose every word is common, still lines up word by word. A span longer
+    than ``_MAX_REALIGN_WORDS`` is not aligned again: that costs time in the square of
+    its length, and the span is then compared as a whole.
+    """
+    start = 0
+    while start < min(len(a), len(b)) and a[start] == b[start]:
+        start += 1
+    end = 0
+    while end < min(len(a), len(b)) - start and a[-1 - end] == b[-1 - end]:
+        end += 1
+    a, b = a[start : len(a) - end], b[start : len(b) - end]
+    for tag, i1, i2, j1, j2 in SequenceMatcher(a=a, b=b, autojunk=autojunk).get_opcodes():
+        if tag == "equal":
+            continue
+        if autojunk and tag == "replace" and max(i2 - i1, j2 - j1) <= _MAX_REALIGN_WORDS:
+            yield from _changed_spans(a[i1:i2], b[j1:j2], autojunk=False)
+        else:
+            yield a[i1:i2], b[j1:j2]
+
+
+def _change_ratio(original: str, changed: str) -> float:
+    """Changed letters per letter of ``original``, after :func:`_letters`.
+
+    The words are aligned first, so a long transcript costs little. They are aligned
+    as :func:`_letters` folds them, so a word whose case, accent or punctuation the pass
+    fixed still lines up (see :func:`_changed_spans`). Inside each changed span the
+    letters are compared, so a merged compound counts as nothing and a replaced word
+    counts by how much of it changed.
+    """
+    a = [w for w in map(_letters, original.split()) if w]
+    b = [w for w in map(_letters, changed.split()) if w]
+    total = max(1, sum(map(len, a)))
+    edits = 0
+    for a_words, b_words in _changed_spans(a, b):
+        x, y = "".join(a_words), "".join(b_words)
+        if x == y:
+            continue
+        if max(len(x), len(y)) > _MAX_SPAN_LETTERS:
+            # A span this long means the words no longer line up: a rewrite. Comparing
+            # its letters would take minutes on a long transcript; count it all.
+            edits += max(len(x), len(y))
+            continue
+        matched = sum(
+            m.size for m in SequenceMatcher(a=x, b=y, autojunk=False).get_matching_blocks()
+        )
+        edits += max(len(x), len(y)) - matched
+    return edits / total
+
+
+def _refusal(before: str, after: str, max_change_ratio: float | None) -> str | None:
+    """Why a pass's answer may not replace its input, or None when it may.
+
+    The prompts forbid changing digits and rewriting the text; these checks hold the
+    pass to that in code, so a spoken instruction in the recording or a model error
+    cannot change a number or rewrite the transcript unnoticed.
+    """
+    if _digit_runs(before) != _digit_runs(after):
+        return "digits changed"
+    if max_change_ratio is not None:
+        ratio = _change_ratio(before, after)
+        if ratio > max_change_ratio:
+            return f"changed {ratio:.0%} of the letters, more than {max_change_ratio:.0%}"
+    return None
 
 
 class TranscriptEnhancer:
-    """Enhance Finnish transcripts using a two-pass prompt workflow."""
+    """Enhance Finnish transcripts using a two-pass prompt workflow.
+
+    Each pass's answer replaces its input only if it keeps every digit and changes at
+    most ``max_change_ratio`` of the letters; otherwise the input is kept and the pass is
+    listed in ``refused_passes``. The original transcript is always in the result.
+    """
+
+    max_change_ratio: float | None = DEFAULT_MAX_CHANGE_RATIO
 
     def __init__(
         self,
@@ -224,7 +353,20 @@ class TranscriptEnhancer:
         use_azure: bool = True,
         model: str | None = None,
         reasoning_effort: str | None = None,
+        max_change_ratio: float | None = DEFAULT_MAX_CHANGE_RATIO,
     ) -> None:
+        """
+        Args:
+            max_change_ratio: Largest share of a pass's input letters the pass may
+                change; case, punctuation, spacing (merged or split compounds) and
+                accents (a/ä, o/ö) do not count. A pass over it, or one that
+                changes any digit, is refused: its input is kept and the refusal is
+                listed in ``TranscriptEnhancerResult.refused_passes``. ``None`` turns
+                the ratio check off; the digit check always applies.
+        """
+        if max_change_ratio is not None and not 0 < max_change_ratio <= 1:
+            raise ValueError("max_change_ratio must be between 0 and 1, or None")
+        self.max_change_ratio = max_change_ratio
         config = (
             dict(api_config) if api_config is not None else get_openai_config(use_azure=use_azure)
         )
@@ -254,30 +396,59 @@ class TranscriptEnhancer:
         if not transcript_text:
             raise ValueError("transcript_text must not be empty")
 
+        refused: list[RefusedPass] = []
+
         self._notify(progress_callback, "pass1_started", {"chars": len(transcript_text)})
-        pass1_text = self._enhance_pass1(transcript_text, domain_rules=domain_rules)
+        pass1_text = self._checked(
+            "pass1",
+            transcript_text,
+            self._enhance_pass1(transcript_text, domain_rules=domain_rules),
+            refused,
+        )
         self._notify(progress_callback, "pass1_completed", {"chars": len(pass1_text)})
 
         self._notify(progress_callback, "pass2_started", {"chars": len(pass1_text)})
-        enhanced_text = self._enhance_pass2(
+        enhanced_text = self._checked(
+            "pass2",
             pass1_text,
-            additional_instructions=additional_instructions,
-            domain_rules=domain_rules,
+            self._enhance_pass2(
+                pass1_text,
+                additional_instructions=additional_instructions,
+                domain_rules=domain_rules,
+            ),
+            refused,
         )
+        # Each pass is checked against its own input; the result as a whole is held to
+        # the same limit against the original, so two passes cannot add up past it.
+        if enhanced_text != pass1_text:
+            whole = _refusal(transcript_text, enhanced_text, self.max_change_ratio)
+            if whole is not None:
+                logger.warning("TranscriptEnhancer pass2 refused (%s with pass1)", whole)
+                refused.append(RefusedPass(pass_name="pass2", reason=f"{whole}, with pass1"))
+                enhanced_text = pass1_text
         self._notify(progress_callback, "pass2_completed", {"chars": len(enhanced_text)})
 
+        # ``generate_summary`` is kept for callers; the summary is always computed now,
+        # so every result says how much the enhancement changed.
+        del generate_summary
         return TranscriptEnhancerResult(
             original_text=transcript_text,
             enhanced_text=enhanced_text,
-            correction_summary=(
-                self._summarize_corrections(transcript_text, enhanced_text)
-                if generate_summary
-                else None
-            ),
+            refused_passes=refused,
+            correction_summary=self._summarize_corrections(transcript_text, enhanced_text),
             diff_chunks=self._build_diff_chunks(transcript_text, enhanced_text)
             if diff_chunks
             else None,
         )
+
+    def _checked(self, name: str, before: str, after: str, refused: list[RefusedPass]) -> str:
+        """``after``, or ``before`` when the pass broke a rule the code checks."""
+        reason = _refusal(before, after, self.max_change_ratio)
+        if reason is None:
+            return after
+        logger.warning("TranscriptEnhancer %s refused (%s); kept its input", name, reason)
+        refused.append(RefusedPass(pass_name=name, reason=reason))
+        return before
 
     @staticmethod
     def _notify(
@@ -335,17 +506,18 @@ class TranscriptEnhancer:
         *,
         domain_rules: str | None = None,
     ) -> str:
-        messages = [
-            {
-                "role": "system",
-                "content": apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
-            },
-            {
-                "role": "user",
-                "content": f"Edit this Finnish transcript for spelling consistency:\n\n{transcript_text}",
-            },
-        ]
-        return self._chat_text(messages, fallback=transcript_text)
+        # The transcript is what was said: an instruction spoken in the recording stays
+        # data, in a block of its own, apart from the editing rules.
+        material = SourceMaterial()
+        messages = source_material_messages(
+            apply_domain_rules(PASS1_SYSTEM_PROMPT, domain_rules),
+            "Edit this Finnish transcript for spelling consistency:\n\n"
+            + material.wrap(transcript_text, label="transcript"),
+        )
+        # An answer that was only the echoed tags is empty: keep the input.
+        return material.strip_echo(self._chat_text(messages, fallback=transcript_text)) or (
+            transcript_text
+        )
 
     def _enhance_pass2(
         self,
@@ -354,20 +526,20 @@ class TranscriptEnhancer:
         additional_instructions: str | None = None,
         domain_rules: str | None = None,
     ) -> str:
-        user_prompt = (
-            f"Repair remaining ASR errors in this Finnish transcript:\n\n{transcript_text}"
+        material = SourceMaterial()
+        user_prompt = "Repair remaining ASR errors in this Finnish transcript:\n\n" + material.wrap(
+            transcript_text, label="transcript"
         )
         if additional_instructions and additional_instructions.strip():
             user_prompt += f"\n\nADDITIONAL INSTRUCTIONS:\n{additional_instructions.strip()}"
 
-        messages = [
-            {
-                "role": "system",
-                "content": apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules),
-            },
-            {"role": "user", "content": user_prompt},
-        ]
-        return self._chat_text(messages, fallback=transcript_text)
+        messages = source_material_messages(
+            apply_domain_rules(PASS2_SYSTEM_PROMPT, domain_rules), user_prompt
+        )
+        # An answer that was only the echoed tags is empty: keep the input.
+        return material.strip_echo(self._chat_text(messages, fallback=transcript_text)) or (
+            transcript_text
+        )
 
     def _chat_text(self, messages: list[dict], *, fallback: str) -> str:
         # ``reasoning_effort`` is omitted unless explicitly configured so we

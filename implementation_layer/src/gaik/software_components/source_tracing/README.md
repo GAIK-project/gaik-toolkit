@@ -178,8 +178,8 @@ For text, `rects` is empty and `span` holds the offsets, for example `"span": [1
 | Verdict | Meaning | What a reviewer should do |
 |---|---|---|
 | `verified` | the quote is in the source and holds the value | nothing, or a glance |
-| `check` | the quote is not in the source, or holds another number or date than the value | look at it: the value may be wrong, or a legitimate conversion |
-| `reworded` | the quote is in the source, but a text value is not in it | usually the model's own wording (a translation or a summary); read it |
+| `check` | the quote is not in the source, or holds another number or date than the value (also a text value such as `PO-2025-15903` against `PO-2025-15908`) | look at it: the value may be wrong, or a legitimate conversion |
+| `reworded` | the quote is in the source, but a text value is not in it; any numbers in the value are in the quote | usually the model's own wording (a translation or a summary); read it |
 | `unchecked` | cannot be compared: a list, a number written in words, a scan | check by hand |
 
 A `verified` value matches its quote. It does not prove the quote is the right place to read
@@ -193,6 +193,7 @@ Examples from the sample purchase order:
 | `2026-02-15` | `DATE: 02/15/2026` | verified | the same date in another order |
 | `7200-4453-21` | `PURCHASE NO: 7200445321` | verified | the same characters with other separators |
 | `2721.55` (kg) | `... 6,000 LB LB` | check | the only number in the quote is 6000 |
+| `2026-15-02` | `DATE: 02/15/2026` | check | no date order reads 15 as the month |
 | `alumiiniseoksinen pyörötanko` | `010 6061-T6 Aluminium Alloy Round Bar` | reworded | a Finnish value in an English line |
 
 ## Viewing the results
@@ -268,9 +269,23 @@ No model is involved in the check. For each citation:
    and spacing removed, and the quote's words must appear as an unbroken run. The cited page is
    tried first, then the other pages of that file, then the other files.
 2. **Value in the quote?** Numbers are compared as numbers in both European and American
-   formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`); dates by their year, month and
-   day in any order (`11.04.2025` holds `2025-04-11`), including month names; text by its
-   words, or as the same characters with other separators (`7200-4453-21` for `7200445321`).
+   formats (`3.000 kg` holds `3000`, `1.234,50` holds `1234.5`), with their sign: a minus
+   written against the digits counts (`-250,00` does not hold `250`), a dash between two
+   numbers does not (`10-20`). A negative value also matches a number in brackets
+   (`(250,00)`), with a minus after it (`250,00-`) or `CR`, or with a minus set apart before
+   it (`- EUR 250`); a dash elsewhere in the quote (`Lasku 2026-0042`) does not count.
+   Dates are compared by their year, month and day, in an order
+   a date is written in and each from its own number: `11.04.2025` holds `2025-04-11`,
+   `11 April 2025` and `11. huhtikuuta 2025` (English and Finnish month names), but not
+   `2025-11-04`, since dates with dots put the day first; a slash or a
+   dash may put the month first (`04/11/2025` holds both). Only a year written with two digits
+   (`'25`, `11.04.05`) stands for a four-digit one. Each end of a range or a list shares the
+   rest of the date (`11.–15.4.2025` holds the 11th and the 15th). A value no date order reads,
+   such as a version `1.2.3`, matches the same characters in the quote (`v1.2.3`). Text is
+   compared by its words, or as the same characters with other separators (`7200-4453-21`
+   for `7200445321`).
+   Text is compared in Unicode NFC form, so a decomposed `ä` (as some PDFs store it) is the
+   same letter as a composed one.
 3. **Verdict** from the two answers, as in the table above.
 4. **Position** (PDF): the matched words' boxes from the PDF's own text layer, and the box of
    the value inside the quote when it can be located.
@@ -302,6 +317,21 @@ the quote exactly.
   an audio or video recording.
 - A value in another format, such as a converted unit, is flagged `check`: the code can not tell
   a correct conversion from a wrong number.
+- A date written with slashes or dashes and a day of 12 or less (`04/11/2025`) reads either way,
+  so a value with its day and month swapped still matches it. Only dates with dots are read day
+  first.
+- A date's parts must be written together: a quote that gives the year apart from the day and
+  the month (`Report 2025, approved 11 April`), or labels them (`Day 11 Month 04 Year 2025`), is
+  `check`, and so is a day written with three digits (`011`). Two days joined only by a comma
+  or `&` (`11, 12.4.2025`) count as a list after a dot (`11., 12.4.`) or with a word in the list
+  (`11, 12 and 15.4.2025`), not otherwise: `Qty 1, 09.01.98` and `Erä 3, 1. elokuuta` look the
+  same. A `/` lists days next to a month name (`11/12 April`).
+- With a month name, the day comes before the name, after it (`April 11, 2025`), or after the
+  year only with a comma and its suffix (`April 2025, 11th`); a name after both numbers makes no
+  date, so a count or an amount after a date (`1. maaliskuuta 2025 2 kpl`) is never its day.
+  Dates with dots are read year first only when the year has four digits (`2025.04.11`).
+- A text value with fewer numbers in its quote than in itself is `reworded`, not `check`: the
+  quote may spell a number in words (`kerros kolme` for `floor 3`).
 - A number with one dot or comma and three digits after it, such as `4.200`, can be read as
   4.2 or 4200. The check accepts either, so a value of 4.2 matches a quote of `4.200` even when the
   document means 4200 and the value is a conversion (kilograms to tonnes, for example).

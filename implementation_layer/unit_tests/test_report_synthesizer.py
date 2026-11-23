@@ -301,15 +301,27 @@ def test_usage_heading_order_and_review_log(fakes):
 
 def test_strict_review_raises_on_unresolved_edits(fakes):
     fakes.reviewer.unresolved["services"] = [Edit(search="nowhere", replace="x", reason="r")]
-    with pytest.raises(RuntimeError, match="'services'"):
+    with pytest.raises(RuntimeError, match="'services'") as raised:
         _synthesize(strict_review=True)
+    message = str(raised.value)
+    assert "1 reviewer edit(s) could not be applied" in message
+    assert "strict_review=False" in message and "review_log" in message
+    assert "nowhere" not in message
     assert ("write", "summary") not in fakes.events
+
+
+def test_review_is_strict_by_default(fakes):
+    fakes.reviewer.unresolved["services"] = [Edit(search="nowhere", replace="x", reason="r")]
+    with pytest.raises(RuntimeError, match=r"'services'.*could not be applied \(strict_review"):
+        ReportSynthesizer(CONFIG).synthesize(
+            KNOWLEDGE, SECTIONS, title="Condition assessment", instructions=INSTRUCTIONS
+        )
 
 
 def test_unresolved_edits_are_logged_without_strict_review(fakes):
     unresolved = [Edit(search="nowhere", replace="x", reason="r")]
     fakes.reviewer.unresolved["services"] = unresolved
-    report = _synthesize()
+    report = _synthesize(strict_review=False)
     entry = next(e for e in report.review_log if e.section_id == "services")
     assert entry.unresolved == unresolved and entry.applied == [FIX]
 
@@ -447,3 +459,29 @@ def test_citations_off_change_the_writer_and_the_reviewer_prompts(fakes):
         assert "citation format" not in call["instructions"]
         assert "(missing: <item>) marker" in call["instructions"]
         assert "REPORT_RULES" in call["instructions"]
+
+
+@pytest.mark.parametrize("citations", [True, False])
+def test_the_writer_follows_the_code_chosen_side_of_a_resolved_conflict(citations):
+    prompt = writer_system_prompt(citations)
+
+    assert "follow the units listed in its preferred_unit_ids" in prompt
+    assert "follow the side its description gives" not in prompt
+
+
+@pytest.mark.parametrize(
+    ("answer", "kept"),
+    [
+        # A section that mirrors a sample's subsections starts with its own sub-heading.
+        ("### Roof\n\nDRAFT structures roof.\n\n### Attic\n\nDry.", "### Roof\n\nREVIEWED"),
+        ("## Structures\n\n### Roof\n\nDRAFT structures roof.", "### Roof\n\nREVIEWED"),
+        ("## 2. Structures\n\nDRAFT structures roof.", "REVIEWED structures roof."),
+        ("#### Foundations\n\nDRAFT structures fine.", "#### Foundations\n\nREVIEWED"),
+    ],
+    ids=["sub-heading", "echoed-then-sub-heading", "numbered-echo", "other-heading"],
+)
+def test_only_a_heading_that_repeats_the_title_is_stripped(fakes, answer, kept):
+    fakes.answers["structures"] = answer
+    report = _synthesize()
+    text = next(s.text for s in report.sections if s.id == "structures")
+    assert text.startswith(kept)

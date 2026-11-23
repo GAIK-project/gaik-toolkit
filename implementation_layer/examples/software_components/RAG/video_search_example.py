@@ -33,12 +33,17 @@ load_dotenv(Path(__file__).parent.parent.parent / ".env")
 sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / "src"))
 
 from gaik.software_components.config import get_openai_config
+from gaik.software_components.env_file import load_env_file
 from gaik.software_components.RAG.embedder import Embedder
 from gaik.software_components.RAG.pg_vector_store import PgVectorStore
 from gaik.software_components.RAG.pg_vector_store.video_search_helpers import (
     format_search_results,
     ingest_video_segments,
 )
+
+# Settings kept only in the repository's .env are read below before any gaik config
+# helper runs, so load that file (found from the gaik package) first.
+load_env_file()
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",

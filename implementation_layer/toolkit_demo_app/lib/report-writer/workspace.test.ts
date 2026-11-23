@@ -9,6 +9,8 @@ import {
   knowledgeJsonError,
   parseArtifacts,
   parseSpec,
+  precedenceForSpec,
+  precedenceNotice,
   reportOutOfDate,
   settingsForSpec,
   staleAfterEdit,
@@ -28,6 +30,7 @@ const SPEC: ReportSpec = {
     { id: "summary", title: "Summary", instructions: "i", required_items: [], depends_on: ["background"] },
   ],
   instructions: "",
+  source_precedence: [],
   sources: { primary: ["rec1.mp3"], secondary: ["renovation_1998.pdf"] },
   sample_report: "sample_report.docx",
   models: { vision: null, transcription: null, curator: "c", writer: null, reviewer: null },
@@ -87,6 +90,56 @@ describe("parseSpec", () => {
     // Other settings stay required.
     const { docx: _docx, ...withoutDocx } = withoutCitations;
     expect(() => parseSpec({ ...SPEC, settings: withoutDocx })).toThrow("settings is missing docx");
+  });
+});
+
+describe("source_precedence", () => {
+  test("is optional, defaults to empty and is kept on import", () => {
+    const { source_precedence: _omitted, ...withoutPrecedence } = SPEC;
+
+    expect(parseSpec(withoutPrecedence).source_precedence).toEqual([]);
+    expect(parseSpec({ ...SPEC, source_precedence: ["primary", "secondary"] }).source_precedence).toEqual([
+      "primary",
+      "secondary",
+    ]);
+  });
+
+  test("rejects an unknown or repeated class", () => {
+    expect(() => parseSpec({ ...SPEC, source_precedence: ["primary", "notes"] })).toThrow(
+      "source_precedence names unknown classes notes",
+    );
+    expect(() => parseSpec({ ...SPEC, source_precedence: ["primary", "primary"] })).toThrow(
+      "source_precedence names a class more than once",
+    );
+    expect(() => parseSpec({ ...SPEC, source_precedence: "primary" })).toThrow(
+      "source_precedence must be an array of strings",
+    );
+  });
+
+  test("is written on export only when it names a class, and parses back", () => {
+    expect(precedenceForSpec([])).toEqual({});
+    const exported = { ...SPEC, ...precedenceForSpec(["secondary", "primary"]) };
+    expect(parseSpec(JSON.parse(JSON.stringify(exported))).source_precedence).toEqual([
+      "secondary",
+      "primary",
+    ]);
+  });
+
+  test("a run on a gaik without the key leaves it out, and the page says so", () => {
+    const ranked: ("primary" | "secondary")[] = ["primary", "secondary"];
+    expect(precedenceForSpec(ranked, false)).toEqual({});
+    expect(precedenceForSpec(ranked, true)).toEqual({
+      source_precedence: ranked,
+    });
+
+    const notice = precedenceNotice(ranked, false);
+    expect(notice).toContain("primary over secondary");
+    expect(notice).toContain("where the report instructions rank the sources");
+    // Nothing to say while the API has not answered, when it takes the key, or when
+    // the spec ranks nothing.
+    expect(precedenceNotice(ranked, null)).toBeNull();
+    expect(precedenceNotice(ranked, true)).toBeNull();
+    expect(precedenceNotice([], false)).toBeNull();
   });
 });
 

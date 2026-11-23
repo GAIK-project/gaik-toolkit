@@ -16,8 +16,8 @@ description: >-
 # Parsing documents with gaik
 
 ```bash
-pip install "gaik[parser]==0.11.1"              # PyMuPDF, python-docx, Docling
-pip install "gaik[multimodal-parser]==0.11.1"   # multi-provider vision parsing
+pip install "gaik[parser]==0.12.0"              # PyMuPDF, python-docx, Docling
+pip install "gaik[multimodal-parser]==0.12.0"   # multi-provider vision parsing
 # Add llm-google for shared Google/Vertex configs, or llm-litellm for LiteLLM.
 ```
 
@@ -124,8 +124,9 @@ must accept images. Shared multimodal parsing renders PDF pages as PNG images, s
 PDF uploads are not required.
 
 `ParseResult` is a plain dataclass with
-`raw_markdown`, `clean_markdown`, `html` (populated only when `create_html=True`) and
-`usage`; it has no `save()` method, so write the files yourself. `DoclingParser` has no
+`raw_markdown`, `clean_markdown`, `html` (populated only when `create_html=True`),
+`usage` and `truncated` (True when the reply stopped at the model's output-token cap,
+so the end of the document is missing: split the PDF); it has no `save()` method, so write the files yourself. `DoclingParser` has no
 `parse()` method.
 
 Set `merge_table=True` when a table runs across a page break — it instructs the model to

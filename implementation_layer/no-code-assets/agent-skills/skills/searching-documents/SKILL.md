@@ -18,8 +18,8 @@ description: >-
 # Searching documents with gaik
 
 ```bash
-pip install "gaik[pg-vector-store,embedder,ranker]==0.11.1"
-pip install "gaik[finnish-rag]==0.11.1"   # Finnish lemmatization
+pip install "gaik[pg-vector-store,embedder,ranker]==0.12.0"
+pip install "gaik[finnish-rag]==0.12.0"   # Finnish lemmatization
 ```
 
 Hybrid search runs two arms that fail differently. The vector arm finds passages that
@@ -276,10 +276,18 @@ around one.
   candidates (0.7 × vector + 0.3 × BM25), so a document the embedding missed cannot come
   back. `PgVectorStore.search_keyword()` is the real one.
 - `search_semantic()` defaults to `threshold=0.7`. Pass `threshold=0.0` when fusing or
-  gating, or the list arrives pre-cut and the gate never sees the weak cases.
-- `hnsw.ef_search` defaults to 40. Raising it to 100 measured recall@20 against an exact
-  scan at 96.2% → 99.2% for +0.7 ms on one 1,500-dimension corpus. On a few thousand rows
-  it changes nothing — the index already returns exact neighbours.
+  gating, or the list arrives pre-cut and the gate never sees the weak cases. The
+  comparison is `similarity >= threshold` on cosine similarity, which runs from -1 to 1,
+  so 0.0 still drops rows that point away from the query. That is rare with text
+  embeddings; pass `threshold=-1.0` where recall is the point.
+- `hnsw.ef_search` defaults to 40, and it caps the row count as well as recall: an HNSW
+  index scan returns at most `hnsw.ef_search` rows. At the default a `search_semantic()`
+  with `top_k` above 40 returns 40 rows, and a hybrid search with `top_k` above 13 gets
+  fewer vector candidates than it asked for, because its vector arm reads `3 * top_k`.
+  Set `hnsw_ef_search=` to at least the largest number of rows a vector search asks for,
+  or, on pgvector 0.8+, let the scan go on past it with `hnsw_iterative_scan="relaxed_order"`. Raising it to 100 also
+  measured recall@20 against an exact scan at 96.2% → 99.2% for +0.7 ms on one
+  1,500-dimension corpus.
 - A filtered vector query returns fewer rows than asked unless iterative scans are on
   (pgvector 0.8+): `PgVectorStore(..., hnsw_iterative_scan="relaxed_order")` from gaik
   0.8.4, or `SET hnsw.iterative_scan = relaxed_order` per connection or as a database
