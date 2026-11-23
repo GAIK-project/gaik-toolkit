@@ -769,3 +769,33 @@ def test_a_refused_folder_is_matched_in_any_case_where_the_filesystem_ignores_it
         pytest.skip("this filesystem tells names apart by case")
     other_case = Path(str(keep).swapcase())
     assert agent_tool_guard.under_any(other_case / "x.py", [keep])
+
+
+def test_a_junction_counts_as_a_link_where_python_has_no_isjunction(monkeypatch):
+    """Python 3.11 has no os.path.isjunction; on Windows a junction shows only as
+    the mount-point reparse tag of its lstat, and any user can make one."""
+    from types import SimpleNamespace
+
+    monkeypatch.delattr(agent_tool_guard.os.path, "isjunction", raising=False)
+    monkeypatch.setattr(agent_tool_guard.os.path, "islink", lambda path: False)
+    monkeypatch.setattr(agent_tool_guard.sys, "platform", "win32")
+    junction = SimpleNamespace(st_reparse_tag=agent_tool_guard._MOUNT_POINT_TAG)
+    folder = SimpleNamespace(st_reparse_tag=0)
+    monkeypatch.setattr(
+        agent_tool_guard.os, "lstat", lambda path: junction if path == "out" else folder
+    )
+
+    assert agent_tool_guard._is_link("out")
+    assert not agent_tool_guard._is_link("poc")
+
+
+def test_without_isjunction_other_systems_have_no_junctions_to_look_for(monkeypatch):
+    def lstat(path):
+        raise AssertionError("lstat is not needed where junctions do not exist")
+
+    monkeypatch.delattr(agent_tool_guard.os.path, "isjunction", raising=False)
+    monkeypatch.setattr(agent_tool_guard.os.path, "islink", lambda path: False)
+    monkeypatch.setattr(agent_tool_guard.sys, "platform", "linux")
+    monkeypatch.setattr(agent_tool_guard.os, "lstat", lstat)
+
+    assert not agent_tool_guard._is_link("out")
