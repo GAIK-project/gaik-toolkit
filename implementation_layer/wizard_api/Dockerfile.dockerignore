@@ -1,0 +1,8 @@
+# The api image is built with implementation_layer/ as its context, so
+# wizard_api/.dockerignore is not read. Keys in an env file stay out of the
+# build context wherever they are (the Dockerfile copies solution_wizard/ whole).
+**/.env
+**/.env.*
+!**/.env.example
+**/.venv
+**/__pycache__

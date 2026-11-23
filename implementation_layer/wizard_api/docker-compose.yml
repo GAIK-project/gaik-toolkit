@@ -5,8 +5,10 @@ services:
       POSTGRES_USER: wizard
       POSTGRES_PASSWORD: wizard
       POSTGRES_DB: wizard
+    # Every published port is bound to loopback: the stack has dev accounts and
+    # no service token, and its agent spends the developer's own Foundry key.
     ports:
-      - "${POSTGRES_HOST_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - wizard_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -21,10 +23,21 @@ services:
       dockerfile: wizard_api/Dockerfile
       target: production
     ports:
-      - "8100:8100"
+      - "127.0.0.1:8100:8100"
     environment:
       WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@postgres:5432/wizard
       WIZARD_SESSION_OUTPUT_ROOT: /data/sessions
+      # The wizard agent's model on Azure Foundry, taken by name from
+      # wizard_api/.env (git ignores it) or the shell; one left unset stays unset.
+      # Only these names reach the container, not the rest of the file.
+      CLAUDE_CODE_USE_FOUNDRY:
+      ANTHROPIC_FOUNDRY_API_KEY:
+      ANTHROPIC_FOUNDRY_RESOURCE:
+      ANTHROPIC_MODEL:
+      # The image runs as root here (Rahti runs it under a non-root uid), and the
+      # agent CLI refuses to skip its permission prompts as root ("cannot be used
+      # with root/sudo privileges") unless it is told it runs in a sandbox.
+      IS_SANDBOX: "1"
     volumes:
       - wizard_session_output:/data/sessions
     depends_on:
@@ -35,10 +48,18 @@ services:
     build:
       context: ../solution_wizard_v2
       dockerfile: Dockerfile
+      # Read at build time (NEXT_PUBLIC_*); the Dockerfile defaults it to false,
+      # and the runtime value under `environment` alone left the dev login off.
+      args:
+        NEXT_PUBLIC_DEV_AUTH: "true"
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       WIZARD_API_URL: http://wizard-api:8100
+      # The chat goes to wizard-api's agent (which needs the model settings in
+      # wizard_api/.env), as on Rahti. WIZARD_AGENT_CHAT=false in that file or
+      # the shell brings back the UI's mock reply.
+      WIZARD_AGENT_CHAT: ${WIZARD_AGENT_CHAT:-true}
       NEXT_PUBLIC_DEV_AUTH: "true"
       # Local-only accounts; a deployed instance sets its own from a secret.
       WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"

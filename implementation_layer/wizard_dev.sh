@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # Full Sprint 1 dev stack: Postgres + wizard_api + Next.js UI
 set -euo pipefail
-WIZARD_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+# This script sits in implementation_layer/, beside wizard_api/ and solution_wizard_v2/.
+WIZARD_ROOT="$(cd "$(dirname "$0")" && pwd)"
 API_ROOT="$WIZARD_ROOT/wizard_api"
 UI_ROOT="$WIZARD_ROOT/solution_wizard_v2"
 
 export NEXT_PUBLIC_DEV_AUTH=true
 export WIZARD_API_URL="${WIZARD_API_URL:-http://localhost:8100}"
+export WIZARD_AGENT_CHAT="${WIZARD_AGENT_CHAT:-true}"
 export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY:-dev-local-encryption-key-32chars!!}"
 
 echo "==> Starting Postgres + wizard_api (background)"
