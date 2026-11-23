@@ -16,10 +16,11 @@ os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 # GAIK_NO_DOTENV=1 keeps it out.
 load_env_file()
 
-#: Solution Wizard v2's deploy tests run its shell scripts with a POSIX bash and
-#: PATH=/usr/bin:/bin. On Windows `bash` is WSL's launcher and a .sh file is not a
-#: program, so they run on Linux only: in test.yml and in solution-wizard-v2.yml,
-#: whose deploy-manifests job runs them with --noconftest, past this hook.
+#: Solution Wizard v2's deploy tests. Most of them run its shell scripts with a POSIX
+#: bash and PATH=/usr/bin:/bin; on Windows `bash` is WSL's launcher and a .sh file is
+#: not a program. The whole files skip on Windows, their few checks that only read
+#: files too. All of them run on Linux in test.yml, and three of the files also in
+#: solution-wizard-v2.yml's deploy-manifests job (--noconftest, past this hook).
 POSIX_SHELL_TESTS = frozenset(
     {
         "test_deploy_instances.py",
