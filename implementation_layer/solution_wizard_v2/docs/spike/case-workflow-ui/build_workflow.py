@@ -7,6 +7,7 @@ itself comes from the blueprint's target_output_spec, as in build_form.py.
 
 Usage: build_workflow.py <blueprint.json> <workflow.bpmn> <sandbox run log> <audio or -> <out.html>
 """
+
 import base64
 import json
 import re
@@ -22,8 +23,18 @@ spec = bp["target_output_spec"]
 NS = "{http://www.omg.org/spec/BPMN/20100524/MODEL}"
 proc = ET.parse(bpmn_path).getroot().find(f"{NS}process")
 data_names = {d.get("id"): d.get("name") for d in proc.iter(f"{NS}dataObjectReference")}
-KINDS = ("userTask", "serviceTask", "sendTask", "manualTask", "task", "scriptTask",
-         "startEvent", "endEvent", "exclusiveGateway", "parallelGateway")
+KINDS = (
+    "userTask",
+    "serviceTask",
+    "sendTask",
+    "manualTask",
+    "task",
+    "scriptTask",
+    "startEvent",
+    "endEvent",
+    "exclusiveGateway",
+    "parallelGateway",
+)
 nodes = {}
 for kind in KINDS:
     for el in proc.iter(f"{NS}{kind}"):
@@ -31,8 +42,14 @@ for kind in KINDS:
             "id": el.get("id"),
             "kind": kind,
             "name": re.sub(r"^\[[A-Z0-9]+\]\s*", "", el.get("name") or ""),
-            "inputs": [data_names.get(a.findtext(f"{NS}sourceRef")) for a in el.iter(f"{NS}dataInputAssociation")],
-            "outputs": [data_names.get(a.findtext(f"{NS}targetRef")) for a in el.iter(f"{NS}dataOutputAssociation")],
+            "inputs": [
+                data_names.get(a.findtext(f"{NS}sourceRef"))
+                for a in el.iter(f"{NS}dataInputAssociation")
+            ],
+            "outputs": [
+                data_names.get(a.findtext(f"{NS}targetRef"))
+                for a in el.iter(f"{NS}dataOutputAssociation")
+            ],
         }
 lanes = []
 for lane in proc.iter(f"{NS}lane"):
@@ -42,12 +59,14 @@ for lane in proc.iter(f"{NS}lane"):
             nodes[r]["lane"] = lane.get("id")
     human = any(nodes.get(r, {}).get("kind") in ("userTask", "manualTask") for r in refs)
     lanes.append({"id": lane.get("id"), "name": lane.get("name"), "human": human})
-flows = [{"from": f.get("sourceRef"), "to": f.get("targetRef"), "name": f.get("name") or ""}
-         for f in proc.iter(f"{NS}sequenceFlow")]
+flows = [
+    {"from": f.get("sourceRef"), "to": f.get("targetRef"), "name": f.get("name") or ""}
+    for f in proc.iter(f"{NS}sequenceFlow")
+]
 
 # --- the run's output ------------------------------------------------------
 log = Path(log_path).read_text(encoding="utf-8", errors="ignore")
-seg = log[log.find("=== POC OUTPUT BEGIN ==="): log.find("=== POC OUTPUT END ===")]
+seg = log[log.find("=== POC OUTPUT BEGIN ===") : log.find("=== POC OUTPUT END ===")]
 files = dict(re.findall(r"--- output/([^\n]+) ---\n(.*?)(?=\n--- output/|\Z)", seg, re.S))
 record = validation = None
 transcript = ""
@@ -72,10 +91,17 @@ payload = {
     "title": (bp.get("use_case") or {}).get("name") or spec.get("schema_name"),
     "spec": spec,
     "process": {"lanes": lanes, "nodes": list(nodes.values()), "flows": flows},
-    "sample": {"record": record, "validation": validation, "transcript": transcript,
-               "audio": audio, "audioName": Path(audio_path).name if audio_path != "-" else ""},
+    "sample": {
+        "record": record,
+        "validation": validation,
+        "transcript": transcript,
+        "audio": audio,
+        "audioName": Path(audio_path).name if audio_path != "-" else "",
+    },
 }
 template = Path(__file__).with_name("workflow_template.html").read_text(encoding="utf-8")
-Path(out).write_text(template.replace("/*__PAYLOAD__*/null", json.dumps(payload, ensure_ascii=False)),
-                     encoding="utf-8")
+Path(out).write_text(
+    template.replace("/*__PAYLOAD__*/null", json.dumps(payload, ensure_ascii=False)),
+    encoding="utf-8",
+)
 print("wrote", out, "| roles:", [l["name"] for l in lanes], "| nodes:", len(nodes))

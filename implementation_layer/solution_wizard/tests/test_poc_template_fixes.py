@@ -140,7 +140,7 @@ def test_skill_tells_the_agent_paths_are_not_json_and_to_key_manifests_once():
     text = SKILL.read_text(encoding="utf-8")
 
     assert "`Path` objects are not JSON" in text
-    assert "spec.model_dump(mode=\"json\")" in text
+    assert 'spec.model_dump(mode="json")' in text
     # The manifest lookup is the scaffolded helper's now (#251).
     assert "do not write your own lookup" in text
 
@@ -200,7 +200,9 @@ def _needs_keys(provider_config):
 
     def get_llm_config(provider, **settings):
         if provider == "openai" and not os.environ.get("OPENAI_API_KEY"):
-            raise ValueError("OPENAI_API_KEY not found in environment; provide 'api_key' explicitly")
+            raise ValueError(
+                "OPENAI_API_KEY not found in environment; provide 'api_key' explicitly"
+            )
         result = {"provider": provider, **settings}
         if provider == "azure":  # gaik fills Azure's own defaults
             result.setdefault("model", "azure-chat-default")
