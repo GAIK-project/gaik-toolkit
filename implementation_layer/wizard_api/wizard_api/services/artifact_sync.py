@@ -50,6 +50,97 @@ UI_VIEW_BLUEPRINT_FILE = f"{UI_VIEW_DIR}/blueprint.json"
 #: agent's draft, so an unchanged draft is not adopted again over a newer user
 #: version (see sync_blueprint_from_draft).
 ADOPTED_DRAFT_KEY = "agent_draft_digest"
+#: The note of the version the chat sync adds for the agent's own draft.
+AGENT_DRAFT_NOTE = "Agentin luonnos"
+
+#: Session metadata key: steps the user made AI steps (``ai``) in the Blueprint
+#: form or the diagram that have no component yet. In the draft they are
+#: automated tasks, which ``v2_step_type`` shows as ``io`` without a component;
+#: these are shown as ``ai`` until the agent gives them one or the user changes
+#: the type.
+AI_STEPS_KEY = "ai_steps_without_component"
+#: The lanes the user added in the diagram editor (``add_lane``), by
+#: participant id, in the order they were added. The generator draws them
+#: also while no step is in them, after every other lane (``generate_bpmn``'s
+#: ``extra_lane_ids``); a participant the agent declared is drawn only when a
+#: node reaches it. The list grows only through ``add_lane``; after every write
+#: it keeps only the ids still in the blueprint's participants
+#: (``with_user_lanes``), so an id the agent drops and later declares again,
+#: or a participant an undo brings back, is no user lane.
+USER_LANES_KEY = "user_lanes"
+
+
+def user_lane_list(metadata: dict[str, Any] | None) -> list[str]:
+    """The lanes ``USER_LANES_KEY`` names, in order."""
+    stored = (metadata or {}).get(USER_LANES_KEY)
+    if not isinstance(stored, list):
+        return []
+    return list(dict.fromkeys(v for v in stored if isinstance(v, str) and v))
+
+
+def user_lanes(metadata: dict[str, Any] | None) -> frozenset[str]:
+    """The lanes ``USER_LANES_KEY`` names."""
+    return frozenset(user_lane_list(metadata))
+
+
+def participant_ids(blueprint: dict[str, Any] | None) -> set[str]:
+    """The ids of ``business_process.participants``."""
+    process = (blueprint or {}).get("business_process") or {}
+    if not isinstance(process, dict):
+        return set()
+    participants = process.get("participants") or []
+    return {
+        str(p.get("id"))
+        for p in participants
+        if isinstance(p, dict) and isinstance(p.get("id"), str) and p.get("id")
+    }
+
+
+def with_user_lanes(
+    metadata: dict[str, Any], lanes: list[str], blueprint: dict[str, Any] | None
+) -> dict[str, Any]:
+    """``metadata`` with ``lanes`` as the user's lanes, keeping only the ids
+    that are still participants of ``blueprint`` (in order); no key when none is."""
+    present = participant_ids(blueprint)
+    kept = [lane for lane in dict.fromkeys(lanes) if lane in present]
+    out = {k: v for k, v in metadata.items() if k != USER_LANES_KEY}
+    if kept:
+        out[USER_LANES_KEY] = kept
+    return out
+
+
+def ai_steps(metadata: dict[str, Any] | None) -> frozenset[str]:
+    """The steps ``AI_STEPS_KEY`` names."""
+    stored = (metadata or {}).get(AI_STEPS_KEY)
+    if not isinstance(stored, list):
+        return frozenset()
+    return frozenset(s for s in stored if isinstance(s, str))
+
+
+def still_without_component(
+    draft: dict[str, Any] | None, steps: frozenset[str] | set[str]
+) -> frozenset[str]:
+    """Of ``steps``, the draft's automated tasks that have no component: the
+    ones ``AI_STEPS_KEY`` still applies to. A step given a component, made
+    another type or removed is no longer one."""
+    workflow = (draft or {}).get("workflow")
+    raw = workflow.get("steps") if isinstance(workflow, dict) else None
+    return frozenset(
+        str(s.get("id"))
+        for s in raw or []
+        if isinstance(s, dict)
+        and str(s.get("id")) in steps
+        and s.get("type") == "automated_task"
+        and not s.get("component")
+    )
+
+
+def _with_ai_steps(metadata: dict[str, Any], ai: frozenset[str]) -> dict[str, Any]:
+    out = {k: v for k, v in metadata.items() if k != AI_STEPS_KEY}
+    if ai:
+        out[AI_STEPS_KEY] = sorted(ai)
+    return out
+
 
 #: The agent's package and the files it writes there as the phases go by.
 POC_DIR = "poc"
@@ -314,7 +405,9 @@ def _str_list(value: object) -> list[str]:
     return [item.strip() for item in value if isinstance(item, str) and item.strip()]
 
 
-def _steps_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
+def _steps_from_draft(
+    draft: dict[str, Any], ai: frozenset[str] = frozenset()
+) -> list[dict[str, Any]]:
     workflow = draft.get("workflow")
     raw_steps = workflow.get("steps") if isinstance(workflow, dict) else None
     if not isinstance(raw_steps, list):
@@ -329,10 +422,13 @@ def _steps_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
         if not step_id and not name:
             continue
         component = _str(raw.get("component"))
+        v1_type = _str(raw.get("type"))
         step: dict[str, Any] = {
             "id": step_id or name,
             "name": name or step_id,
-            "type": v2_step_type(_str(raw.get("type")), component),
+            "type": "ai"
+            if v1_type == "automated_task" and not component and step_id in ai
+            else v2_step_type(v1_type, component),
         }
         if component:
             step["component"] = component
@@ -348,14 +444,19 @@ def _steps_from_draft(draft: dict[str, Any]) -> list[dict[str, Any]]:
     return steps
 
 
-def blueprint_from_draft(draft: dict[str, Any]) -> BlueprintContent | None:
+def blueprint_from_draft(
+    draft: dict[str, Any], ai: frozenset[str] = frozenset()
+) -> BlueprintContent | None:
     """Map the agent's V1 draft blueprint onto the V2 blueprint the UI renders.
+
+    ``ai`` are the steps the user made AI steps without a component yet
+    (``AI_STEPS_KEY``), shown as ``ai``.
 
     Returns ``None`` when the draft carries no workflow yet — an early draft
     with only business framing must not overwrite the blueprint with an empty
     flow (the business framing is surfaced separately at Gate 1).
     """
-    steps = _steps_from_draft(draft)
+    steps = _steps_from_draft(draft, ai)
     if not steps:
         return None
 
@@ -524,11 +625,13 @@ def user_changed_blueprint(db: Session, session: WizardSession) -> bool:
     return active is not None and content_digest(active.content) != adopted
 
 
-def _draft_content(draft: dict[str, Any] | None) -> dict[str, Any] | None:
+def _draft_content(
+    draft: dict[str, Any] | None, ai: frozenset[str] = frozenset()
+) -> dict[str, Any] | None:
     """The blueprint content a draft maps to, or None when it maps to nothing."""
     if draft is None:
         return None
-    mapped = blueprint_from_draft(draft)
+    mapped = blueprint_from_draft(draft, ai)
     return mapped.model_dump() if mapped is not None else None
 
 
@@ -537,7 +640,7 @@ def sync_blueprint_from_draft(
     session: WizardSession,
     draft: dict[str, Any] | None = None,
     *,
-    note: str = "Agentin luonnos",
+    note: str = AGENT_DRAFT_NOTE,
 ) -> bool:
     """Record the agent's current draft as the session's blueprint.
 
@@ -552,12 +655,24 @@ def sync_blueprint_from_draft(
     from_file = draft is None
     if from_file:
         draft = read_draft_blueprint(session.output_dir)
-    content = _draft_content(draft)
+    # The AI steps the agent has given a component, made another type or
+    # removed since are no longer shown as AI steps without one.
+    marked = ai_steps(session.session_metadata)
+    ai = still_without_component(draft, marked)
+    content = _draft_content(draft, ai)
     if content is None:
         return False
     digest = content_digest(content)
-    # The common turn, an unchanged draft, takes no lock.
-    if (session.session_metadata or {}).get(ADOPTED_DRAFT_KEY) == digest:
+    # The common turn, an unchanged draft, takes no lock. A draft that changed
+    # only the participants (which the version does not show) still drops the
+    # user's lanes it no longer has.
+    lanes = user_lane_list(session.session_metadata)
+    lanes_kept = [lane for lane in lanes if lane in participant_ids(draft)]
+    if (
+        (session.session_metadata or {}).get(ADOPTED_DRAFT_KEY) == digest
+        and ai == marked
+        and lanes_kept == lanes
+    ):
         return False
 
     # Metadata is one JSONB object: read it fresh and hold the row until the
@@ -568,11 +683,14 @@ def sync_blueprint_from_draft(
     if from_file:
         # The draft too: one read before the lock could be older than a draft
         # another sync adopted meanwhile, and would be written over it.
-        content = _draft_content(read_draft_blueprint(session.output_dir))
-        if content is None:
-            db.commit()
-            return False
-        digest = content_digest(content)
+        draft = read_draft_blueprint(session.output_dir)
+    # And the AI steps as stored now.
+    ai = still_without_component(draft, ai_steps(session.session_metadata))
+    content = _draft_content(draft, ai)
+    if content is None:
+        db.commit()
+        return False
+    digest = content_digest(content)
     adopted = (session.session_metadata or {}).get(ADOPTED_DRAFT_KEY)
     # A session whose draft was adopted before the digest was kept: a draft the
     # sync has already written as a version is not new, whatever came after it.
@@ -584,9 +702,16 @@ def sync_blueprint_from_draft(
     added = (
         adopted != digest and not adopted_before and (active is None or active.content != content)
     )
+    metadata = dict(session.session_metadata or {})
     if added:
-        blueprint_service.add_version(db, session, note=note, content=content)
-    session.session_metadata = {**session.session_metadata, ADOPTED_DRAFT_KEY: digest}
+        blueprint_service.add_version(db, session, note=note, content=content, draft=draft)
+        # A new draft from the agent: an undo goes back from it, not from
+        # where an earlier undo had walked to.
+        metadata = blueprint_service.without_undo_cursor(metadata)
+    metadata = _with_ai_steps(metadata, ai)
+    # A lane the agent's draft no longer has is no user lane any more.
+    metadata = with_user_lanes(metadata, user_lane_list(metadata), draft)
+    session.session_metadata = {**metadata, ADOPTED_DRAFT_KEY: digest}
     db.commit()
     db.refresh(session)
     return added

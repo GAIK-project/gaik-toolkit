@@ -95,6 +95,8 @@ class Artifact(BaseModel):
     produced_by: Optional[str] = None
     schema_ref: Optional[str] = None
     overwrite: bool = False
+    # The data object's name in the BPMN; empty means one derived from the id/type.
+    label: str = Field("", max_length=200)
 
     @model_validator(mode="after")
     def _check_source_rules(self) -> "Artifact":
@@ -128,6 +130,12 @@ class WorkflowStep(BaseModel):
     parameters: Dict[str, Any] = {}
     depends_on: List[str] = []
     loop: Optional[LoopConfig] = None
+    # Shown as the task's <bpmn:documentation>.
+    description: str = Field("", max_length=2000)
+    # A business_process.participants id whose lane holds the step; empty means
+    # the lane follows the step type. With no participants, a derived lane id
+    # (system, reviewers, users) is accepted too.
+    performed_by: str = ""
 
 
 class Workflow(BaseModel):

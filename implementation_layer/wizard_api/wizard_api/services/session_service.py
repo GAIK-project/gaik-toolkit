@@ -1,3 +1,6 @@
+import hashlib
+import logging
+import os
 import re
 import uuid
 from datetime import UTC, datetime
@@ -25,6 +28,8 @@ from wizard_api.session_state import (
 )
 from wizard_api.storage import ensure_output_dir
 
+logger = logging.getLogger(__name__)
+
 # Metadata keys the server writes as a record of what happened: the chat
 # transcript, the refinement history, the run the deployable package is gated
 # on (#143), the agent conversation the next chat turn resumes, the agent draft
@@ -45,12 +50,16 @@ SERVER_OWNED_METADATA_KEYS = frozenset(
         "agent_sdk_session_id",
         "protected",
         artifact_sync.ADOPTED_DRAFT_KEY,
+        artifact_sync.AI_STEPS_KEY,
+        artifact_sync.USER_LANES_KEY,
         "gate_reopened",
         "gate_replay",
         "voided_runs",
         "approved_content",
         "user_edits",
         "agent_seen_edit",
+        "pending_user_edits",
+        blueprint_service.UNDO_CURSOR_KEY,
         # The session's spend and its warning (services/usage_caps.py): a caller
         # that could set them could lift its own cap.
         "usage_cost_usd",
@@ -70,7 +79,7 @@ REPLAY_KEY = "gate_replay"
 #: the solution as it was, so they are never recorded as its successful run.
 VOIDED_RUNS_KEY = "voided_runs"
 #: Session metadata key: the digest of the package the latest run was started on
-#: (the sessions router's ``_approved_package_digest``, which covers ``prompts/``).
+#: (``approved_package_digest``, which covers ``prompts/``).
 RUN_PACKAGE_KEY = "latest_run_package"
 #: Session metadata key: the names of the files in ``sample_input/`` when the
 #: latest run was started, the material it ran on. The PoC tab tells a result
@@ -98,6 +107,12 @@ USER_EDITS_KEY = "user_edits"
 AGENT_SEEN_EDIT_KEY = "agent_seen_edit"
 #: How many edits the record keeps.
 MAX_USER_EDITS = 50
+#: Session metadata key: what the user changed in the blueprint through the
+#: workspace's operations (one summary per change, the latest last), for the
+#: agent to hear of with its next turn.
+PENDING_USER_EDITS_KEY = "pending_user_edits"
+#: How many of those summaries are kept.
+MAX_PENDING_USER_EDITS = 50
 
 
 class ServerOwnedMetadataError(ValueError):
@@ -128,13 +143,24 @@ def _session_title(metadata: dict) -> str:
     return "Nimetön sessio"
 
 
+#: Metadata the server keeps for itself and leaves out of session responses:
+#: the diagram layout can grow to megabytes, and the web app reads it only
+#: through ``GET /bpmn``, which lays it over the drawing.
+_SERVER_ONLY_METADATA = frozenset({"bpmn_layout"})
+
+
+def public_metadata(metadata: dict | None) -> dict:
+    """``metadata`` without the keys only the server reads (``_SERVER_ONLY_METADATA``)."""
+    return {k: v for k, v in (metadata or {}).items() if k not in _SERVER_ONLY_METADATA}
+
+
 def _to_response(session: WizardSession) -> dict:
     return {
         "id": session.id,
         "user_id": session.user_id,
         "step": session.step,
         "gate_statuses": session.gate_statuses,
-        "metadata": session.session_metadata,
+        "metadata": public_metadata(session.session_metadata),
         "output_dir": session.output_dir,
         "active_version": session.active_version,
         "created_at": session.created_at,
@@ -281,7 +307,7 @@ def session_detail(
         step=session.step,
         status=_session_status(session.step, metadata),
         gate_statuses=session.gate_statuses,
-        metadata=metadata,
+        metadata=public_metadata(metadata),
         output_dir=session.output_dir,
         active_version=session.active_version,
         versions=[
@@ -421,6 +447,37 @@ def record_user_edit(db: Session, session: WizardSession, path: str) -> WizardSe
     metadata[USER_EDITS_KEY] = edits[-MAX_USER_EDITS:]
     session.session_metadata = metadata
     session.updated_at = datetime.now(UTC)
+    db.commit()
+    db.refresh(session)
+    return session
+
+
+def pending_user_edits(metadata: dict | None) -> list[str]:
+    """The summaries of the user's blueprint changes the agent has not been told of."""
+    return [e for e in (metadata or {}).get(PENDING_USER_EDITS_KEY) or [] if isinstance(e, str)]
+
+
+def clear_told_user_edits(db: Session, session: WizardSession, told: list[str]) -> WizardSession:
+    """Drop the summaries the agent was told of from ``pending_user_edits``.
+
+    Read under the row lock (``lock_fresh``). Only the told ones go: a summary
+    recorded since stays for the next turn. The list keeps its last
+    ``MAX_PENDING_USER_EDITS`` only, so the head of what was told may have left
+    it meanwhile; the longest tail of ``told`` that the list starts with is
+    what is dropped.
+    """
+    if not told:
+        return session
+    lock_fresh(db, session)
+    current = pending_user_edits(session.session_metadata)
+    kept = current
+    for size in range(min(len(told), len(current)), 0, -1):
+        if current[:size] == told[-size:]:
+            kept = current[size:]
+            break
+    if kept != current:
+        session.session_metadata = {**session.session_metadata, PENDING_USER_EDITS_KEY: kept}
+        session.updated_at = datetime.now(UTC)
     db.commit()
     db.refresh(session)
     return session
@@ -593,3 +650,93 @@ def append_to_last_reply(db: Session, session: WizardSession, text: str) -> Wiza
 
 def session_response(session: WizardSession) -> dict:
     return _to_response(session)
+
+
+def poc_dir(output_dir: str) -> str | None:
+    """Resolve the session's generated PoC folder (``<output_dir>/poc``), guarding
+    against path escapes. Returns None if output_dir is unset or the resolved poc
+    path would fall outside it."""
+    if not output_dir:
+        return None
+    base = os.path.realpath(output_dir)
+    poc = os.path.realpath(os.path.join(base, "poc"))
+    if poc != base and not poc.startswith(base + os.sep):
+        return None
+    return poc
+
+
+#: What the package digest covers. 3: every file of the package but its
+#: README files (``poc_service._in_version``); 2: every Python file and every
+#: file in ``schemas/``, and the prompts; 1: a fixed list and the prompts. A
+#: package approved under another scheme is not comparable with today's digest.
+PACKAGE_DIGEST_SCHEME = 3
+
+
+def approved_content(session) -> dict[str, str | int] | None:
+    """Digests of the solution and of the package as they are now, or None without a draft."""
+
+    solution = artifact_sync.solution_digest(artifact_sync.read_draft_blueprint(session.output_dir))
+    if solution is None:
+        return None
+    poc = poc_dir(session.output_dir)
+    package = approved_package_digest(poc) if poc and os.path.isdir(poc) else ""
+    return {"solution": solution, "package": package, "package_scheme": PACKAGE_DIGEST_SCHEME}
+
+
+def approved_package_digest(poc: str) -> str:
+    """The package as approved and tested: every file of it but its README files.
+
+    ``package_version`` covers the code, the settings, the schema, the
+    extraction instructions under ``prompts/`` and the data files the run
+    reads, so a change to any of them after a test run or Gate 3 is a change
+    to what was tested and accepted.
+    """
+    from wizard_api.services import poc_service
+
+    return hashlib.sha256(poc_service.package_version(poc).encode()).hexdigest()[:16]
+
+
+def reopen_if_approved_content_changed(db: Session, session) -> bool:
+    """After a chat turn or an edit: reopen the gate whose approved content it changed.
+
+    Once Gate 3 is approved the solution and its package are what the user
+    accepted. Asked in the chat for another field after that, the agent
+    changed its files and said "ok", and every gate stayed approved: the
+    approvals then covered a solution nobody had reviewed, and the deployable
+    package was offered on a test run of the old one. The agent has a tool to
+    reopen a gate and is told to use it, but an approval must not depend on
+    that, so the server compares what is on disk with what was approved.
+
+    A changed solution (fields, steps, components, participants) reopens Gate
+    2; a changed package alone reopens Gate 3. Before Gate 3 is approved
+    nothing is compared: refining the PoC is what that gate's loop is for
+    (#96). Best-effort, like the rest of the sync. True when a gate was reopened.
+    """
+    if session.gate_statuses.get("gate_3") != "approved":
+        return False
+    now = approved_content(session)
+    if now is None:
+        return False
+    approved = session.session_metadata.get(APPROVED_CONTENT_KEY)
+    if not isinstance(approved, dict):
+        # A session approved before this was kept: start from what is there now.
+        update_session(db, session, SessionUpdate(metadata={APPROVED_CONTENT_KEY: now}))
+        return False
+    if approved.get("solution") != now["solution"]:
+        gate_key = "gate_2"
+    elif approved.get("package_scheme") != now["package_scheme"]:
+        # Approved under a digest that covered fewer files: it differs from
+        # today's for a package nobody changed. Start from the package as it is,
+        # as for a session approved before this was kept.
+        update_session(db, session, SessionUpdate(metadata={APPROVED_CONTENT_KEY: now}))
+        return False
+    elif approved.get("package") != now["package"]:
+        gate_key = "gate_3"
+    else:
+        return False
+    try:
+        reopen_gate(db, session, gate_key, by="change")
+    except GateNotReopenableError:
+        return False
+    logger.info("session %s: %s reopened, its approved content changed", session.id, gate_key)
+    return True

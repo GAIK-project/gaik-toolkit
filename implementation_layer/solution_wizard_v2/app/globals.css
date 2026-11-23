@@ -562,9 +562,42 @@ body {
   padding: 0;
   border: none;
 }
+/* A step's tool that has nothing to do there (the first step cannot move earlier). */
+.bpmn-editable .djs-context-pad .entry.gaik-pad-disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.bpmn-editable .djs-context-pad .entry.gaik-pad-disabled:hover {
+  background: none;
+}
 /* A phone has no room for the tools; the diagram is for reading there. */
 @media (max-width: 767px) {
   .bpmn-editable .djs-palette {
+    display: none;
+  }
+}
+
+/* The minimap is part of the editor's canvas, always open: the bottom-right corner,
+   above bpmn.io's mark (which bpmn-js's licence keeps visible), clear of the zoom
+   controls at the top. It has no switch. */
+.bpmn-editable .djs-minimap {
+  top: auto;
+  right: 12px;
+  bottom: 48px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--color-surface) 95%, transparent);
+  box-shadow: var(--shadow-sm);
+}
+.bpmn-editable .djs-minimap .map {
+  width: 200px;
+  height: 120px;
+}
+.bpmn-editable .djs-minimap .toggle {
+  display: none;
+}
+@media (max-width: 767px) {
+  .bpmn-editable .djs-minimap {
     display: none;
   }
 }

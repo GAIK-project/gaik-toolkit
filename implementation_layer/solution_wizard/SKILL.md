@@ -62,6 +62,8 @@ in that directory.
   made to the diagram files are silently overwritten the next time the diagrams are
   regenerated. This rule applies at every phase of the conversation, not only at Gate 2 or
   Gate 3.
+- **The user's workspace edits stand.** When the user has changed the solution in the
+  workspace, read `use_case.blueprint.json` again before you edit it, and keep those changes.
 - **Keep blueprint identifiers in one language, consistently — English, regardless of
   the conversation language.** `workflow.steps[].id`, `workflow.steps[].name`,
   `workflow.steps[].component`, artifact names, and any other field/key acting as an
@@ -723,6 +725,8 @@ Then fill the template in:
    - An `automated_task` (no component required) for the delivery/notification — e.g. *"Send report to supervisor"*. If `integration_targets` is set, the BPMN enrichment will also automatically add a Send Task for the system submission; this notification step covers the human notification.
    - A separate `human_review` step for the reviewer's actual decision — e.g. *"Supervisor reviews and approves"*.
    The BPMN generator places `automated_task` steps in the GAIK AI System lane and `human_review` steps in the reviewer's lane — so only the correct lane gets each action.
+
+   Each step can also carry a `description` (up to 2000 characters, shown as the task's documentation in the BPMN) and a `performed_by`: the id of a `business_process.participants` entry, whose lane then holds the step. Leave `performed_by` empty for the default lane of the step's type; the validator refuses an id that names no participant (rule 16; with no participants it accepts the derived lane ids `system`, `reviewers` and `users`). Each artifact can carry a `label` (up to 200 characters), the display name of its data object in the BPMN; empty means a name derived from the artifact.
 3. **Provide required parameters**: if a selected component lists `required_parameters` in the registry, include them in the step's `parameters`. For schema and prompt paths always use the fixed convention: `"schema_ref": "schemas/output_schema.py"` and `"requirements_ref": "schemas/output_schema_requirements.json"` -- do NOT invent use-case-specific schema filenames (e.g. `maintenance_ticket_schema.py`). The scaffold always generates `output_schema.py` regardless of the schema class name inside it.
 4. **Set `depends_on`** so the step order is explicit and acyclic.
 5. **Record all assumptions** you have made so far, in the `assumptions` array.

@@ -19,28 +19,18 @@ import {
   type BpmnViewMode,
 } from "@/lib/bpmn-view-fit";
 import { BPMN_VIEWER_OPTIONS } from "@/lib/bpmn-viewer-options";
-import {
-  bpmnChangeKind,
-  bpmnSaveProblems,
-  bpmnSemantics,
-  isRenamableBpmnElement,
-  stripTaskCodePrefixes,
-  type BpmnSemantics,
-  type ModdleElement,
-} from "@/lib/bpmn-edit-state";
-import { gaikEditorModule, type BpmnEditorLabels } from "@/lib/bpmn-editor-module";
+import { isRenamableBpmnElement, stripTaskCodePrefixes } from "@/lib/bpmn-edit-state";
+import { gaikEditorModule, type BpmnEditorLabels, type BpmnEditorOps } from "@/lib/bpmn-editor-module";
+import minimapModule from "diagram-js-minimap";
 import "bpmn-js/dist/assets/diagram-js.css";
 import "bpmn-js/dist/assets/bpmn-js.css";
 import "bpmn-js/dist/assets/bpmn-font/css/bpmn-embedded.css";
+import "diagram-js-minimap/assets/diagram-js-minimap.css";
 
 type EventBus = {
   on: (event: string, cb: (e: unknown) => void) => void;
   off: (event: string, cb: (e: unknown) => void) => void;
   fire: (event: string) => void;
-};
-
-type Modeling = {
-  updateProperties: (element: unknown, props: Record<string, unknown>) => void;
 };
 
 type DiagramElement = {
@@ -51,7 +41,9 @@ type DiagramElement = {
   width?: number;
   height?: number;
   labelTarget?: DiagramElement;
-  businessObject?: { id?: string; name?: string; $type?: string };
+  businessObject?: { id?: string; name?: string; $type?: string; documentation?: { text?: string }[] };
+  incoming?: { id: string }[];
+  outgoing?: { id: string }[];
 };
 
 type Selection = {
@@ -69,7 +61,10 @@ type Canvas = {
   };
 };
 
-type ElementRegistry = { get: (id: string) => DiagramElement | undefined };
+type ElementRegistry = {
+  get: (id: string) => DiagramElement | undefined;
+  filter: (fn: (el: DiagramElement) => boolean) => DiagramElement[];
+};
 
 type DirectEditing = { isActive: () => boolean };
 type Dragging = { context: () => unknown };
@@ -83,37 +78,40 @@ export type BpmnSelectionInfo = {
   /** bpmn type without the "bpmn:" prefix ("ServiceTask"). */
   type: string;
   name: string;
+  /** The element's `<bpmn:documentation>`: a step's description, as the generator draws it. */
+  documentation: string;
 } | null;
 
-/** Unsaved edits on the canvas, measured against the diagram last imported. */
-export type BpmnEditState = {
-  kind: "none" | "rename" | "structure";
-  problems: ReturnType<typeof bpmnSaveProblems>;
-};
+/** The text of an element's `<bpmn:documentation>`, "" without one. */
+function documentationOf(el: DiagramElement | undefined): string {
+  const docs = el?.businessObject?.documentation;
+  return Array.isArray(docs) ? docs.map((d) => d?.text ?? "").join("\n") : "";
+}
 
 export type BpmnModelerHandle = {
-  saveXml: () => Promise<string>;
   zoomIn: () => void;
   zoomOut: () => void;
   fit: () => void;
-  updateSelectedName: (name: string) => void;
   /**
    * Select an element and bring it to the middle of the view; false if it is
    * not on the canvas. `cover` is what a panel over the canvas hides, in screen px.
    */
   focusElement: (id: string, cover?: Partial<BpmnViewInset>) => boolean;
-  /** Counts the edits since the last import: a save compares it to see whether more came in. */
-  revision: () => number;
-  /** What the canvas holds now, as the blueprint sync reads it. */
-  semantics: () => BpmnSemantics;
-  /** What the server has now, for diagrams kept on the canvas after a save or restored from a draft. */
-  setBase: (base: BpmnSemantics) => void;
   /**
    * The user is in the middle of an edit that is no command yet: typing a
-   * label in place, or dragging. An import now would throw it away, and the
-   * revision does not count it.
+   * label in place, or dragging. An import now would throw it away.
    */
   isEditing: () => boolean;
+  /** The mapping or the steps behind `ops` changed: the tools and the derived marks are drawn again. */
+  refreshOps: () => void;
+  /** Open or close the large view (`onToggleFullscreen`): the diagram over the whole screen. */
+  toggleFullscreen: () => void;
+  /** The `<bpmn:documentation>` of the element `id` on the canvas (a step's description); null when it is not there. */
+  documentationOf: (id: string) => string | null;
+  /** The lanes on the canvas, top to bottom: their element ids and names. */
+  lanes: () => { id: string; name: string }[];
+  /** The ids of the flows that start or end at the element `id`. */
+  edgesOf: (id: string) => string[];
 };
 
 function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
@@ -125,7 +123,7 @@ function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
     const type = bo?.$type || el.type || "";
     const id = bo?.id || el.id;
     if (!isRenamableBpmnElement(type, id)) return null;
-    return { id, type: type.replace(/^bpmn:/, ""), name: bo?.name || "" };
+    return { id, type: type.replace(/^bpmn:/, ""), name: bo?.name || "", documentation: documentationOf(el) };
   } catch {
     return null;
   }
@@ -134,7 +132,8 @@ function selectionFromModeler(modeler: BpmnCanvas): BpmnSelectionInfo {
 /**
  * The Workflow tab's BPMN diagram. One bpmn-js modeler lives as long as the
  * component; a new `xml` is imported into it, keeping the user's view and
- * selection, so a save does not throw the diagram back to its start view.
+ * selection, so an edit does not throw the diagram back to its start view.
+ * Edits go out as operations through `ops` (lib/bpmn-editor-module).
  *
  * `readOnly` draws the same diagram in bpmn-js's viewer instead: it has no
  * modeling at all (no palette, context pad, dragging or typing in place), so
@@ -148,18 +147,25 @@ export const BpmnModeler = forwardRef<
     ariaLabel: string;
     loadErrorLabel: string;
     editorLabels: BpmnEditorLabels;
+    /** Where the editor's edits go; read when one is made. */
+    ops?: BpmnEditorOps | null;
     className?: string;
     onSelectionChange?: (info: BpmnSelectionInfo) => void;
-    onEditStateChange?: (state: BpmnEditState) => void;
     onZoomChange?: (zoom: number) => void;
+    /** A name is being typed in place on the canvas (true), or that has ended (false). */
+    onDirectEditingChange?: (active: boolean) => void;
     /** After each import, when the diagram is on the canvas. */
     onImported?: () => void;
     /** After an edit in place or a drag has ended, with or without a change (see `isEditing`). */
     onEditingEnd?: () => void;
-    /** A new value imports `xml` again even when the text is the same (after a save). */
+    /** A new value imports `xml` again even when the text is the same (after an edit was refused). */
     importKey?: number;
     /** The diagram can be looked at, moved and its elements picked, but not changed. */
     readOnly?: boolean;
+    /** The minimap's name for a screen reader, in the UI language. */
+    minimapLabel?: string;
+    /** Whoever owns the large view opens or closes it (`toggleFullscreen`). */
+    onToggleFullscreen?: () => void;
   }
 >(function BpmnModeler(
   {
@@ -167,23 +173,42 @@ export const BpmnModeler = forwardRef<
     ariaLabel,
     loadErrorLabel,
     editorLabels,
+    ops = null,
     className = "",
     onSelectionChange,
-    onEditStateChange,
     onZoomChange,
+    onDirectEditingChange,
     onImported,
     onEditingEnd,
     importKey = 0,
     readOnly = false,
+    minimapLabel,
+    onToggleFullscreen,
   },
   ref,
 ) {
   const containerRef = useRef<HTMLDivElement>(null);
   const modelerRef = useRef<BpmnCanvas | null>(null);
-  const callbacks = useRef({ onSelectionChange, onEditStateChange, onZoomChange, onImported, onEditingEnd });
-  callbacks.current = { onSelectionChange, onEditStateChange, onZoomChange, onImported, onEditingEnd };
+  const callbacks = useRef({
+    onSelectionChange,
+    onZoomChange,
+    onDirectEditingChange,
+    onImported,
+    onEditingEnd,
+    onToggleFullscreen,
+  });
+  callbacks.current = {
+    onSelectionChange,
+    onZoomChange,
+    onDirectEditingChange,
+    onImported,
+    onEditingEnd,
+    onToggleFullscreen,
+  };
   const labelsRef = useRef(editorLabels);
   labelsRef.current = editorLabels;
+  const opsRef = useRef(ops);
+  opsRef.current = ops;
   const [modeler, setModeler] = useState<BpmnCanvas | null>(null);
   const [error, setError] = useState(false);
   const [ready, setReady] = useState(false);
@@ -192,8 +217,6 @@ export const BpmnModeler = forwardRef<
   // True while this component moves the view itself; any other change of the
   // view (wheel, drag, keys) is the user's, and a resize then keeps it.
   const programmatic = useRef(false);
-  const base = useRef<BpmnSemantics | null>(null);
-  const revisionRef = useRef(0);
   const importedOnce = useRef(false);
   // An import clears the selection before it is put back: the panel must not
   // close the name field under the user's cursor for that moment.
@@ -222,29 +245,9 @@ export const BpmnModeler = forwardRef<
     if (m) callbacks.current.onZoomChange?.((m.get("canvas") as Canvas).zoom());
   }
 
-  function currentSemantics(m: BpmnCanvas): BpmnSemantics {
-    return bpmnSemantics(m.getDefinitions() as unknown as ModdleElement);
-  }
-
-  function reportEditState(m: BpmnCanvas) {
-    if (!base.current) return;
-    const now = currentSemantics(m);
-    callbacks.current.onEditStateChange?.({
-      kind: bpmnChangeKind(base.current, now),
-      problems: bpmnSaveProblems(now),
-    });
-  }
-
   useImperativeHandle(
     ref,
     () => ({
-      saveXml: async () => {
-        const m = modelerRef.current;
-        if (!m) throw new Error("modeler not ready");
-        const { xml: saved } = await m.saveXML({ format: true });
-        if (!saved) throw new Error("empty BPMN XML");
-        return saved;
-      },
       zoomIn: () => {
         const m = modelerRef.current;
         const container = containerRef.current;
@@ -265,18 +268,6 @@ export const BpmnModeler = forwardRef<
         viewMode.current = "fit";
         moveView(() => fitBpmnView(m, viewInset()));
       },
-      updateSelectedName: (name: string) => {
-        const m = modelerRef.current;
-        if (!m) return;
-        try {
-          const selected = (m.get("selection") as Selection).get?.() ?? [];
-          const el = selected[0]?.labelTarget ?? selected[0];
-          if (!el) return;
-          (m.get("modeling") as Modeling).updateProperties(el, { name });
-        } catch {
-          /* ignore */
-        }
-      },
       focusElement: (id: string, cover?: Partial<BpmnViewInset>) => {
         const m = modelerRef.current;
         if (!m) return false;
@@ -286,16 +277,6 @@ export const BpmnModeler = forwardRef<
         viewMode.current = "manual";
         moveView(() => centerBpmnElement(m, el, { ...viewInset(), ...cover }));
         return true;
-      },
-      revision: () => revisionRef.current,
-      semantics: () => {
-        const m = modelerRef.current;
-        return m ? currentSemantics(m) : bpmnSemantics(null);
-      },
-      setBase: (next: BpmnSemantics) => {
-        base.current = next;
-        const m = modelerRef.current;
-        if (m) reportEditState(m);
       },
       isEditing: () => {
         const m = modelerRef.current;
@@ -309,14 +290,62 @@ export const BpmnModeler = forwardRef<
           return false;
         }
       },
+      toggleFullscreen: () => callbacks.current.onToggleFullscreen?.(),
+      documentationOf: (id: string) => {
+        const m = modelerRef.current;
+        if (!m) return null;
+        try {
+          const el = (m.get("elementRegistry") as ElementRegistry).get(id);
+          return el ? documentationOf(el) : null;
+        } catch {
+          return null;
+        }
+      },
+      lanes: () => {
+        const m = modelerRef.current;
+        if (!m) return [];
+        try {
+          return (m.get("elementRegistry") as ElementRegistry)
+            .filter((el) => el.type === "bpmn:Lane")
+            .sort((a, b) => (a.y ?? 0) - (b.y ?? 0))
+            .map((el) => ({ id: el.id, name: el.businessObject?.name ?? "" }));
+        } catch {
+          return [];
+        }
+      },
+      edgesOf: (id: string) => {
+        const m = modelerRef.current;
+        if (!m) return [];
+        try {
+          const el = (m.get("elementRegistry") as ElementRegistry).get(id);
+          return el ? [...(el.incoming ?? []), ...(el.outgoing ?? [])].map((c) => c.id) : [];
+        } catch {
+          return [];
+        }
+      },
+      refreshOps: () => {
+        const m = modelerRef.current;
+        if (!m || readOnlyRef.current) return;
+        try {
+          (m.get("eventBus") as EventBus).fire("gaik.context.changed");
+          // An open context pad shows the tools of the mapping it was opened with.
+          (m.get("contextPad") as { close: () => void }).close();
+        } catch {
+          /* tearing down */
+        }
+      },
     }),
     // The handle reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
+  const readOnlyRef = useRef(readOnly);
+  useEffect(() => {
+    readOnlyRef.current = readOnly;
+  }, [readOnly]);
+
   // One canvas at a time: the modeler with the Workflow tab's tools, or the
-  // viewer while the diagram is read-only.
+  // viewer while the diagram is read-only. Both have the minimap.
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
@@ -329,17 +358,28 @@ export const BpmnModeler = forwardRef<
       if (readOnly) {
         const { default: ViewerCtor } = await import("bpmn-js/lib/NavigatedViewer");
         if (cancelled) return;
-        m = new ViewerCtor({ container, ...BPMN_VIEWER_OPTIONS } as ConstructorParameters<typeof ViewerCtor>[0]);
+        m = new ViewerCtor({
+          container,
+          additionalModules: [minimapModule],
+          minimap: { open: true },
+          ...BPMN_VIEWER_OPTIONS,
+        } as ConstructorParameters<typeof ViewerCtor>[0]);
       } else {
         const { default: BpmnModelerCtor } = await import("bpmn-js/lib/Modeler");
         if (cancelled) return;
         m = new BpmnModelerCtor({
           container,
-          additionalModules: [gaikEditorModule],
-          // Read when a tool is drawn, so the tools follow the UI language.
+          additionalModules: [gaikEditorModule, minimapModule],
+          // Always open: the minimap is part of the canvas, not a tool to switch on.
+          minimap: { open: true },
+          // Read when a tool is drawn, so the tools follow the UI language
+          // and the server's latest mapping.
           gaikEditor: {
             get labels() {
               return labelsRef.current;
+            },
+            get ops() {
+              return opsRef.current;
             },
           },
           ...BPMN_VIEWER_OPTIONS,
@@ -367,11 +407,11 @@ export const BpmnModeler = forwardRef<
       });
       on("commandStack.changed", () => {
         if (importing.current) return;
-        revisionRef.current += 1;
-        reportEditState(m);
         // A rename keeps the element selected; its new name goes to the panel.
         callbacks.current.onSelectionChange?.(selectionFromModeler(m));
       });
+      on("directEditing.activate", () => callbacks.current.onDirectEditingChange?.(true));
+      on("directEditing.deactivate", () => callbacks.current.onDirectEditingChange?.(false));
       // An edit in place or a drag can end without a command (Escape, no
       // change): whoever waited for it to end hears that it has.
       const settled = () =>
@@ -418,8 +458,6 @@ export const BpmnModeler = forwardRef<
       setReady(false);
       setModeler(null);
     };
-    // reportEditState reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [readOnly]);
 
   // Import each new diagram into the same modeler. The first one opens on the
@@ -448,8 +486,6 @@ export const BpmnModeler = forwardRef<
       importing.current = false;
       if (cancelled) return;
       importedOnce.current = true;
-      revisionRef.current = 0;
-      base.current = currentSemantics(modeler);
       if (keepView && keepView.width > 0) {
         moveView(() => canvas.viewbox(keepView));
       } else {
@@ -460,7 +496,6 @@ export const BpmnModeler = forwardRef<
       const again = selected ? registry.get(selected) : undefined;
       if (again) (modeler.get("selection") as Selection).select(again);
       else callbacks.current.onSelectionChange?.(null);
-      reportEditState(modeler);
       setReady(true);
       callbacks.current.onImported?.();
     })();
@@ -469,21 +504,31 @@ export const BpmnModeler = forwardRef<
       cancelled = true;
     };
     // Not the UI language: a language switch must not load the diagram again
-    // over unsaved edits. moveView and reportEditState read refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // under a name being typed.
   }, [modeler, xml, importKey]);
 
   // The palette is drawn once; a new UI language draws its tools again. The
   // context pad reads its labels each time it opens.
-  const { addTask, connect, rename, remove } = editorLabels;
+  const { addTask, connect, derived } = editorLabels;
   useEffect(() => {
     if (!modeler) return;
     try {
-      (modeler.get("eventBus") as EventBus).fire("i18n.changed");
+      const eventBus = modeler.get("eventBus") as EventBus;
+      eventBus.fire("i18n.changed");
+      eventBus.fire("gaik.context.changed");
     } catch {
       /* tearing down */
     }
-  }, [modeler, addTask, connect, rename, remove]);
+  }, [modeler, addTask, connect, derived]);
+
+  // The minimap is named for a screen reader, in the UI language.
+  useEffect(() => {
+    const map = modeler && containerRef.current?.querySelector<HTMLElement>(".djs-minimap");
+    if (!map || !minimapLabel) return;
+    map.setAttribute("role", "group");
+    map.setAttribute("aria-label", minimapLabel);
+    map.setAttribute("title", minimapLabel);
+  }, [modeler, minimapLabel]);
 
   // A new size re-fits the start view and the fit; a view the user picked stays.
   useEffect(() => {
@@ -496,8 +541,6 @@ export const BpmnModeler = forwardRef<
     });
     ro.observe(container);
     return () => ro.disconnect();
-    // moveView reads refs only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready]);
 
   return (
@@ -511,7 +554,7 @@ export const BpmnModeler = forwardRef<
         ref={containerRef}
         // isolate: bpmn-js's context pad (z-index 100) stays under the panels drawn over the canvas.
         // bpmn-editable is the Workflow tab's look (bpmn-js's own lane names), read-only or not.
-        className={`bpmn-viewer-themed bpmn-editable isolate h-full overflow-hidden [&_.bjs-powered-by]:hidden ${className}`}
+        className={`bpmn-viewer-themed bpmn-editable isolate h-full overflow-hidden ${className}`}
         role="application"
         aria-label={ariaLabel}
         aria-busy={!ready}

@@ -185,11 +185,14 @@ export class WizardApiError extends Error {
   readonly status: number;
   readonly code: string | undefined;
   readonly reason: string | undefined;
+  /** The answer's body as it came; a relay passes it on only through lib/safe-error. */
+  readonly body: string;
 
   constructor(status: number, path: string, body: string) {
     super(`wizard_api ${status} ${path}: ${body}`);
     this.name = "WizardApiError";
     this.status = status;
+    this.body = body;
     this.code = detailField(body, "error");
     this.reason = detailField(body, "reason");
   }
@@ -397,20 +400,30 @@ export async function apiPostVersion(
   });
 }
 
+/**
+ * `baseVersion`: the version the edit was made on; wizard_api refuses the save
+ * over a newer one (409 changed_elsewhere). Without it the save writes over
+ * whatever is there (the user chose to keep their edit).
+ */
 export async function apiPatchBlueprint(
   id: string,
   content: ApiSessionDetail["blueprint"],
   note = "Blueprint päivitetty",
+  baseVersion?: number,
 ) {
   return wizardFetch<ApiSessionDetail>(`/sessions/${encodeURIComponent(id)}/blueprint`, {
     method: "PATCH",
-    body: JSON.stringify({ content, note }),
+    body: JSON.stringify({ content, note, ...(baseVersion === undefined ? {} : { base_version: baseVersion }) }),
   });
 }
 
-export async function apiGetSessionBpmn(id: string): Promise<string> {
+export async function apiGetSessionBpmn(
+  id: string,
+  { dataObjects = true }: { dataObjects?: boolean } = {},
+): Promise<string> {
   const base = getWizardApiUrl() ?? DEFAULT_API_URL;
-  const res = await fetch(`${base}/sessions/${encodeURIComponent(id)}/bpmn`, {
+  const query = dataObjects ? "" : "?data_objects=0";
+  const res = await fetch(`${base}/sessions/${encodeURIComponent(id)}/bpmn${query}`, {
     headers: await outgoingHeaders(),
     cache: "no-store",
   });
@@ -640,4 +653,66 @@ export async function apiCases(id: string, subpath: string, init: RequestInit = 
     headers: { ...(await outgoingHeaders()), ...(init.headers as Record<string, string> | undefined) },
     cache: "no-store",
   });
+}
+
+// -- edits to the full blueprint draft (routers/blueprint_edit.py) ---------------
+//
+// Raw Responses: the Next routes pass a refusal on (409 changed_elsewhere,
+// 422 invalid_operation...) through lib/safe-error and trim a success.
+
+async function sendJson(path: string, method: string, body?: unknown): Promise<Response> {
+  const base = getWizardApiUrl() ?? DEFAULT_API_URL;
+  return fetch(`${base}${path}`, {
+    method,
+    headers:
+      body === undefined
+        ? await outgoingHeaders()
+        : { "Content-Type": "application/json", ...(await outgoingHeaders()) },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    cache: "no-store",
+  });
+}
+
+const sessionPath = (id: string, rest: string) => `/sessions/${encodeURIComponent(id)}/${rest}`;
+const dataObjectsQuery = (dataObjects: boolean) => `?data_objects=${dataObjects ? 1 : 0}`;
+
+/** `{base_version, operations}` applied to the draft: 200 `{session, warnings, needs_attention, bpmn_changed}`. */
+export async function apiPostOperations(id: string, body: unknown): Promise<Response> {
+  return sendJson(sessionPath(id, "blueprint/operations"), "POST", body);
+}
+
+/** `{base_version}`: back to the blueprint before the last write; 200 the session. */
+export async function apiUndoBlueprint(id: string, body: unknown): Promise<Response> {
+  return sendJson(sessionPath(id, "blueprint/undo"), "POST", body);
+}
+
+/** Where the user placed the diagram's shapes and edges, for one drawing mode; 204. */
+export async function apiPutBpmnLayout(
+  id: string,
+  body: unknown,
+  { dataObjects = true }: { dataObjects?: boolean } = {},
+): Promise<Response> {
+  return sendJson(sessionPath(id, `bpmn/layout${dataObjectsQuery(dataObjects)}`), "PUT", body);
+}
+
+/** `{mapping: {element_id: {kind, blueprint_path}}}` of the diagram drawn in that mode. */
+export async function apiGetBpmnMapping(
+  id: string,
+  { dataObjects = true }: { dataObjects?: boolean } = {},
+): Promise<Response> {
+  return sendJson(sessionPath(id, `bpmn/mapping${dataObjectsQuery(dataObjects)}`), "GET");
+}
+
+/** `{version, draft, readonly_sections, draft_digest}`: the full draft; 409 no_draft before there is one. */
+export async function apiGetFullBlueprint(id: string): Promise<Response> {
+  return sendJson(sessionPath(id, "blueprint/full"), "GET");
+}
+
+/**
+ * `{base_version, base_digest, draft}`: the full draft saved whole, `base_digest`
+ * the `draft_digest` it was read with (409 changed_elsewhere once the file has
+ * changed since); answers as the operations do.
+ */
+export async function apiPutFullBlueprint(id: string, body: unknown): Promise<Response> {
+  return sendJson(sessionPath(id, "blueprint/full"), "PUT", body);
 }

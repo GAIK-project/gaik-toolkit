@@ -61,6 +61,17 @@ export const KNOWN_ERROR_CODES: ReadonlySet<string> = new Set([
   "bpmn_invalid",
   "bpmn_not_runnable",
   "refinement_rejected",
+  // edits to the blueprint from the workspace (the diagram, the form, undo)
+  "no_draft",
+  "changed_elsewhere",
+  "invalid_operation",
+  "unsupported_edit",
+  "invalid_layout",
+  "nothing_to_undo",
+  "cannot_undo",
+  "readonly_section",
+  "invalid_draft",
+  "needs_wizard_api",
   // a plain refusal: the route's own fixed words ("session not found")
   "not_found",
   "conflict",
@@ -82,8 +93,26 @@ const INTERNAL_CODES: Record<string, keyof ErrorStrings> = {
   unavailable: "errorGeneric",
 };
 
-/** The extra keys a person needs to act on a refusal; nothing else is passed on. */
-const EXTRA_KEYS = ["gate", "gate_step", "status", "missing", "problems", "keys", "feedback", "variables"] as const;
+/**
+ * The extra keys a person needs to act on a refusal; nothing else is passed on.
+ * `field`, `index` and `code` say which operation of an edit was refused, at
+ * which place, and why (`code` is the operation's own reason, next to `error`);
+ * `fields` names what an unsupported edit tried to change.
+ */
+const EXTRA_KEYS = [
+  "gate",
+  "gate_step",
+  "status",
+  "missing",
+  "problems",
+  "keys",
+  "feedback",
+  "variables",
+  "field",
+  "fields",
+  "index",
+  "code",
+] as const;
 
 export const MESSAGE_MAX_CHARS = 300;
 const MAX_LIST_ITEMS = 20;
@@ -198,6 +227,21 @@ export async function relayError(upstream: Response, status = upstream.status): 
     status,
     retryAfter && /^\d{1,4}$/.test(retryAfter) ? { "Retry-After": retryAfter } : {},
   );
+}
+
+/**
+ * The same as `relayError` for an answer already read: a WizardApiError's
+ * status and body text. Nothing of the text is sent but what passed
+ * `safeErrorDetail`.
+ */
+export async function relayErrorBody(status: number, bodyText: string): Promise<Response> {
+  let body: unknown = null;
+  try {
+    body = JSON.parse(bodyText);
+  } catch {
+    // Not JSON: the generic message.
+  }
+  return errorResponse(safeErrorDetail(body, currentTraceId(), await errorStrings()), status);
 }
 
 /** The answer for an upstream that did not answer at all (down, timeout). */

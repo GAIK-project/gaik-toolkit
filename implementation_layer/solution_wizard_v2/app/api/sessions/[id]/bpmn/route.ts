@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 import { BPMN_VISUAL_STEP, hasBpmnSpike } from "@/lib/bpmn-spike";
 import { fetchBpmnXmlForSession } from "@/lib/bpmn-generate";
+import { parseDataObjectsParam } from "@/lib/bpmn-show-data";
 import { requireOwnedSession } from "@/lib/session-access";
 import { withLogging } from "@/lib/with-logging";
 import { logger } from "@/lib/logger";
@@ -11,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const GET = withLogging(
   "bpmn.get",
   async (
-    _req: NextRequest,
+    req: NextRequest,
     { params }: { params: Promise<{ id: string }> },
   ) => {
     const { id } = await params;
@@ -24,8 +25,14 @@ export const GET = withLogging(
       return new Response("BPMN not available for this session", { status: 404 });
     }
 
+    // ?data_objects=0 draws the diagram without data objects ("Show data" off).
+    const dataObjects = parseDataObjectsParam(req.nextUrl.searchParams.get("data_objects"));
+    if (dataObjects === null) {
+      return new Response("data_objects must be 0 or 1", { status: 400 });
+    }
+
     try {
-      const xml = await fetchBpmnXmlForSession(id, owned.session.blueprint);
+      const xml = await fetchBpmnXmlForSession(id, owned.session.blueprint, { dataObjects });
       return new Response(xml, {
         headers: {
           "Content-Type": "application/xml; charset=utf-8",

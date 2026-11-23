@@ -36,6 +36,7 @@ from wizard_api.services.artifact_sync import (
     DRAFT_BLUEPRINT_FILE,
     WORKFLOW_BPMN_FILE,
     read_draft_blueprint,
+    user_lanes,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,7 @@ def _bpmn(db: Session, session, session_id: uuid.UUID) -> str | None:
             detail.blueprint.model_dump(),
             session_id=str(session_id),
             agent_draft=read_draft_blueprint(session.output_dir),
+            extra_lane_ids=user_lanes(session.session_metadata),
         )
     except Exception:  # noqa: BLE001 - fall back to the agent's diagram, see the docstring
         logger.warning("diagram for session %s could not be generated", session_id, exc_info=True)

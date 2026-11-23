@@ -162,7 +162,7 @@ export const BpmnViewer = forwardRef<
   return (
     <div
       ref={containerRef}
-      className={`bpmn-viewer-themed h-full min-h-[280px] overflow-hidden [&_.bjs-powered-by]:hidden ${className}`}
+      className={`bpmn-viewer-themed h-full min-h-[280px] overflow-hidden ${className}`}
       role="img"
       aria-label={ariaLabel}
       aria-busy={!ready}

@@ -389,6 +389,10 @@ IMPORTANT INSTRUCTIONS FOR THIS WEB SESSION:
   user steps. A mapping path that starts with "derived:" means the lane or
   element was derived by that rule, not written in the blueprint. To change the
   diagram, change the blueprint.
+- THE USER EDITS THE SOLUTION TOO. The user can change the solution in the
+  workspace; the server writes those changes into use_case.blueprint.json and
+  tells you which. Read the file again before you edit it, and never undo a
+  change the user made unless they ask.
 - THE POC IS RUN IN THE PANEL'S SANDBOX. The panel starts a test run by itself
   once the package is complete and has passed its check, and again after you
   have changed the package, so do not ask the user to press Run: say that the
@@ -466,7 +470,8 @@ STATE_LINE_PREFIX = "[Session state:"
 #: line and leave this one as it was.
 _SERVER_LINE = re.compile(
     r"^([^\S\n]*\[(?:Session state:|PoC sandbox run|Package check|Preflight of"
-    r"|The diagram the user sees|The user changed the blueprint|Reopened gate"
+    r"|The diagram the user sees|The user changed the blueprint|This time the server could not"
+    r"|The user changed the solution|Reopened gate"
     r"|Gate 1 cannot be approved|The user edited|The user stopped your previous reply))",
     re.MULTILINE | re.IGNORECASE,
 )

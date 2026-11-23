@@ -416,11 +416,26 @@ describe("sessions.ts — wizard_api mode (WIZARD_API_URL set)", () => {
   it("patchSessionBlueprint / saveBlueprintAfterBpmnSync PATCH the blueprint and return undefined on failure", async () => {
     apiFns.apiPatchBlueprint.mockResolvedValueOnce(apiDetail());
     const saved = await patchSessionBlueprint("s1", blueprint, "note");
-    expect(apiFns.apiPatchBlueprint).toHaveBeenCalledWith("s1", blueprint, "note");
+    expect(apiFns.apiPatchBlueprint).toHaveBeenCalledWith("s1", blueprint, "note", undefined);
     expect(saved?.id).toBe("s1");
 
     apiFns.apiPatchBlueprint.mockRejectedValueOnce(new Error("boom"));
     const failed = await saveBlueprintAfterBpmnSync("s1", blueprint);
     expect(failed).toBeUndefined();
+  });
+
+  it("patchSessionBlueprint sends the base version and lets wizard_api's 409 and 422 refusals through", async () => {
+    const { WizardApiError } = await import("@/lib/wizard-api-client");
+    apiFns.apiPatchBlueprint.mockResolvedValueOnce(apiDetail());
+    await patchSessionBlueprint("s1", blueprint, "note", 4);
+    expect(apiFns.apiPatchBlueprint).toHaveBeenCalledWith("s1", blueprint, "note", 4);
+
+    for (const status of [409, 422]) {
+      const refusal = new WizardApiError(status, "/sessions/s1/blueprint", '{"detail":{"error":"x"}}');
+      apiFns.apiPatchBlueprint.mockRejectedValueOnce(refusal);
+      await expect(patchSessionBlueprint("s1", blueprint, "note", 4)).rejects.toBe(refusal);
+    }
+    apiFns.apiPatchBlueprint.mockRejectedValueOnce(new WizardApiError(500, "/x", "boom"));
+    expect(await patchSessionBlueprint("s1", blueprint, "note", 4)).toBeUndefined();
   });
 });

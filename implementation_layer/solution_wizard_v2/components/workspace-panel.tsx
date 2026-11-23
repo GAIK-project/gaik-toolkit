@@ -83,7 +83,9 @@ import {
   type ValueWords,
 } from "@/lib/poc-run-output";
 import { shouldShowBpmnSpike } from "@/lib/bpmn-spike";
+import { bpmnDataObjectsQuery, readBpmnShowData, saveBpmnShowData } from "@/lib/bpmn-show-data";
 import { BlueprintJsonEditor } from "@/components/blueprint-json-editor";
+import { FullBlueprintView } from "@/components/full-blueprint-view";
 import { isSeedBlueprint } from "@/lib/blueprint-goal";
 import { SolutionPlanView } from "@/components/solution-plan-view";
 import { AskStepButton, StepNumber, StepTypeTag, stepTypeLabels } from "@/components/step-type";
@@ -337,9 +339,11 @@ function WorkflowFlowTab({
   sessionId,
   wizardStep,
   blueprint,
+  blueprintVersion,
   blueprintUpdate,
   bpmnRefreshKey,
   onBlueprintChange,
+  onVersionChange,
   pocNoteLabel,
   onSaved,
   t,
@@ -349,10 +353,14 @@ function WorkflowFlowTab({
   sessionTitle: string;
   wizardStep: number;
   blueprint: Blueprint;
+  /** The session's active version as the page read it: the diagrams' saves are made on it. */
+  blueprintVersion: number | null;
   /** `blueprint` is one the page brought (the wizard wrote it in the chat), not a save made in this panel. */
   blueprintUpdate: BlueprintUpdate | null;
   bpmnRefreshKey: number;
   onBlueprintChange: (blueprint: Blueprint) => void;
+  /** A save here wrote this version. */
+  onVersionChange: (version: number | undefined) => void;
   pocNoteLabel: ReactNode;
   onSaved: (via: "save" | "undo") => void;
   t: Dict;
@@ -363,6 +371,8 @@ function WorkflowFlowTab({
   const [loading, setLoading] = useState(showBpmn);
   const [fetchError, setFetchError] = useState(false);
   const [retry, setRetry] = useState(0);
+  // "Show data" on the BPMN diagram, kept in this browser: off draws it without data objects.
+  const [showData, setShowData] = useState(() => readBpmnShowData());
   const [rootRef, wide] = useWideEnough(FLOW_TWO_COLUMNS_MIN_WIDTH);
   const [view, setView] = useState<"diagram" | "list">("diagram");
   // Which diagram: the simple flow, or the BPMN editor.
@@ -441,6 +451,41 @@ function WorkflowFlowTab({
       window.removeEventListener(CHAT_REFERENCE_EVENT, onReference);
     };
   }, [fullViewOn]);
+  // The large view asks the browser for full screen as well; where the browser
+  // says no, the box lays itself over the window (fixed inset-0) all the same.
+  // When the browser leaves full screen by itself (its Esc, its own controls),
+  // the large view stays, as that box: the browser's Esc cannot be told apart
+  // from an Esc that cancels a name being typed or closes a step's menu. Only
+  // the page's own Esc (above) and the button close it, and closing it leaves
+  // the browser's full screen.
+  // The page goes full screen, not the box: Chromium makes all but the full-screen
+  // element inert, and the chat, which a step is handed to from the large view,
+  // could not take the cursor then.
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!fullViewOn || typeof root.requestFullscreen !== "function" || document.fullscreenElement) return;
+    let closed = false;
+    const leave = () => {
+      if (document.fullscreenElement === root) {
+        document.exitFullscreen().catch(() => {
+          /* already left */
+        });
+      }
+    };
+    root.requestFullscreen().then(
+      // Closed while the browser was still deciding: it is left at once.
+      () => {
+        if (closed) leave();
+      },
+      () => {
+        /* refused: the CSS fallback covers the window */
+      },
+    );
+    return () => {
+      closed = true;
+      leave();
+    };
+  }, [fullViewOn]);
   useEffect(() => {
     if (diagramVisible) setDiagramShown(true);
   }, [diagramVisible]);
@@ -456,7 +501,7 @@ function WorkflowFlowTab({
     setLoading(true);
     setFetchError(false);
 
-    fetch(`/api/sessions/${sessionId}/bpmn`)
+    fetch(`/api/sessions/${sessionId}/bpmn${bpmnDataObjectsQuery(showData)}`)
       .then((res) => {
         if (!res.ok) throw new Error("bpmn unavailable");
         return res.text();
@@ -476,7 +521,7 @@ function WorkflowFlowTab({
     return () => {
       cancelled = true;
     };
-  }, [sessionId, showBpmn, bpmnRefreshKey, retry]);
+  }, [sessionId, showBpmn, bpmnRefreshKey, retry, showData]);
 
   const count = blueprint.steps.length;
 
@@ -583,6 +628,7 @@ function WorkflowFlowTab({
               <WorkflowFlowView
                 sessionId={sessionId}
                 blueprint={blueprint}
+                baseVersion={blueprintVersion}
                 bpmnXml={bpmnXml}
                 locked={locked}
                 onUnlock={() => setFlowUnlocked(true)}
@@ -592,8 +638,9 @@ function WorkflowFlowTab({
                 selectedStepId={selectedStepId}
                 onSelectedStepChange={setSelectedStepId}
                 fullView={fullView}
-                onSaved={(saved, via) => {
+                onSaved={(saved, via, version) => {
                   onBlueprintChange(saved);
+                  onVersionChange(version);
                   onSaved(via);
                   // The BPMN is generated again from the saved blueprint.
                   setRetry((n) => n + 1);
@@ -617,7 +664,7 @@ function WorkflowFlowTab({
             <BpmnDiagramPanel
               sessionId={sessionId}
               xml={bpmnXml}
-              blueprint={blueprint}
+              baseVersion={blueprintVersion}
               steps={blueprint.steps}
               pocNoteLabel={pocNoteLabel}
               // Fetching again with a diagram on the canvas: the blueprint changed elsewhere.
@@ -629,10 +676,20 @@ function WorkflowFlowTab({
               focusRequest={focusRequest}
               onSelectedStepChange={setSelectedStepId}
               fullView={fullView}
-              // Other tabs get a change once it is saved, never while it is being typed.
-              onSynced={({ blueprint: synced }) => {
+              showData={showData}
+              onShowDataChange={(show) => {
+                saveBpmnShowData(show);
+                setShowData(show);
+              }}
+              // Other tabs get a change once the server has it, never while it is being typed.
+              onSynced={({ blueprint: synced, xml: syncedXml, version, via }) => {
+                // The diagram of the edit is kept, so the panel opens with it again
+                // after the simple flow; read again when the panel could not read it.
+                if (syncedXml) setBpmnXml(syncedXml);
+                else setRetry((n) => n + 1);
                 onBlueprintChange(synced);
-                onSaved("save");
+                onVersionChange(version);
+                onSaved(via ?? "save");
               }}
               t={t}
             />
@@ -811,6 +868,13 @@ export function WorkspacePanel({
   // after "Done", so a draft not yet saved is still there on the next "Edit".
   const [blueprintEditing, setBlueprintEditing] = useState(false);
   const [editorMounted, setEditorMounted] = useState(false);
+  // The tab's two views: "Workflow steps" (the plan and its form) and "Full
+  // blueprint" (the whole draft, components/full-blueprint-view).
+  const [blueprintView, setBlueprintView] = useState<"steps" | "full">("steps");
+  // The full view's editor holds text not saved: leaving the view (which
+  // drops the editor) asks first.
+  const [fullDirty, setFullDirty] = useState(false);
+  const [leaveAsk, setLeaveAsk] = useState(false);
   // The form holds a draft it cannot save (an unnamed step, JSON that does not
   // parse, a failed save, a newer version to choose over). Behind the read
   // view that draft was out of sight and the read view showed the old
@@ -823,7 +887,11 @@ export function WorkspacePanel({
   useEffect(() => {
     // The note beside "Done" says why the form is open: it was brought back.
     setDoneRefused(formStuck && !blueprintEditingRef.current);
-    if (formStuck) setBlueprintEditing(true);
+    if (formStuck) {
+      setBlueprintEditing(true);
+      // The form is in the "Workflow steps" view: it is brought back there.
+      setBlueprintView("steps");
+    }
   }, [formStuck]);
   // "Generate again" in the package details asks first: it replaces the package.
   const [regenConfirm, setRegenConfirm] = useState(false);
@@ -866,6 +934,18 @@ export function WorkspacePanel({
   function takeOwnBlueprint(saved: Blueprint) {
     setBlueprint(saved);
     setBlueprintUpdate(null);
+  }
+  // The version the form's and the diagrams' saves are made on: the page's, or
+  // the one a save made here wrote since (the page is not read again after
+  // one). Unknown after a save that did not say: a save then names none.
+  const [activeVersion, setActiveVersion] = useState(() => knownVersion(blueprintVersion));
+  const [pageVersion, setPageVersion] = useState(blueprintVersion);
+  if (pageVersion !== blueprintVersion) {
+    setPageVersion(blueprintVersion);
+    setActiveVersion(knownVersion(blueprintVersion));
+  }
+  function takeOwnVersion(version: number | undefined) {
+    setActiveVersion(knownVersion(version));
   }
   useEffect(() => {
     // Every reading of the session by the page comes through here: its
@@ -3080,6 +3160,67 @@ export function WorkspacePanel({
     </BlueprintModeBar>
   );
   const pocLockedNoteId = `${baseId}-poc-locked`;
+  const blueprintViewButton = (key: "steps" | "full", icon: IconName, label: string) => (
+    <button
+      type="button"
+      aria-pressed={blueprintView === key}
+      onClick={() => {
+        if (key === "steps" && blueprintView === "full" && fullDirty) {
+          setLeaveAsk(true);
+          return;
+        }
+        setLeaveAsk(false);
+        setBlueprintView(key);
+      }}
+      className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors duration-150 ${
+        blueprintView === key ? "bg-surface text-text-strong shadow-xs" : "text-text-muted hover:text-text"
+      }`}
+      data-testid={`blueprint-view-${key}`}
+    >
+      <Icon name={icon} size={14} />
+      {label}
+    </button>
+  );
+  const blueprintViewSwitch = (
+    <div
+      role="group"
+      aria-label={t.bpViewLabel}
+      className="mb-3 inline-flex rounded-lg border border-border bg-surface-muted p-0.5"
+    >
+      {blueprintViewButton("steps", "listChecks", t.bpViewSteps)}
+      {blueprintViewButton("full", "fileBraces", t.bpViewFull)}
+    </div>
+  );
+  const blueprintLeaveAsk = leaveAsk && blueprintView === "full" && (
+    <div
+      role="alertdialog"
+      aria-label={t.bpViewLeaveAsk}
+      className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg border border-warning-border bg-warning-bg px-3 py-2 text-sm text-warning-text"
+      data-testid="blueprint-view-leave"
+    >
+      <span className="min-w-0 flex-1 basis-56">{t.bpViewLeaveAsk}</span>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => setLeaveAsk(false)}
+        data-testid="blueprint-view-leave-stay"
+      >
+        {t.bpViewLeaveStay}
+      </button>
+      <button
+        type="button"
+        className="btn-secondary"
+        onClick={() => {
+          setLeaveAsk(false);
+          setFullDirty(false);
+          setBlueprintView("steps");
+        }}
+        data-testid="blueprint-view-leave-discard"
+      >
+        {t.bpViewLeaveDiscard}
+      </button>
+    </div>
+  );
 
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -3176,9 +3317,11 @@ export function WorkspacePanel({
                   sessionTitle={sessionTitle}
                   wizardStep={wizardStep}
                   blueprint={blueprint}
+                  blueprintVersion={activeVersion}
                   blueprintUpdate={blueprintUpdate}
                   bpmnRefreshKey={bpmnRefreshKey}
                   onBlueprintChange={takeOwnBlueprint}
+                  onVersionChange={takeOwnVersion}
                   pocNoteLabel={pocNote}
                   onSaved={noteBlueprintSaved}
                   t={t}
@@ -3188,7 +3331,23 @@ export function WorkspacePanel({
 
             {key === "json" && (
               <>
-                {!blueprintEditing && (
+                {blueprintViewSwitch}
+                {blueprintLeaveAsk}
+                {blueprintView === "full" && (
+                  <FullBlueprintView
+                    sessionId={sessionId}
+                    version={activeVersion}
+                    t={t}
+                    onDirtyChange={setFullDirty}
+                    onSaved={({ blueprint: saved, version, bpmnChanged }) => {
+                      if (saved) takeOwnBlueprint(saved);
+                      takeOwnVersion(version);
+                      if (bpmnChanged) setBpmnRefreshKey((k) => k + 1);
+                      noteBlueprintSaved("save");
+                    }}
+                  />
+                )}
+                {blueprintView === "steps" && !blueprintEditing && (
                   <SolutionPlanView
                     blueprint={blueprint}
                     outputFields={outputFields}
@@ -3201,7 +3360,8 @@ export function WorkspacePanel({
                   />
                 )}
                 {editorMounted && (
-                  <div className={blueprintEditing ? "" : "hidden"}>
+                  // Kept mounted under the other view: a draft the form has not saved stays.
+                  <div className={blueprintEditing && blueprintView === "steps" ? "" : "hidden"}>
                     <div>
                       <BlueprintJsonEditor
                         control={
@@ -3235,8 +3395,10 @@ export function WorkspacePanel({
                         }
                         sessionId={sessionId}
                         blueprint={blueprint}
-                        onSaved={(saved) => {
+                        baseVersion={activeVersion}
+                        onSaved={(saved, version) => {
                           takeOwnBlueprint(saved);
+                          takeOwnVersion(version);
                           setBpmnRefreshKey((k) => k + 1);
                           noteBlueprintSaved("save");
                         }}

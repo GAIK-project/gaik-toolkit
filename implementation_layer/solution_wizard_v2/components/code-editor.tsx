@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Compartment, EditorState, type Extension } from "@codemirror/state";
 import {
+  Decoration,
   EditorView,
   drawSelection,
   highlightActiveLine,
@@ -21,6 +22,7 @@ import {
 } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import type { EditorLanguage } from "@/lib/poc-file";
+import { lockedRanges as lockedRangesExtension, lockedRangesField } from "@/lib/locked-ranges";
 
 /**
  * The text editor of the PoC tab: CodeMirror 6 with the app's own colours.
@@ -29,6 +31,8 @@ import type { EditorLanguage } from "@/lib/poc-file";
  * none of it until a file is opened; each language is a chunk of its own,
  * fetched when a file of that kind is. The document is given once: the dialog
  * remounts the editor (a new `key`) to show another version of the file.
+ * The full blueprint view's advanced editor uses it too, with the parts of
+ * the text that cannot be edited (`lockedRanges`) shaded.
  */
 
 // The app's tokens (app/globals.css), so the editor follows the theme.
@@ -62,10 +66,24 @@ const theme = EditorView.theme({
     backgroundColor: "var(--color-brand-soft-border)",
   },
   ".cm-cursor": { borderLeftColor: "var(--color-text-strong)" },
+  // A part of the text that cannot be edited (lockedRanges).
+  ".cm-locked": { backgroundColor: "var(--color-surface-muted)", opacity: "0.75" },
   "&.cm-focused .cm-matchingBracket": {
     backgroundColor: "var(--color-brand-soft)",
     outline: "1px solid var(--color-brand-soft-border)",
   },
+});
+
+const lockedMark = Decoration.mark({ class: "cm-locked", attributes: { "data-locked": "true" } });
+/** The locked ranges drawn shaded. */
+const lockedDecorations = EditorView.decorations.compute([lockedRangesField], (state) => {
+  const locked = state.field(lockedRangesField, false);
+  if (!locked) return Decoration.none;
+  const marks: ReturnType<typeof lockedMark.range>[] = [];
+  locked.between(0, state.doc.length, (from, to) => {
+    marks.push(lockedMark.range(from, to));
+  });
+  return Decoration.set(marks);
 });
 
 const highlight = HighlightStyle.define([
@@ -117,6 +135,7 @@ export default function CodeEditor({
   value,
   language,
   readOnly = false,
+  lockedRanges,
   label,
   onChange,
   onSave,
@@ -125,6 +144,8 @@ export default function CodeEditor({
   value: string;
   language: EditorLanguage | null;
   readOnly?: boolean;
+  /** Parts of the starting document that cannot be edited; taken once, as `value` is. */
+  lockedRanges?: readonly { from: number; to: number }[];
   /** What a screen reader calls the text field. */
   label: string;
   onChange?: (text: string) => void;
@@ -160,6 +181,7 @@ export default function CodeEditor({
           EditorState.tabSize.of(4),
           EditorState.readOnly.of(readOnly),
           EditorView.editable.of(!readOnly),
+          ...(lockedRanges?.length ? [lockedRangesExtension(lockedRanges), lockedDecorations] : []),
           ...(wraps ? [EditorView.lineWrapping] : []),
           syntaxHighlighting(highlight),
           theme,

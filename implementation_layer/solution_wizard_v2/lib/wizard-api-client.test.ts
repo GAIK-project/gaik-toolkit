@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   apiCreateSession,
+  apiGetBpmnMapping,
+  apiGetFullBlueprint,
+  apiPostOperations,
+  apiPutBpmnLayout,
+  apiPutFullBlueprint,
+  apiUndoBlueprint,
   apiDeletePocInput,
   apiGetDeployablePocZip,
   apiListPocInputs,
@@ -143,11 +149,29 @@ describe("wizardFetch-backed API helpers", () => {
     expect(JSON.parse(init.body)).toEqual({ content: detail.blueprint, note: "edited" });
   });
 
+  it("apiPatchBlueprint sends the version the edit was made on, when there is one", async () => {
+    await apiPatchBlueprint("s1", detail.blueprint, "edited", 4);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
+      content: detail.blueprint,
+      note: "edited",
+      base_version: 4,
+    });
+  });
+
   it("apiGetSessionBpmn returns the raw XML text", async () => {
     fetchMock.mockResolvedValueOnce(new Response("<bpmn/>", { status: 200 }));
     const xml = await apiGetSessionBpmn("s1");
     expect(xml).toBe("<bpmn/>");
     expect(fetchMock).toHaveBeenCalledWith("http://api.test/sessions/s1/bpmn", expect.anything());
+  });
+
+  it("apiGetSessionBpmn asks wizard_api to leave the data objects out", async () => {
+    fetchMock.mockResolvedValueOnce(new Response("<bpmn/>", { status: 200 }));
+    await apiGetSessionBpmn("s1", { dataObjects: false });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "http://api.test/sessions/s1/bpmn?data_objects=0",
+      expect.anything(),
+    );
   });
 
   it("apiGetSessionBpmn throws with status + body text on failure", async () => {
@@ -353,5 +377,77 @@ describe("sample input and the deployable package (#95, #143)", () => {
     const res = await apiGetDeployablePocZip("s1");
     expect(res.ok).toBe(true);
     expect(fetchMock.mock.calls[0][0]).toBe("http://api.test/sessions/s1/poc/deployable");
+  });
+});
+
+describe("blueprint edit calls (raw Responses, each with outgoingHeaders())", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.stubEnv("WIZARD_API_URL", "http://api.test");
+    vi.stubEnv("WIZARD_API_TOKEN", "s3cret");
+    fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  const call = () => fetchMock.mock.calls[0] as [string, RequestInit & { headers: Record<string, string> }];
+
+  it.each([
+    [
+      "apiPostOperations",
+      () => apiPostOperations("s 1", { base_version: 2, operations: [{ op: "remove_step", step_id: "a" }] }),
+      "http://api.test/sessions/s%201/blueprint/operations",
+      "POST",
+      { base_version: 2, operations: [{ op: "remove_step", step_id: "a" }] },
+    ],
+    [
+      "apiUndoBlueprint",
+      () => apiUndoBlueprint("s1", { base_version: 2 }),
+      "http://api.test/sessions/s1/blueprint/undo",
+      "POST",
+      { base_version: 2 },
+    ],
+    [
+      "apiPutBpmnLayout",
+      () => apiPutBpmnLayout("s1", { shapes: { a: null } }, { dataObjects: false }),
+      "http://api.test/sessions/s1/bpmn/layout?data_objects=0",
+      "PUT",
+      { shapes: { a: null } },
+    ],
+    [
+      "apiPutFullBlueprint",
+      () => apiPutFullBlueprint("s1", { base_version: 2, base_digest: "d1", draft: { a: 1 } }),
+      "http://api.test/sessions/s1/blueprint/full",
+      "PUT",
+      { base_version: 2, base_digest: "d1", draft: { a: 1 } },
+    ],
+  ])("%s sends its body with the service token", async (_name, run, url, method, body) => {
+    await run();
+    const [sentUrl, init] = call();
+    expect(sentUrl).toBe(url);
+    expect(init.method).toBe(method);
+    expect(JSON.parse(String(init.body))).toEqual(body);
+    expect(init.headers["Content-Type"]).toBe("application/json");
+    expect(init.headers["X-Wizard-Service-Token"]).toBe("s3cret");
+  });
+
+  it("apiPutBpmnLayout addresses the full drawing's layout by default", async () => {
+    await apiPutBpmnLayout("s1", {});
+    expect(call()[0]).toBe("http://api.test/sessions/s1/bpmn/layout?data_objects=1");
+  });
+
+  it("apiGetFullBlueprint and apiGetBpmnMapping GET with the service token", async () => {
+    await apiGetFullBlueprint("s1");
+    await apiGetBpmnMapping("s1", { dataObjects: false });
+    await apiGetBpmnMapping("s1");
+    const urls = fetchMock.mock.calls.map((c) => c[0]);
+    expect(urls).toEqual([
+      "http://api.test/sessions/s1/blueprint/full",
+      "http://api.test/sessions/s1/bpmn/mapping?data_objects=0",
+      "http://api.test/sessions/s1/bpmn/mapping?data_objects=1",
+    ]);
+    for (const [, init] of fetchMock.mock.calls) {
+      expect((init as { headers: Record<string, string> }).headers["X-Wizard-Service-Token"]).toBe("s3cret");
+    }
   });
 });
