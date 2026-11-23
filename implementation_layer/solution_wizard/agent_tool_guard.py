@@ -33,6 +33,7 @@ import os
 import re
 import shlex
 import site
+import stat
 import sys
 from collections.abc import Callable
 from pathlib import Path, PurePath
@@ -299,8 +300,19 @@ def odd_path_form(path: str) -> bool:
 
 
 def _is_link(path: str) -> bool:
+    """A symlink, or a Windows junction, which any user can make without the
+    symlink right. ``os.path.isjunction`` is Python 3.12+; on 3.11 the junction
+    shows only as the mount-point reparse tag of its ``lstat``."""
+    if os.path.islink(path):
+        return True
     isjunction = getattr(os.path, "isjunction", None)
-    return os.path.islink(path) or bool(isjunction and isjunction(path))
+    if isjunction is not None:
+        return isjunction(path)
+    try:
+        tag = getattr(os.lstat(path), "st_reparse_tag", 0)
+    except OSError:
+        return False
+    return tag == stat.IO_REPARSE_TAG_MOUNT_POINT
 
 
 def find_link(folders: list[Path]) -> Path | None:
