@@ -152,6 +152,8 @@ def _record(monkeypatch, session, run_id: str) -> None:
 
     monkeypatch.setattr(wizard_api.db, "SessionLocal", lambda: _Rows(session))
     monkeypatch.setattr(session_service, "get_session", lambda db, session_id: session)
+    # The row is locked before the checks; without a database there is nothing to lock.
+    monkeypatch.setattr(session_service, "lock_fresh", lambda db, row: row)
     monkeypatch.setattr(session_service, "update_session", update)
     sessions_router._record_successful_run(session.id, run_id)
 
