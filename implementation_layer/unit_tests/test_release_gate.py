@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import re
 import subprocess
 import sys
 import tarfile
@@ -440,13 +441,12 @@ def test_raw_client_budget_preserves_raw_component_branch_and_sampling_kwargs():
         wrapped.chat.completions.create(model="gpt-6-luna")
 
 
-def test_the_release_gate_leaves_out_only_an_existing_v2_image_pin_check():
+def test_both_release_gates_leave_out_the_v2_image_pin_check_by_its_real_name():
     """pytest ignores a --deselect that names nothing, so a renamed test would come
-    back into the gate unnoticed; test.yml must leave out the same one."""
+    back into the gate unnoticed; test.yml and release_check.py must name it."""
     path, name = gate.V2_IMAGE_PIN_TEST.split("::")
     assert f"def {name}(" in (ROOT / path).read_text(encoding="utf-8")
     workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
     assert f"--deselect {gate.V2_IMAGE_PIN_TEST}" in workflow
-    assert workflow.count("--deselect") == 1
     script = (ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
-    assert script.count('"--deselect"') == 1
+    assert re.search(r'"--deselect",\s*V2_IMAGE_PIN_TEST,', script)
