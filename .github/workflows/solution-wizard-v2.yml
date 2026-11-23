@@ -477,7 +477,11 @@ jobs:
   tag-dev:
     runs-on: ubuntu-latest
     needs: [wizard-api, solution-wizard, solution-wizard-v2]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    # The fork's dev branch only: GAIK-project/gaik-toolkit has a dev branch of its own,
+    # and its tags are release tags.
+    if: >-
+      github.repository == 'NCF-public/gaik-toolkit-configuration-wizard-v2'
+      && github.event_name == 'push' && github.ref == 'refs/heads/dev'
     permissions:
       contents: write
     steps:

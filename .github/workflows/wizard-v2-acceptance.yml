@@ -36,6 +36,11 @@ permissions:
 
 jobs:
   stack-e2e:
+    # A push runs it in the fork only; GAIK-project/gaik-toolkit has a dev branch of its
+    # own and runs the stack on the schedule and by hand.
+    if: >-
+      github.event_name != 'push'
+      || github.repository == 'NCF-public/gaik-toolkit-configuration-wizard-v2'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
