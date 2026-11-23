@@ -1,6 +1,7 @@
 """Shared pytest setup for the offline unit tests."""
 
 import os
+import sys
 
 import pytest
 from gaik.software_components.env_file import load_env_file
@@ -13,6 +14,28 @@ os.environ.setdefault("LITELLM_LOCAL_MODEL_COST_MAP", "True")
 # reads no .env file, so the repository's .env is loaded here, before collection.
 # GAIK_NO_DOTENV=1 keeps it out.
 load_env_file()
+
+#: Solution Wizard v2's deploy tests run its shell scripts with a POSIX bash and
+#: PATH=/usr/bin:/bin. On Windows `bash` is WSL's launcher and a .sh file is not a
+#: program, so they run on Linux only: in test.yml and in solution-wizard-v2.yml,
+#: whose deploy-manifests job runs them with --noconftest, past this hook.
+POSIX_SHELL_TESTS = frozenset(
+    {
+        "test_deploy_instances.py",
+        "test_deploy_signin.py",
+        "test_sandbox_job_manifest.py",
+        "test_sandbox_network_policy.py",
+    }
+)
+
+
+def pytest_collection_modifyitems(config, items):
+    if sys.platform != "win32":
+        return
+    skip = pytest.mark.skip(reason="runs Solution Wizard v2's deploy scripts with a POSIX bash")
+    for item in items:
+        if item.path.name in POSIX_SHELL_TESTS:
+            item.add_marker(skip)
 
 
 @pytest.fixture
