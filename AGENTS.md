@@ -10,15 +10,11 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   components and the MCP server built on them; outside the packages the gaik-sync audit
   scans, by design.
 - `implementation_layer/solution_wizard/`: the Solution Wizard, which mirrors gaik's API
-  (see gaik-sync below). The demo's wizard chat, the `solution-wizard` skill and Solution
-  Wizard v2 all run it and read its one `SKILL.md`; an instruction there for one host
-  only says so ("the wizard's web app" is v2, "elsewhere" the others).
-- Solution Wizard v2: `implementation_layer/solution_wizard_v2/` (the web app),
-  `implementation_layer/wizard_api/` (its API and agent), `implementation_layer/deploy/`
-  (its Rahti manifests and PoC runner) and `gaik-aiops/`. It is developed in the fork
-  `NCF-public/gaik-toolkit-configuration-wizard-v2` and arrives here as a merge of the
-  fork's release; change these folders there, since an edit here conflicts with the next
-  delivery. Running it locally: `implementation_layer/WIZARD-DEV.md`.
+  (see gaik-sync below); v1 and v2 share it.
+- Solution Wizard v2 (`implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`,
+  `gaik-aiops/`) is developed in the fork `NCF-public/gaik-toolkit-configuration-wizard-v2`
+  and arrives here as a merge of a fork branch; change those folders there, since an edit
+  here conflicts with the next delivery. Running it locally: `implementation_layer/WIZARD-DEV.md`.
 - `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI
   backend in `api/`, deployed on Rahti.
 - `guidance_layer/website/`: the docs site.
