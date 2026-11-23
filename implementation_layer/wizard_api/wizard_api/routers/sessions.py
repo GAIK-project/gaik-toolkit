@@ -2892,7 +2892,7 @@ async def upload_poc_input(
     Only that directory: the package root holds ``run_poc.py``, the file the Job
     executes, and an upload must never be able to become it.
     """
-    from wizard_api.services import input_content, malware_scan, poc_service
+    from wizard_api.services import case_service, input_content, malware_scan, poc_service
     from wizard_api.services.artifact_sync import read_draft_blueprint
 
     session = session_service.get_session(db, session_id)
@@ -2911,7 +2911,11 @@ async def upload_poc_input(
         # Then the malware check; a file it reports, or one it could not
         # check, is never written.
         await malware_scan.check_upload(data)
-        name = poc_service.save_sample_input(poc, file.filename or "", data)
+        # Within the limits a case's input has, and counted with the cases'. Off the
+        # event loop: it waits for the session's input lock and writes the file.
+        name = await asyncio.to_thread(
+            case_service.save_sample_input, session.output_dir, poc, file.filename or "", data
+        )
     # Both name the user's own file and the limit it broke.
     except poc_service.InputTooLargeError as exc:
         raise api_error(413, "input_too_large", str(exc)) from exc

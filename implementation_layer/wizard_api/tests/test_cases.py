@@ -122,6 +122,37 @@ def test_a_case_holds_so_many_files_and_so_many_bytes(out, monkeypatch):
     assert case_service.save_input(out, case["id"], "c.txt", b"x" * 12) == "c.txt"
 
 
+def test_the_pocs_test_data_holds_as_many_files_and_bytes_as_a_case(out, monkeypatch):
+    """PoC uploads had only the per-file limit (review of GAIK-project/gaik-toolkit#324)."""
+    monkeypatch.setattr(case_service, "MAX_INPUTS_PER_CASE", 2)
+    monkeypatch.setattr(case_service, "MAX_CASE_INPUT_BYTES", 20)
+    poc = os.path.join(out, "poc")
+    case_service.save_sample_input(out, poc, "a.txt", b"x" * 8)
+    case_service.save_sample_input(out, poc, "b.txt", b"x" * 8)
+
+    with pytest.raises(poc_service.InputRejectedError, match="already has 2 files"):
+        case_service.save_sample_input(out, poc, "c.txt", b"x")
+    # The same name replaces the file, so only the difference counts.
+    assert case_service.save_sample_input(out, poc, "b.txt", b"x" * 12) == "b.txt"
+    with pytest.raises(poc_service.InputTooLargeError, match="test data would exceed"):
+        case_service.save_sample_input(out, poc, "b.txt", b"x" * 13)
+    assert sorted(e["name"] for e in poc_service.list_sample_inputs(poc)) == ["a.txt", "b.txt"]
+
+
+def test_the_pocs_test_data_and_the_cases_share_the_sessions_input(out, monkeypatch):
+    monkeypatch.delenv("WIZARD_MAX_SESSION_INPUT_MB", raising=False)
+    monkeypatch.setattr(case_service, "MAX_SESSION_INPUT_BYTES", 20)
+    poc = os.path.join(out, "poc")
+    case = case_service.create_case(out, created_by="u")
+    case_service.save_sample_input(out, poc, "sample.wav", b"x" * 12)
+
+    with pytest.raises(poc_service.InputTooLargeError, match="session's input would exceed"):
+        case_service.save_input(out, case["id"], "a.wav", b"x" * 9)
+    case_service.save_input(out, case["id"], "a.wav", b"x" * 8)
+    with pytest.raises(poc_service.InputTooLargeError, match="session's input would exceed"):
+        case_service.save_sample_input(out, poc, "more.wav", b"x")
+
+
 def test_a_session_holds_so_many_cases(out, monkeypatch):
     monkeypatch.setattr(case_service, "MAX_CASES_PER_SESSION", 1)
     case_service.create_case(out, created_by="u")
@@ -185,7 +216,7 @@ def test_a_sessions_input_is_bounded_across_its_cases(out, monkeypatch):
     second = case_service.create_case(out, created_by="u")
     case_service.save_input(out, first["id"], "a.txt", b"x" * 12)
 
-    with pytest.raises(poc_service.InputTooLargeError, match="session's case input"):
+    with pytest.raises(poc_service.InputTooLargeError, match="session's input would exceed"):
         case_service.save_input(out, second["id"], "b.txt", b"x" * 9)
     assert case_service.save_input(out, second["id"], "b.txt", b"x" * 8) == "b.txt"
 

@@ -685,6 +685,25 @@ def test_a_started_run_keeps_the_names_of_the_inputs_it_ran_on(
 
 
 @requires_postgres
+def test_the_test_data_upload_keeps_to_the_input_limits(client, db_session, monkeypatch) -> None:
+    """The route goes through the limits a case's input has (review of #324 upstream)."""
+    from wizard_api.services import case_service
+
+    monkeypatch.setattr(case_service, "MAX_INPUTS_PER_CASE", 1)
+    sid = _session_ready_to_generate(client, "input-limits")["id"]
+    _write_poc(_session_output_dir(db_session, sid))
+    pdf = ("a.pdf", b"%PDF-1.7", "application/pdf")
+
+    assert client.post(f"/sessions/{sid}/poc/input", files={"file": pdf}).status_code == 201
+    refused = client.post(
+        f"/sessions/{sid}/poc/input",
+        files={"file": ("b.pdf", b"%PDF-1.7", "application/pdf")},
+    )
+    assert refused.status_code == 422
+    assert refused.json()["detail"]["error"] == "input_rejected"
+
+
+@requires_postgres
 def test_a_run_the_sandbox_has_no_room_for_is_told_to_try_again(
     client, db_session, monkeypatch
 ) -> None:
