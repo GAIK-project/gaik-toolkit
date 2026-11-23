@@ -324,3 +324,19 @@ def test_no_parser_other_than_visionparser_and_pymupdf_claims_page_citations():
         returns_text = str(card.get("returns", "")).lower()
         hits = [p for p in affirmative_phrases if p in returns_text]
         assert not hits, f"{name}'s 'returns' text wrongly claims page attribution: {hits}"
+
+
+def test_report_writer_guidance_keeps_calculation_steps_out_of_report_blueprints():
+    """The agent added its own pandas step in front of ReportWriter and wrote it
+    without seeing the workbook; it read row 1 as the header and the run produced
+    no figures (UC04, 5 Nov 2026). The card and the skill both say what to do
+    with figures, because the agent reads the card when it picks the module and
+    the skill when it composes the blueprint."""
+    note = get_reference_cards().get("ReportWriter")["note"]
+    assert "do NOT add a custom calculation step" in note
+    assert "header row" in note
+
+    skill = (Path(__file__).parent.parent / "SKILL.md").read_text(encoding="utf-8")
+    rule = skill.split("**Figures in a report.**", 1)[1].split("\n\n", 1)[0]
+    assert "do not add a calculation step of your own" in rule
+    assert "only when the user asks for one" in rule

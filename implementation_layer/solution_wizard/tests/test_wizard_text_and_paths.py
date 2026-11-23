@@ -1,4 +1,4 @@
-"""Text from blueprints stays text in documents, and paths stay where they belong."""
+"""Text from blueprints and canvases stays text, and paths stay where they belong."""
 
 import json
 import shutil
@@ -12,6 +12,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from solution_wizard import registry as registry_module  # noqa: E402
 from solution_wizard.blueprint import Blueprint  # noqa: E402
+from solution_wizard.bpmn_sync import (  # noqa: E402
+    MAX_BPMN_XML_DEPTH,
+    MAX_NAME_CHARS,
+    sync_v2_blueprint_from_bpmn_xml,
+)
 from solution_wizard.docs_generator import generate_docs, md_text  # noqa: E402
 from solution_wizard.scaffolder import scaffold_poc  # noqa: E402
 
@@ -174,3 +179,71 @@ def test_the_audio_input_note_names_a_language_code_only(tmp_path, language, not
     bp.technical_spec["language"] = language
     poc = scaffold_poc(bp, tmp_path)["poc_dir"]
     assert note in (poc / "README.md").read_text(encoding="utf-8")
+
+
+V2 = {
+    "name": "Demo",
+    "description": "",
+    "goal": "",
+    "steps": [{"id": "a", "name": "First", "type": "io"}],
+}
+
+
+def _canvas(new_id: str, new_name: str) -> str:
+    return f"""<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+  id="D1" targetNamespace="x">
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:startEvent id="StartEvent_1" />
+    <bpmn:userTask id="Activity_a" name="First" />
+    <bpmn:userTask id="{new_id}" name="{new_name}" />
+    <bpmn:exclusiveGateway id="Gateway_ok&quot; x" name="Check&#10;again" />
+    <bpmn:endEvent id="EndEvent_1" />
+    <bpmn:sequenceFlow id="F1" sourceRef="StartEvent_1" targetRef="Activity_a" />
+    <bpmn:sequenceFlow id="F2" sourceRef="Activity_a" targetRef="{new_id}" />
+    <bpmn:sequenceFlow id="F3" sourceRef="{new_id}" targetRef="EndEvent_1" />
+  </bpmn:process>
+</bpmn:definitions>
+"""
+
+
+def test_a_task_added_on_the_canvas_gets_a_clean_id_and_a_one_line_name() -> None:
+    long_name = "Line one&#10;line two " + "x" * 400
+    synced = sync_v2_blueprint_from_bpmn_xml(V2, _canvas("Activity_new&quot; step", long_name))
+    added = synced["steps"][1]
+    assert added["id"] == "new_step"
+    assert "\n" not in added["name"] and len(added["name"]) <= MAX_NAME_CHARS
+    assert added["name"].startswith("Line one")
+    gateway = synced["gateways"][0]
+    assert gateway["id"] == "Gateway_ok_x" and gateway["name"] == "Check again"
+
+
+def test_a_canvas_id_that_ends_in_a_line_break_becomes_one_token() -> None:
+    synced = sync_v2_blueprint_from_bpmn_xml(V2, _canvas("Activity_new&#10;", "New"))
+    assert synced["steps"][1]["id"] == "new"
+
+
+def test_a_data_object_id_that_ends_in_a_line_break_gets_no_label() -> None:
+    from solution_wizard.bpmn_sync import _parse, _sync_data_object_names
+
+    root = _parse(
+        '<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL">'
+        '<bpmn:dataObjectReference id="DataObjectRef_report" name="Report" />'
+        '<bpmn:dataObjectReference id="DataObjectRef_notes&#10;" name="Notes" />'
+        "</bpmn:definitions>"
+    )
+    assert _sync_data_object_names(root, V2) == {"report": "Report"}
+
+
+def test_xml_nested_deeper_than_a_diagram_is_refused() -> None:
+    deep = "<a>" * (MAX_BPMN_XML_DEPTH + 1) + "</a>" * (MAX_BPMN_XML_DEPTH + 1)
+    with pytest.raises(ValueError, match="nests deeper"):
+        sync_v2_blueprint_from_bpmn_xml(V2, deep)
+
+
+def test_the_parser_itself_refuses_a_document_type_and_entities() -> None:
+    from solution_wizard.bpmn_sync import _parse
+
+    nested = '<?xml version="1.0"?><!DOCTYPE r [<!ENTITY a "aaaa"><!ENTITY b "&a;&a;">]><r>&b;</r>'
+    with pytest.raises(ValueError, match="DTD or entities"):
+        _parse(nested)

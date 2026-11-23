@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import io
 import json
+import re
 import subprocess
 import sys
 import tarfile
@@ -438,3 +439,14 @@ def test_raw_client_budget_preserves_raw_component_branch_and_sampling_kwargs():
     assert calls == [{"model": "gpt-6-luna", "temperature": 0, "max_completion_tokens": 256}]
     with pytest.raises(RuntimeError, match="budget"):
         wrapped.chat.completions.create(model="gpt-6-luna")
+
+
+def test_both_release_gates_leave_out_the_v2_image_pin_check_by_its_real_name():
+    """pytest ignores a --deselect that names nothing, so a renamed test would come
+    back into the gate unnoticed; test.yml and release_check.py must name it."""
+    path, name = gate.V2_IMAGE_PIN_TEST.split("::")
+    assert f"def {name}(" in (ROOT / path).read_text(encoding="utf-8")
+    workflow = (ROOT / ".github" / "workflows" / "test.yml").read_text(encoding="utf-8")
+    assert f"--deselect {gate.V2_IMAGE_PIN_TEST}" in workflow
+    script = (ROOT / "scripts" / "release_check.py").read_text(encoding="utf-8")
+    assert re.search(r'"--deselect",\s*V2_IMAGE_PIN_TEST,', script)

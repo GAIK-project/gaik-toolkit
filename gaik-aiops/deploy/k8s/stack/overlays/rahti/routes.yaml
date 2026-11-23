@@ -1,0 +1,35 @@
+# Public HTTPS addresses, the names Rahti would assign anyway (<route>-<project>.2.rahtiapp.fi):
+#   grafana -> https://grafana-gaik-aiops.2.rahtiapp.fi  (Grafana's own sign-in)
+#   mlflow  -> https://mlflow-gaik-aiops.2.rahtiapp.fi   (basic auth in mlflow-auth, then MLflow)
+# spec.host is the one place they are written: kustomization.yaml copies them into Grafana's root URL
+# and MLflow's allowed hosts. The collector's token-checked OTLP way in has its Route in otlp-ingress.yaml.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: grafana
+  labels: {app.kubernetes.io/name: grafana}
+  annotations:
+    haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+spec:
+  host: grafana-gaik-aiops.2.rahtiapp.fi
+  to: {kind: Service, name: grafana, weight: 100}
+  port: {targetPort: 3000}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: mlflow
+  labels: {app.kubernetes.io/name: mlflow-signin}
+  annotations:
+    haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+    haproxy.router.openshift.io/timeout: 5m
+spec:
+  host: mlflow-gaik-aiops.2.rahtiapp.fi
+  to: {kind: Service, name: mlflow-signin, weight: 100}
+  port: {targetPort: 4180}
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect

@@ -1,0 +1,83 @@
+# Acceptance-grade checks that are too slow or too heavy for the PR build.
+#
+# The *-stack specs verify the Sprint 3 acceptance criteria that only hold when
+# the UI talks to a real wizard_api and Postgres (#93 PoC generation, #126 gate
+# feedback, #138 workspace sync, US-S1-01 persistence). They skip themselves
+# unless PLAYWRIGHT_STACK_E2E is set, so without this workflow a green PR build
+# says nothing about them.
+#
+# docs/sprint3-acceptance.md maps each criterion to the level that covers it.
+name: Wizard V2 acceptance
+
+on:
+  # GitHub evaluates `schedule` only from the repository's DEFAULT branch, and
+  # this file has only ever lived on dev. The nightly below has therefore never
+  # fired once — so the stack specs, the only thing covering these criteria, had
+  # never run anywhere. The customer's test report found that before we did.
+  #
+  # `push` is evaluated from the branch being pushed, so it works from where this
+  # file already is. A merge to dev now runs the stack specs, and the schedule
+  # starts working as well if this workflow ever reaches the default branch.
+  push:
+    branches: [dev, sync-v1, sprint4, release/wizard-v2, develop]
+  schedule:
+    # 02:00 UTC on weekday mornings — a failure is waiting at the start of the day.
+    # Needs this file on the default branch; see the note above.
+    - cron: "0 2 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Branch or SHA to run against (default: the commit that started the run)"
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  stack-e2e:
+    # A push runs it in the fork only; GAIK-project/gaik-toolkit has a dev branch of its
+    # own and runs the stack on the schedule and by hand.
+    if: >-
+      github.event_name != 'push'
+      || github.repository == 'NCF-public/gaik-toolkit-configuration-wizard-v2'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # A push tests the commit it pushed, and a scheduled run the default
+      # branch; a manual run can name any branch or SHA.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          ref: ${{ inputs.ref || github.sha }}
+
+      - name: Stack E2E (Postgres + wizard_api + UI)
+        working-directory: implementation_layer/wizard_api
+        env:
+          STACK_E2E_REPORT_DIR: ${{ runner.temp }}/stack-e2e
+        run: ./scripts/docker-test.sh --step stack-e2e
+      - name: Test report (stack E2E)
+        if: always()
+        run: python3 .github/scripts/junit_summary.py "Whole-stack browser tests" "$RUNNER_TEMP/stack-e2e/junit.xml"
+      - name: Keep the stack E2E results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: stack-e2e-report
+          path: ${{ runner.temp }}/stack-e2e
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Compose logs on failure
+        if: failure()
+        working-directory: implementation_layer/wizard_api
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml \
+            --profile stack-e2e logs --no-color --tail=300
+
+      - name: Tear down
+        if: always()
+        working-directory: implementation_layer/wizard_api
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.test.yml \
+            --profile stack-e2e --profile test down -v

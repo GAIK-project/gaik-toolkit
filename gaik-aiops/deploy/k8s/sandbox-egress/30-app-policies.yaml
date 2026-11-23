@@ -1,0 +1,41 @@
+# Ingress side in the application namespace: the API accepts sandbox traffic, the database only the API.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: gaik-app
+spec:
+  podSelector: {}
+  policyTypes: [Ingress]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-from-sandbox
+  namespace: gaik-app
+spec:
+  podSelector:
+    matchLabels: {app: api}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: gaik-sandbox}
+      ports:
+        - {protocol: TCP, port: 8080}
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-from-api
+  namespace: gaik-app
+spec:
+  podSelector:
+    matchLabels: {app: db}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app: api}
+      ports:
+        - {protocol: TCP, port: 8080}

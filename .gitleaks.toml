@@ -1,0 +1,29 @@
+# Secret scan settings for CI (.github/workflows/solution-wizard-v2.yml, job
+# security). Starts from gitleaks' default rules; what is listed here is what
+# the default rules flag in this tree that is not a credential.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Values in the tree that look like keys but are not credentials"
+regexes = [
+  # Supabase publishable keys and PostHog project keys are meant for the
+  # browser: they identify the project and grant nothing on their own.
+  '''sb_publishable_[A-Za-z0-9_-]+''',
+  '''phc_[A-Za-z0-9]+''',
+  # Keycloak's database address (port and database name, jdbc:...:5432/keycloak):
+  # the word "keycloak" reads as a key name to the
+  # generic rule. The credentials come from a Secret (deploy/keycloak).
+  '''^5432/keycloak$''',
+  # Invented values in upstream tests: a canary .env line the interactive
+  # runner must not read, and a made-up key the error redaction must hide.
+  '''^CANARY-ENV-0451$''',
+  '''^abcdefgh12345$''',
+]
+paths = [
+  # A manifest of test fixtures: file names and their sha256 digests.
+  '''evaluation_layer/.*/fixture_manifest\.json''',
+  # Unit tests with a placeholder key and a configuration arithmetic line.
+  '''implementation_layer/unit_tests/test_report_skill\.py''',
+  '''implementation_layer/unit_tests/test_parallel_transcriber_config\.py''',
+]

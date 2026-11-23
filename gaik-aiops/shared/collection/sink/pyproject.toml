@@ -1,0 +1,22 @@
+[project]
+name = "collection-sink"
+version = "0.1.0"
+description = "OTLP/HTTP logs receiver for the shared collection layer"
+requires-python = ">=3.11"
+dependencies = ["psycopg[binary]>=3.2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "pyyaml>=6.0"]
+
+[project.scripts]
+collection-sink = "collection_sink.server:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["collection_sink*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

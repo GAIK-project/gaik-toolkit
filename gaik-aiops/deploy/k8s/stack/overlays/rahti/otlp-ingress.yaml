@@ -1,0 +1,34 @@
+# The public OTLP/HTTP address for producers in other projects (M2):
+# https://otlp-gaik-aiops.2.rahtiapp.fi, the name Rahti would assign anyway. The Route reaches only the token-checked receiver on port
+# 4320 (otlp-ingress-collector.yaml); the collector's open in-project ports 4317 and 4318 stay internal.
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: otlp
+  labels: {app.kubernetes.io/name: otel-collector}
+  annotations:
+    haproxy.router.openshift.io/hsts_header: "max-age=31536000;includeSubDomains"
+spec:
+  host: otlp-gaik-aiops.2.rahtiapp.fi
+  to: {kind: Service, name: otel-collector, weight: 100}
+  port: {targetPort: otlp-ingress}
+  tls:
+    termination: edge
+    # Plain HTTP is refused, not redirected: a producer set up with http:// would send its bearer
+    # token in clear before any redirect.
+    insecureEdgeTerminationPolicy: None
+---
+# The OpenShift router may reach the token-checked receiver, and no other collector port.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-router-to-otlp-ingress
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: otel-collector}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {policy-group.network.openshift.io/ingress: ""}
+      ports: [{protocol: TCP, port: 4320}]

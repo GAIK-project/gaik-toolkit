@@ -1,0 +1,63 @@
+# Postgres for the collection layer and MLflow. The Software Collections image runs under any UID, as
+# OpenShift assigns them; a start hook (postgres-init.sh) adds the collection roles, the MLflow database and the schema.
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels: {app.kubernetes.io/name: postgres}
+spec:
+  selector: {app.kubernetes.io/name: postgres}
+  ports: [{name: postgres, port: 5432, targetPort: 5432}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels: {app.kubernetes.io/name: postgres}
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: postgres}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: postgres}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: postgres
+          image: quay.io/sclorg/postgresql-16-c9s@sha256:1e47f477e07d4378179a21f9cc88402ad39aa32789e0cd62fe2cef16c2a7bbdf
+          ports: [{containerPort: 5432}]
+          env:
+            - {name: POSTGRESQL_DATABASE, value: observability}
+            - {name: POSTGRESQL_USER, value: wp45}
+            - {name: POSTGRESQL_PASSWORD, valueFrom: {secretKeyRef: {name: aiops-db, key: owner-password}}}
+            - {name: POSTGRESQL_ADMIN_PASSWORD, valueFrom: {secretKeyRef: {name: aiops-db, key: admin-password}}}
+            - {name: COLLECTION_WRITER_PASSWORD, valueFrom: {secretKeyRef: {name: aiops-db, key: writer-password}}}
+            - {name: COLLECTION_READER_PASSWORD, valueFrom: {secretKeyRef: {name: aiops-db, key: reader-password}}}
+            - {name: MLFLOW_DB_PASSWORD, valueFrom: {secretKeyRef: {name: aiops-db, key: mlflow-password}}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/pgsql/data}
+            - {name: init, mountPath: /opt/app-root/src/postgresql-start}
+            - {name: sql, mountPath: /sql}
+          readinessProbe:
+            exec: {command: ["pg_isready", "-h", "127.0.0.1"]}
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 1Gi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: init
+          configMap: {name: postgres-init}
+        - name: sql
+          configMap: {name: collection-sql}
+  volumeClaimTemplates:
+    - metadata: {name: data}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 10Gi}}

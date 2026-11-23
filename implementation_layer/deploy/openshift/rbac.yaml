@@ -1,0 +1,59 @@
+# What the api may do in the project: create sandbox Jobs and read their pods
+# and logs. Nothing else — in particular no `secrets`, which the project's
+# `edit` role would have granted. Until this file existed the api ran as the
+# namespace's default ServiceAccount and sandbox runs failed with Forbidden
+# (or, where someone had given `default` the edit role, the api could read
+# every Secret in the project).
+#
+# NAME_PLACEHOLDER is the instance prefix deploy.sh substitutes, so each stack
+# has its own ServiceAccount; the Role is scoped to the namespace either way.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: v1
+    kind: ServiceAccount
+    metadata:
+      name: NAME_PLACEHOLDER-api
+      labels:
+        app: NAME_PLACEHOLDER-api
+
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: Role
+    metadata:
+      name: NAME_PLACEHOLDER-api-sandbox
+      labels:
+        app: NAME_PLACEHOLDER-api
+    rules:
+      # SandboxRunner: create_namespaced_job, read_namespaced_job_status,
+      # delete after TTL as a fallback. The status call reads the
+      # `jobs/status` subresource, which is authorised separately from `jobs`:
+      # without it the run itself proceeded but every status poll was
+      # Forbidden, so the api reported the run as failed and the PoC stream
+      # died with a 503.
+      - apiGroups: ["batch"]
+        resources: ["jobs"]
+        verbs: ["create", "get", "list", "watch", "delete"]
+      - apiGroups: ["batch"]
+        resources: ["jobs/status"]
+        verbs: ["get"]
+      # Find the Job's pod and follow its log stream.
+      - apiGroups: [""]
+        resources: ["pods"]
+        verbs: ["get", "list", "watch"]
+      - apiGroups: [""]
+        resources: ["pods/log"]
+        verbs: ["get"]
+
+  - apiVersion: rbac.authorization.k8s.io/v1
+    kind: RoleBinding
+    metadata:
+      name: NAME_PLACEHOLDER-api-sandbox
+      labels:
+        app: NAME_PLACEHOLDER-api
+    subjects:
+      - kind: ServiceAccount
+        name: NAME_PLACEHOLDER-api
+    roleRef:
+      kind: Role
+      name: NAME_PLACEHOLDER-api-sandbox
+      apiGroup: rbac.authorization.k8s.io

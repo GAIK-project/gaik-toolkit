@@ -10,7 +10,11 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   components and the MCP server built on them; outside the packages the gaik-sync audit
   scans, by design.
 - `implementation_layer/solution_wizard/`: the Solution Wizard, which mirrors gaik's API
-  (see gaik-sync below).
+  (see gaik-sync below); v1 and v2 share it.
+- Solution Wizard v2 (`implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`,
+  `gaik-aiops/`) is developed in the fork `NCF-public/gaik-toolkit-configuration-wizard-v2`
+  and arrives here as a merge of a fork branch; change those folders there, since an edit
+  here conflicts with the next delivery. Running it locally: `implementation_layer/WIZARD-DEV.md`.
 - `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI
   backend in `api/`, deployed on Rahti.
 - `guidance_layer/website/`: the docs site.
@@ -218,4 +222,7 @@ expected.
   publish like the certification does. Run it, or `gh workflow run live-smoke.yml`, before
   tagging so that the tag does not find a failure first.
 - Once a release is on PyPI, offer to take it into the Solution Wizard v2 fork with the
-  `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`.
+  `wizard-upstream-sync` skill: one checked pull request to the fork's `develop`. v2's
+  images here pin the older gaik until that sync comes back with the next delivery; the
+  release gate leaves their pin check to `solution-wizard-v2.yml`, which stays red on a
+  wizard change until then.

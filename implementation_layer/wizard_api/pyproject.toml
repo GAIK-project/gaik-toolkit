@@ -1,0 +1,56 @@
+[project]
+name = "wizard-api"
+version = "0.1.0"
+description = "GAIK Solution Wizard V2 — session API (FastAPI + Postgres)"
+requires-python = ">=3.11"
+
+dependencies = [
+    "fastapi>=0.128.0",
+    "uvicorn[standard]>=0.40.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.14.0",
+    "psycopg[binary]>=3.1",
+    "python-dotenv>=1.2.0",
+    "pydantic>=2.0",
+    # Pinned exactly: the agent's tool guard is a PreToolUse hook, and the SDK
+    # (with the CLI it bundles) decides how hooks are registered and called.
+    # Upgrade only together with tests/test_agent_sdk_contract.py (see README).
+    # Keep it at or above the floor of the root pyproject's `wizard` extra and at
+    # the version the root uv.lock resolves, so one environment can hold both and
+    # solution_wizard's guard is tested on the same SDK as this one.
+    "claude-agent-sdk==0.2.185",
+    "opentelemetry-api==1.45.2",
+    "opentelemetry-sdk==1.45.2",
+    "opentelemetry-exporter-otlp-proto-http==1.45.2",
+]
+
+[project.scripts]
+# The agent's CLI in its own container (wizard_api/agent_bridge.py): the bridge
+# runs there, the client is what the SDK starts in the api container.
+wizard-agent-bridge = "wizard_api.agent_bridge:server_main"
+wizard-agent-cli = "wizard_api.agent_bridge:client_main"
+
+[project.optional-dependencies]
+# The sandbox runner talks to the Kubernetes API to create Jobs and follow their
+# logs. Optional so local development and the test suite need no cluster client;
+# sandbox_runner raises a clear error when it is missing rather than failing at
+# import.
+sandbox = [
+    "kubernetes>=31.0.0",
+    "pyyaml>=6.0",
+]
+dev = [
+    "pytest>=8.0.0",
+    "httpx>=0.28.0",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wizard_api*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

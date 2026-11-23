@@ -13,6 +13,11 @@ the repository is laid out and checked.
   model, transcription or parser call outside the rate limits; an upload that reaches a
   parser or a model before its content and size are checked; personal data kept past its
   cleanup; AI output without its AI notice.
+- In the Solution Wizard v2 (`wizard_api`, the web app, the sandbox): a session route
+  that skips the ownership check on `X-Wizard-User-Id` or the service token; an upload or
+  a package that reaches the agent or the sandbox before its checks; a sandbox Job without
+  its resource limits or its network policy; a file's content that the agent reads as
+  instructions; an agent, model or sandbox call outside the run and rate limits.
 - Anywhere: a secret, real customer document or machine-local path; a test that does not
   check what its name says; a CI or release check made to pass by skipping it.
 

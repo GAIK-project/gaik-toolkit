@@ -1,0 +1,158 @@
+# Test profile — see scripts/docker-test.sh
+services:
+  test-api:
+    profiles: [test]
+    build:
+      context: ..
+      dockerfile: wizard_api/Dockerfile
+      target: dev
+    environment:
+      WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@postgres:5432/wizard
+      WIZARD_SESSION_OUTPUT_ROOT: /tmp/wizard-test-sessions
+    command: sh -c "alembic upgrade head && pytest -v --tb=short -ra --capture=no"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  test-ui:
+    profiles: [test]
+    build:
+      context: ../solution_wizard_v2
+      dockerfile: Dockerfile.dev
+    environment:
+      NEXT_PUBLIC_DEV_AUTH: "true"
+      # Local-only accounts; a deployed instance sets its own from a secret.
+      WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+    command: sh -c "npm run test && npm run lint && npm run build"
+
+  wizard-ui-e2e:
+    profiles: [test]
+    build:
+      context: ../solution_wizard_v2
+      dockerfile: Dockerfile.dev
+    environment:
+      NEXT_PUBLIC_DEV_AUTH: "true"
+      # Local-only accounts; a deployed instance sets its own from a secret.
+      WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+    command: sh -c "npm run dev -- -H 0.0.0.0 -p 3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 45s
+
+  test-e2e:
+    profiles: [test]
+    build:
+      context: ../solution_wizard_v2
+      dockerfile: Dockerfile.dev
+    environment:
+      CI: "true"
+      PLAYWRIGHT_SKIP_WEBSERVER: "true"
+      PLAYWRIGHT_BASE_URL: http://wizard-ui-e2e:3000
+      NEXT_PUBLIC_DEV_AUTH: "true"
+      # Local-only accounts; a deployed instance sets its own from a secret.
+      WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+    command: npm run test:e2e -- --grep-invert "Postgres persistence"
+    depends_on:
+      wizard-ui-e2e:
+        condition: service_healthy
+
+  wizard-api-e2e:
+    profiles: [stack-e2e]
+    build:
+      context: ..
+      dockerfile: wizard_api/Dockerfile
+      target: production
+    environment:
+      WIZARD_DATABASE_URL: postgresql+psycopg://wizard:wizard@postgres:5432/wizard
+      WIZARD_SESSION_OUTPUT_ROOT: /tmp/wizard-stack-e2e-sessions
+      WIZARD_TEST_HOOKS: "1"
+      # No agent writes artifacts in this stack, so gates could never be approved.
+      WIZARD_GATE_READINESS: "off"
+      # The specs create many sessions as one user and run no real agent.
+      WIZARD_MAX_SESSIONS_PER_USER: "0"
+      WIZARD_SESSION_MAX_COST_USD: "0"
+      WIZARD_USER_MAX_COST_USD: "0"
+      WIZARD_DEPLOYMENT_MAX_COST_USD: "0"
+    restart: unless-stopped
+    command: sh -c "alembic upgrade head && uvicorn wizard_api.main:app --host 0.0.0.0 --port 8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8100/health')",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 30s
+
+  wizard-ui-stack-e2e:
+    profiles: [stack-e2e]
+    build:
+      context: ../solution_wizard_v2
+      dockerfile: Dockerfile.dev
+    environment:
+      WIZARD_API_URL: http://wizard-api-e2e:8100
+      NEXT_PUBLIC_DEV_AUTH: "true"
+      # Local-only accounts; a deployed instance sets its own from a secret.
+      WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+    command: sh -c "npm run dev -- -H 0.0.0.0 -p 3000"
+    depends_on:
+      wizard-api-e2e:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 24
+      start_period: 45s
+
+  test-e2e-stack:
+    profiles: [stack-e2e]
+    build:
+      context: ../solution_wizard_v2
+      dockerfile: Dockerfile.dev
+    environment:
+      CI: "true"
+      PLAYWRIGHT_STACK_E2E: "true"
+      PLAYWRIGHT_SKIP_WEBSERVER: "true"
+      PLAYWRIGHT_BASE_URL: http://wizard-ui-stack-e2e:3000
+      WIZARD_API_URL: http://wizard-api-e2e:8100
+      WIZARD_TEST_HOOKS: "1"
+      NEXT_PUBLIC_DEV_AUTH: "true"
+      # Local-only accounts; a deployed instance sets its own from a secret.
+      WIZARD_DEV_USERS: "dev@gaik.local:gaik,dev2@gaik.local:gaik2"
+      NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ci-encryption-key-32-characters!!
+    # Every *-stack spec, so a new one is picked up without editing this file.
+      # Reports go to the host folder below, so CI can summarise and keep them.
+      PLAYWRIGHT_REPORT_DIR: /reports
+    volumes:
+      - ${STACK_E2E_REPORT_DIR:-./.stack-e2e-report}:/reports
+    command: ["npx", "playwright", "test", "stack\\.spec\\.ts", "--workers=1"]
+    depends_on:
+      wizard-ui-stack-e2e:
+        condition: service_healthy

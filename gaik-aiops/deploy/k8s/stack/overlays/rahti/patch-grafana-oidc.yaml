@@ -1,0 +1,55 @@
+# Grafana signs users in at the GAIK Keycloak (realm gaik, project gaik; see
+# implementation_layer/deploy/keycloak/README.md). Keycloak groups give the organisations and roles:
+#   aiops-admin    Main Org.: Admin    Security: Viewer   (audit trail readable, its datasource not editable)
+#   aiops-viewer   Main Org.: Viewer   no Security membership
+#   neither        sign-in refused
+# Grafana 11.6 refuses every sign-in under role_attribute_strict unless role_attribute_path is set, and
+# gives each mapped organisation the higher of that role and the organisation mapping's. The path
+# therefore gives Viewer to both groups (nothing to anyone else, so strict refuses them) and the
+# mapping raises aiops-admin to Admin in Main Org. only: Security stays Viewer (tested 18.11.2026 on
+# 11.6.16). Grafana resolves the organisation name Security when it starts, so restart Grafana once
+# after grafana-setup has first created that organisation (README.md). The local admin stays for
+# grafana-setup's API calls. With the sign-in form off it cannot sign in through the page: when
+# Keycloak is down, use the API with basic auth or switch the form back on (README.md). The client and
+# its Secret come from
+#   SECRET_NAMESPACE=gaik-aiops PROJECT=gaik implementation_layer/deploy/keycloak/deploy.sh \
+#     add-client aiops-grafana https://grafana-gaik-aiops.2.rahtiapp.fi /login/generic_oauth
+# Keycloak is in another project, so Grafana reaches it over its public address, never the Service.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  template:
+    spec:
+      containers:
+        - name: grafana
+          env:
+            - {name: GF_AUTH_GENERIC_OAUTH_ENABLED, value: "true"}
+            - {name: GF_AUTH_GENERIC_OAUTH_NAME, value: GAIK}
+            # Only "Sign in with GAIK" on the sign-in page: GAIK accounts typed into
+            # Grafana's own form fail as "user not found". This also stops the local
+            # admin signing in through the page; the setup Job's API calls with basic
+            # auth still work.
+            - {name: GF_AUTH_DISABLE_LOGIN_FORM, value: "true"}
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_ID
+              valueFrom: {secretKeyRef: {name: aiops-grafana-signin, key: client-id}}
+            - name: GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET
+              valueFrom: {secretKeyRef: {name: aiops-grafana-signin, key: client-secret}}
+            - {name: GF_AUTH_GENERIC_OAUTH_SCOPES, value: "openid email profile groups"}
+            - {name: GF_AUTH_GENERIC_OAUTH_USE_PKCE, value: "true"}
+            - {name: GF_AUTH_GENERIC_OAUTH_AUTH_URL, value: "https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/auth"}
+            - {name: GF_AUTH_GENERIC_OAUTH_TOKEN_URL, value: "https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/token"}
+            - {name: GF_AUTH_GENERIC_OAUTH_API_URL, value: "https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/userinfo"}
+            - {name: GF_AUTH_SIGNOUT_REDIRECT_URL, value: "https://gaik-keycloak-gaik.2.rahtiapp.fi/realms/gaik/protocol/openid-connect/logout?client_id=aiops-grafana&post_logout_redirect_uri=https%3A%2F%2Fgrafana-gaik-aiops.2.rahtiapp.fi%2Flogin"}
+            - {name: GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH, value: email}
+            - {name: GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH, value: email}
+            - {name: GF_AUTH_GENERIC_OAUTH_ORG_ATTRIBUTE_PATH, value: groups}
+            - {name: GF_AUTH_GENERIC_OAUTH_ORG_MAPPING, value: "aiops-admin:1:Admin,aiops-admin:Security:Viewer,aiops-viewer:1:Viewer"}
+            - name: GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_PATH
+              value: "(contains(groups[*], 'aiops-admin') || contains(groups[*], 'aiops-viewer')) && 'Viewer'"
+            - {name: GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT, value: "true"}
+            - {name: GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN, value: "false"}
+            - {name: GF_AUTH_GENERIC_OAUTH_SKIP_ORG_ROLE_SYNC, value: "false"}
+            - {name: GF_AUTH_GENERIC_OAUTH_ALLOW_SIGN_UP, value: "true"}
+            - {name: GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP, value: "false"}

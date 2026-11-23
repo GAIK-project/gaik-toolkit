@@ -7,6 +7,10 @@ Usage:
     python run_poc.py                          # interactive Q&A after indexing
     python run_poc.py --synthetic              # generate synthetic docs + index
     python run_poc.py --query "your question"  # single-question mode
+
+Without a terminal (the wizard's test run, a case, a pipe) nobody can type a
+question. The run then answers the lines piped to it, else the questions in the
+text files of sample_input/ (.txt or .md, one question per line).
 """
 
 from __future__ import annotations
@@ -24,8 +28,18 @@ load_dotenv(Path(__file__).parent / ".env")
 
 from gaik.software_modules.RAG_workflow import RAGWorkflow  # noqa: E402
 sys.path.insert(0, str(Path(__file__).parent))
+from input_bundle import uploaded_names  # noqa: E402
 from provider_config import external_model_forbidden, get_stage_config  # noqa: E402
 import poc_output  # noqa: E402
+
+#: Text files in sample_input/ hold the questions of a run that has no terminal.
+QUESTION_SUFFIXES = (".txt", ".md")
+#: More lines than this is a document, not a list of questions: every line would
+#: be one model call.
+MAX_QUESTIONS = 20
+#: What the scaffolder writes in place of a sample PDF when it cannot make one:
+#: a note to the reader, not questions.
+PLACEHOLDER_SAMPLE = "synthetic_sample.txt"
 
 
 def load_config() -> dict:
@@ -46,6 +60,43 @@ def find_documents(config: dict) -> list:
         if f.is_file() and f.suffix.lower() == ".pdf" and f.resolve().is_relative_to(root)
     ]
     return sorted(docs)
+
+
+def find_questions(sample_dir: Path) -> tuple:
+    """The questions given as files, and the names of the files they came from.
+
+    The wizard's test run and a case run have no terminal, so the question comes
+    as a text file beside the documents: every non-empty line of a text file in
+    sample_input/ (subfolders too, like the documents) is one question. A text
+    file the user added themselves is read instead of the package's sample
+    questions. Only files that stay inside sample_input/ once links are resolved.
+    """
+    root = sample_dir.resolve()
+    files = sorted(
+        f
+        for f in sample_dir.rglob("*")
+        if f.is_file()
+        and f.suffix.lower() in QUESTION_SUFFIXES
+        and f.name != PLACEHOLDER_SAMPLE
+        and f.resolve().is_relative_to(root)
+    )
+    # Uploads land at the top of the folder, so a same-named file deeper down is not one.
+    own = uploaded_names(sample_dir)
+    files = [f for f in files if f.name in own and f.parent.resolve() == root] or files
+    names = [f.relative_to(sample_dir).as_posix() for f in files]
+    questions = []
+    for f, name in zip(files, names):
+        lines = f.read_text(encoding="utf-8-sig", errors="replace").splitlines()
+        questions.extend(line.strip() for line in lines if line.strip())
+        if len(questions) > MAX_QUESTIONS:
+            print(
+                f"ERROR: {name} brings the questions to more than "
+                f"{MAX_QUESTIONS}. A text file here is read as questions, one per line; "
+                "the documents to search must be PDF files.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+    return questions, names
 
 
 def generate_synthetic_docs(sample_dir: Path) -> list:
@@ -117,6 +168,27 @@ def main() -> None:
             print("Place .pdf files there, or use --synthetic.")
             sys.exit(1)
 
+    # Without a terminal nobody can type a question. Waiting for one ended the run
+    # at once with exit code 0 and an empty output/, which read as a success.
+    questions = None
+    asked_from = ""
+    if not args.query and not (sys.stdin and sys.stdin.isatty()):
+        # Lines piped to the run come first: someone asked exactly those. The
+        # sandbox pipes nothing, so there the question files are read.
+        questions = [line.strip() for line in sys.stdin if line.strip()] if sys.stdin else []
+        asked_from = "piped to the run"
+        if not questions:
+            questions, names = find_questions(sample_dir)
+            asked_from = "from " + ", ".join(names)
+        if not questions:
+            print(
+                "ERROR: No question to answer. This run has no terminal to type one in: "
+                f"add a text file (.txt) with one question per line to {sample_dir.name}/, "
+                "or run with --query.",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
     persist_path = str(Path(__file__).parent / "output" / "chroma_store")
     workflow = RAGWorkflow(
         parser_config=get_stage_config(config, "parser"),
@@ -151,22 +223,38 @@ def main() -> None:
         print(f"\nResult saved to: {output_path}")
         _pdf_source = {"query": args.query, "answer": answer}
     else:
-        # Interactive mode: the user asks each question here, so each answer is shown.
-        print("\nReady. Type your question (or 'exit' to quit).")
+        # Interactive mode, or the questions of a run without a terminal.
         session_results = []
-        while True:
-            try:
-                query = input("\nQuestion: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                break
-            if query.lower() in ("exit", "quit", "q"):
-                break
-            if not query:
-                continue
+
+        def ask(query: str, show: bool) -> None:
             result = workflow.ask(query, stream=False)
             answer = getattr(result, "answer", str(result))
-            print(f"\nAnswer: {answer}")
+            if show:
+                print(f"\nAnswer: {answer}")
+            else:
+                print(f"\nAnswer: {len(str(answer))} characters (run with --verbose to print it)")
             session_results.append({"query": query, "answer": answer})
+
+        if questions is not None:
+            # Nobody types these questions here: as with --query, the answers go to
+            # output/ and the log prints them only with --verbose.
+            print(f"\nNo terminal: answering {len(questions)} question(s) {asked_from}.")
+            for query in questions:
+                print(f"\nQuestion: {query}")
+                ask(query, show=poc_output.VERBOSE)
+        else:
+            # Interactive mode: the user asks each question here, so each answer is shown.
+            print("\nReady. Type your question (or 'exit' to quit).")
+            while True:
+                try:
+                    query = input("\nQuestion: ").strip()
+                except (EOFError, KeyboardInterrupt):
+                    break
+                if query.lower() in ("exit", "quit", "q"):
+                    break
+                if not query:
+                    continue
+                ask(query, show=True)
 
         if session_results:
             output_path = output_dir / "session_results.json"

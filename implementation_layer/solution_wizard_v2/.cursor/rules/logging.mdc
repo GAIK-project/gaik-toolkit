@@ -1,0 +1,54 @@
+---
+description: Structured logging and audit requirements for Solution Wizard V2 API routes and Server Actions (S3-10)
+globs: implementation_layer/solution_wizard_v2/app/api/**/route.ts,implementation_layer/solution_wizard_v2/app/**/actions.ts
+alwaysApply: false
+---
+
+# Logging (S3-10)
+
+Every API route handler and Server Action in Solution Wizard V2 must go
+through the shared logging/audit infrastructure in `lib/`. This exists so a
+demo or production incident can be traced end-to-end from a single
+`traceId`, without ever leaking secrets into logs. Background:
+`docs/2026-08-logging/technical-task-logging.md`.
+
+## Required for every `app/api/**/route.ts` handler
+
+- Wrap the exported handler (`GET`/`POST`/`PATCH`/...) with
+  `withLogging("<event-name>", handler)` from `lib/with-logging.ts`. Do not
+  call `console.log`/`console.error` directly — use `logger` from
+  `lib/logger.ts` (or let `withLogging` handle it for you on
+  success/error/thrown exceptions).
+- Pick an `event` name in `<resource>.<verb>` form, matching the existing
+  ones (`blueprint.patch`, `bpmn.sync`, `chat.post`, `poc.generate`, ...).
+- If the route performs a security-relevant or data-changing action
+  (auth, session creation, blueprint/BPMN mutation, PoC generation), call
+  `audit(event, { actor, resource, outcome, ... })` from `lib/audit.ts` for
+  both the success and the denied/error paths. See the `AuditEvent` union in
+  `lib/audit.ts` for the allowed event names — add a new one there rather
+  than inventing an ad-hoc string.
+
+## Required for every Server Action (`app/**/actions.ts`)
+
+- Server Actions don't run through `withLogging`'s `AsyncLocalStorage`
+  scope, so read the trace id via `getIncomingTraceId()` from
+  `lib/request-context.ts` (it falls back to a fresh id outside a request
+  scope, e.g. in tests) rather than assuming one is set.
+- Auth-affecting actions (`login`, `devSignIn`, `signOut`) must call `audit()`
+  **before** any `redirect()` call — `redirect()` throws, so anything after
+  it never runs.
+
+## Never log
+
+- Passwords, tokens, cookies, or API keys, even redacted forms should not be
+  attempted manually — `lib/logger.ts`'s `redact` config already covers the
+  known paths; extend that config, don't work around it.
+- Full chat message content or full blueprint bodies. Log identifiers,
+  counts, and outcomes (e.g. `stepCount`, not the blueprint JSON itself).
+
+## Review checklist
+
+A new or modified route/action that does **not** call `withLogging` (routes)
+or `getIncomingTraceId`/`audit` (actions, where applicable) should be flagged
+in review and sent back — this is exactly the gap S3-10 closed, don't
+reopen it silently by adding an unwrapped route later.

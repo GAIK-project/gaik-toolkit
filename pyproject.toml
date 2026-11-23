@@ -484,6 +484,8 @@ dev = [
     "build>=1.0",
     "twine>=4.0",
     "pytest>=8.0",
+    # Used by test_sandbox_job_manifest.py to read the deploy manifests.
+    "pyyaml>=6.0",
 ]
 
 # Solution Configuration Wizard runner (run_wizard_interactive.py / scripts/run_wizard.py)
@@ -513,6 +515,9 @@ exclude = ["gaik.tests", "gaik.*.tests"]
 [tool.setuptools_scm]
 version_file = "implementation_layer/src/gaik/_version.py"
 tag_regex = "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+# Only release tags describe a version. Without this, git describe hands
+# setuptools-scm a dev-YYYY-MM-DD-<sha> or wizard-v2-* tag and the build fails.
+git_describe_command = "git describe --dirty --tags --long --match v*.*.*"
 fallback_version = "0.0.0"
 version_scheme = "no-guess-dev"
 local_scheme = "no-local-version"
@@ -536,6 +541,8 @@ ignore = []
 [tool.ruff.lint.per-file-ignores]
 # Re-exports in __init__.py are intentional
 "**/__init__.py" = ["F401"]
+# sys.path must be patched before solution_wizard imports
+"implementation_layer/wizard_api/tests/conftest.py" = ["E402"]
 # LLM prompt strings are intentionally long single lines
 "implementation_layer/src/gaik/software_components/enhance_transcript/enhance_transcript.py" = ["E501"]
 # Legacy module names that cannot be renamed in a published package

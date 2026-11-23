@@ -1,0 +1,45 @@
+# Overlay: Grafana login through the local Keycloak, WP4 roles mapped to Grafana.
+#   docker compose -f deploy/compose/docker-compose.yml -f deploy/compose/identity.yml up -d --build --wait
+#
+# Mapping (organisation: role)
+#   admin              Main Org.: Admin    Security: Viewer   (audit log readable, its datasource not editable)
+#   expert, approver,  Main Org.: Viewer   no Security membership
+#   viewer
+#   no known role      login refused
+services:
+  keycloak:
+    profiles: !reset []
+
+  grafana:
+    environment:
+      GF_SERVER_ROOT_URL: http://localhost:3000
+      GF_AUTH_GENERIC_OAUTH_ENABLED: "true"
+      GF_AUTH_GENERIC_OAUTH_NAME: Organisation login
+      GF_AUTH_GENERIC_OAUTH_CLIENT_ID: grafana
+      # Local value. In a real deployment use GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET__FILE with a file rendered
+      # by the vault agent (wp4/secrets/).
+      GF_AUTH_GENERIC_OAUTH_CLIENT_SECRET: ${GRAFANA_OIDC_SECRET:-grafana-local-only}
+      GF_AUTH_GENERIC_OAUTH_SCOPES: openid profile email
+      GF_AUTH_GENERIC_OAUTH_USE_PKCE: "true"
+      # The browser talks to localhost:8180; Grafana itself reaches Keycloak on the compose network.
+      GF_AUTH_GENERIC_OAUTH_AUTH_URL: http://localhost:8180/realms/gaik/protocol/openid-connect/auth
+      GF_AUTH_GENERIC_OAUTH_TOKEN_URL: http://keycloak:8180/realms/gaik/protocol/openid-connect/token
+      GF_AUTH_GENERIC_OAUTH_API_URL: http://keycloak:8180/realms/gaik/protocol/openid-connect/userinfo
+      GF_AUTH_GENERIC_OAUTH_SIGNOUT_REDIRECT_URL: http://localhost:8180/realms/gaik/protocol/openid-connect/logout?client_id=grafana&post_logout_redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Flogin
+      GF_AUTH_GENERIC_OAUTH_LOGIN_ATTRIBUTE_PATH: preferred_username
+      GF_AUTH_GENERIC_OAUTH_EMAIL_ATTRIBUTE_PATH: email
+      # Organisation membership and role per organisation from the same "roles" claim as the API.
+      # No role_attribute_path on purpose: when it is set, Grafana applies its single role to every mapped
+      # organisation, which would make admins Admin of the Security organisation as well.
+      # Strict: a user that matches no mapping entry is refused.
+      GF_AUTH_GENERIC_OAUTH_ORG_ATTRIBUTE_PATH: roles
+      GF_AUTH_GENERIC_OAUTH_ORG_MAPPING: "admin:1:Admin,admin:Security:Viewer,expert:1:Viewer,approver:1:Viewer,viewer:1:Viewer"
+      GF_AUTH_GENERIC_OAUTH_ROLE_ATTRIBUTE_STRICT: "true"
+      GF_AUTH_GENERIC_OAUTH_ALLOW_ASSIGN_GRAFANA_ADMIN: "false"
+      GF_AUTH_GENERIC_OAUTH_SKIP_ORG_ROLE_SYNC: "false"
+      GF_AUTH_OAUTH_ALLOW_INSECURE_EMAIL_LOOKUP: "false"
+      # Local admin stays as break-glass access; its password belongs in the vault.
+      GF_AUTH_DISABLE_LOGIN_FORM: "false"
+    depends_on:
+      keycloak:
+        condition: service_healthy

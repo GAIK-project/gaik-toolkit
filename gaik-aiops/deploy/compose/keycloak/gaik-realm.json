@@ -1,0 +1,251 @@
+{
+  "realm": "gaik",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "bruteForceProtected": true,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "passwordPolicy": "length(12) and notUsername",
+  "roles": {
+    "realm": [
+      {
+        "name": "viewer",
+        "description": "Read solutions, results and dashboards"
+      },
+      {
+        "name": "expert",
+        "description": "Create and edit solutions, upload inputs, run jobs"
+      },
+      {
+        "name": "approver",
+        "description": "Approve or reject results (optional role)"
+      },
+      {
+        "name": "admin",
+        "description": "Configuration, role assignments, audit log"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "gaik-api",
+      "description": "Resource server; never issues tokens itself",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "gaik-web",
+      "description": "Browser front end: authorization code flow with PKCE",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "http://localhost:3001/*"
+      ],
+      "webOrigins": [
+        "http://localhost:3001"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3001/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "gaik-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "gaik-local-test",
+      "description": "LOCAL TESTS ONLY: password grant for automated tests. Never import into a real realm.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "true"
+          }
+        },
+        {
+          "name": "api-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "gaik-api",
+            "access.token.claim": "true",
+            "id.token.claim": "false"
+          }
+        }
+      ]
+    },
+    {
+      "clientId": "grafana",
+      "description": "Dashboards (WP5): authorization code flow with PKCE, confidential",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "grafana-local-only",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "redirectUris": [
+        "http://localhost:3000/login/generic_oauth"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:3000/login"
+      },
+      "protocolMappers": [
+        {
+          "name": "roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "4acb4d6b-7489-563c-80b6-89b808f75898",
+      "username": "viewer",
+      "email": "viewer@example.test",
+      "firstName": "Test",
+      "lastName": "Viewer",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "viewer-local-only",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "viewer"
+      ]
+    },
+    {
+      "id": "0a75b14c-0dd2-5b83-9e9f-8ad9bbbb2830",
+      "username": "expert",
+      "email": "expert@example.test",
+      "firstName": "Test",
+      "lastName": "Expert",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "expert-local-only",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "expert"
+      ]
+    },
+    {
+      "id": "a4371301-97e4-5dce-91da-05463bcaf5ad",
+      "username": "approver",
+      "email": "approver@example.test",
+      "firstName": "Test",
+      "lastName": "Approver",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "approver-local-only",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "viewer",
+        "approver"
+      ]
+    },
+    {
+      "id": "ca844341-7b31-5d1e-b8c7-18e8f46a155c",
+      "username": "security-admin",
+      "email": "security-admin@example.test",
+      "firstName": "Test",
+      "lastName": "Security-Admin",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "security-admin-local-only",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "admin"
+      ]
+    },
+    {
+      "id": "38c459a6-0707-5d85-81cb-7604acb6b14e",
+      "username": "norole",
+      "email": "norole@example.test",
+      "firstName": "Test",
+      "lastName": "Norole",
+      "enabled": true,
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "norole-local-only",
+          "temporary": false
+        }
+      ],
+      "realmRoles": []
+    }
+  ]
+}

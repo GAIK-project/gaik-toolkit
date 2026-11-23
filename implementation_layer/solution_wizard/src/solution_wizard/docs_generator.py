@@ -24,7 +24,7 @@ import string
 from pathlib import Path
 from typing import Any, Dict, List
 
-from .blueprint import Blueprint
+from .blueprint import Blueprint, external_services
 
 TEMPLATES_DIR = Path(__file__).parent.parent.parent / "templates" / "docs"
 
@@ -154,6 +154,51 @@ def _artifacts_block(blueprint: Blueprint) -> str:
     return "\n".join(lines)
 
 
+def external_services_block(blueprint: Blueprint) -> str:
+    """One Markdown list item per external service, or "" when the blueprint has none.
+
+    Used by the technical specification and by the PoC's README. The package and the
+    variable names were checked by the blueprint model, so they go in code spans; the
+    rest is text the user or the agent wrote.
+    """
+    items: list[str] = []
+    for service in external_services(blueprint):
+        lines = [f"- **{md_text(service.name)}**: {md_text(service.purpose)}"]
+        if service.python_package:
+            lines.append(f"  - Package: `{service.python_package}` (in `requirements.txt`)")
+        keys = ", ".join(f"`{name}`" for name in service.env_vars)
+        lines.append(f"  - Keys and settings in `.env`: {keys or '_none_'}")
+        lines.append(f"  - Data sent to the service: {md_text(service.data_sent)}")
+        lines.append(
+            "  - Available: "
+            + (
+                "yes, the user provides the account and key"
+                if service.user_can_provide
+                else "not yet, an open item; the PoC runs without it"
+            )
+        )
+        lines.append(f"  - Without it: {md_text(service.fallback)}")
+        if service.docs_url:
+            lines.append(f"  - Documentation: {md_text(service.docs_url)}")
+        items.append("\n".join(lines))
+    return "\n".join(items)
+
+
+def _external_services_keys(blueprint: Blueprint) -> str:
+    """The user guide's prerequisite line for the external services' keys."""
+    services = external_services(blueprint)
+    if not services:
+        return "- External services: none."
+    named = []
+    for service in services:
+        keys = ", ".join(f"`{name}`" for name in service.env_vars) or "no key"
+        named.append(f"{keys} ({md_text(service.name)})")
+    return (
+        "- External services: set " + "; ".join(named) + " in `poc/.env`. Without a key "
+        "the PoC skips that step, says so in its log, and runs the other steps."
+    )
+
+
 def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
     uc = blueprint.use_case
     bspec = _as_dict(blueprint.business_spec)
@@ -206,6 +251,9 @@ def _build_doc_variables(blueprint: Blueprint) -> Dict[str, str]:
         "model_preferences": _fmt_value(tspec.get("model_preferences")),
         "security_constraints": _fmt_value(tspec.get("security_constraints")),
         "integration_targets": _fmt_value(tspec.get("integration_targets")),
+        "external_services_block": external_services_block(blueprint)
+        or "- _none: every step uses GAIK components_",
+        "external_services_keys": _external_services_keys(blueprint),
         "human_review": _fmt_value(tspec.get("human_review", tspec.get("human_review_required"))),
         "evaluation_requirements": _fmt_value(tspec.get("evaluation_requirements")),
         "runtime_interface": _fmt_value(runtime),

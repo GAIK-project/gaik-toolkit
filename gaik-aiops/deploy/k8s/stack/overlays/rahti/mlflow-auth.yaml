@@ -1,0 +1,53 @@
+# The proxy between the sign-in (mlflow-signin.yaml) and MLflow: keeps deleting closed
+# (mlflow-auth-nginx.conf). Red Hat's UBI nginx image runs under any UID.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow-auth
+  labels: {app.kubernetes.io/name: mlflow-auth}
+spec:
+  selector: {app.kubernetes.io/name: mlflow-auth}
+  ports: [{name: http, port: 8080, targetPort: 8080}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mlflow-auth
+  labels: {app.kubernetes.io/name: mlflow-auth}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: mlflow-auth}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: mlflow-auth}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+      containers:
+        - name: nginx
+          # ubi9/nginx-126:1-1777855212, pinned by digest.
+          image: registry.access.redhat.com/ubi9/nginx-126@sha256:06ec47bfc1d8879e597e7a738408fd35353bf5be00aaf3bf432ae42cf7d0c5e7
+          command: ["nginx", "-c", "/etc/nginx-proxy/nginx.conf", "-g", "daemon off;"]
+          ports: [{containerPort: 8080}]
+          volumeMounts:
+            - {name: config, mountPath: /etc/nginx-proxy, readOnly: true}
+          readinessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: 8080}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            # Rahti: at least 50m CPU per container, limit at most five times the request.
+            requests: {cpu: 50m, memory: 32Mi}
+            limits: {cpu: 200m, memory: 128Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities: {drop: [ALL]}
+      volumes:
+        - name: config
+          configMap: {name: mlflow-auth-nginx}

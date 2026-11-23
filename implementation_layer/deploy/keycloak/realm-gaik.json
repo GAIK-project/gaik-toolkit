@@ -1,0 +1,53 @@
+{
+  "realm": "gaik",
+  "displayName": "GAIK",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": true,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "passwordPolicy": "length(12) and notUsername and notEmail",
+  "accessTokenLifespan": 900,
+  "ssoSessionIdleTimeout": 28800,
+  "ssoSessionMaxLifespan": 43200,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "fi",
+    "en"
+  ],
+  "defaultLocale": "fi",
+  "groups": [
+    {
+      "name": "pending"
+    },
+    {
+      "name": "wizard-user"
+    },
+    {
+      "name": "demo-user"
+    },
+    {
+      "name": "admin"
+    },
+    {
+      "name": "aiops-admin"
+    },
+    {
+      "name": "aiops-viewer"
+    }
+  ],
+  "defaultGroups": [
+    "/pending"
+  ],
+  "loginTheme": "gaik"
+}

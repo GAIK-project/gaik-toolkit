@@ -1,0 +1,417 @@
+<!doctype html>
+<html lang="fi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PoC Workflow Prototype</title>
+<style>
+:root{
+  --bg:#f4f6f8;--card:#fff;--text:#1d2a33;--muted:#5b6b75;--border:#d6dde2;
+  --accent:#2f5d7c;--accent-text:#fff;--ok:#1f7a3a;--ok-bg:#e7f5ec;--warn:#8a5a00;--warn-bg:#fff4d6;
+  --bad:#a12a2a;--bad-bg:#fbe9e9;--edit:#4b3a8f;--edit-bg:#eeeafd;--field:#fbfcfd;
+  --l0:#2f6f9f;--l1:#7a4fb0;--l2:#2e8a5a;--l3:#b0602f;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12181d;--card:#1b232a;--text:#e3e9ee;--muted:#9aa9b4;--border:#2e3a44;
+  --accent:#6fa8d0;--accent-text:#0d1419;--ok:#6fd08f;--ok-bg:#163223;--warn:#f0c060;--warn-bg:#3a2e12;
+  --bad:#f08a8a;--bad-bg:#3a1a1a;--edit:#b8a8ff;--edit-bg:#2a2445;--field:#161d23;
+  --l0:#6fa8d0;--l1:#b896e8;--l2:#6fd0a0;--l3:#e8a070;}}
+:root[data-theme="dark"]{
+  --bg:#12181d;--card:#1b232a;--text:#e3e9ee;--muted:#9aa9b4;--border:#2e3a44;
+  --accent:#6fa8d0;--accent-text:#0d1419;--ok:#6fd08f;--ok-bg:#163223;--warn:#f0c060;--warn-bg:#3a2e12;
+  --bad:#f08a8a;--bad-bg:#3a1a1a;--edit:#b8a8ff;--edit-bg:#2a2445;--field:#161d23;
+  --l0:#6fa8d0;--l1:#b896e8;--l2:#6fd0a0;--l3:#e8a070;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{max-width:1180px;margin:0 auto;padding:0 16px}
+header{padding:16px 0 6px;display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+h1{font-size:20px;margin:0 0 2px}
+.sub{color:var(--muted);font-size:13px}
+.toolbar{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.roles{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 4px}
+.role{font:inherit;font-weight:600;font-size:14px;padding:7px 12px;border-radius:999px;border:2px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;display:flex;gap:6px;align-items:center}
+.role.on{border-color:currentColor}
+.role .dot{width:9px;height:9px;border-radius:50%;background:currentColor}
+.role .n{background:var(--bad);color:#fff;border-radius:999px;font-size:11px;padding:0 6px}
+.steps{display:flex;gap:0;overflow-x:auto;margin:10px 0 14px;padding-bottom:4px}
+.step{flex:1 0 130px;padding:8px 10px;border-top:4px solid var(--border);font-size:12.5px;color:var(--muted)}
+.step b{display:block;color:var(--text);font-size:13px;font-weight:600}
+.step.done{border-top-color:var(--ok)}
+.step.cur{border-top-color:currentColor;background:var(--card);border-radius:0 0 8px 8px}
+.step.cur b{color:inherit}
+.step .lane{font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+main{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:16px;padding-bottom:40px}
+@media (max-width:860px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card h2{font-size:15px;margin:0 0 12px}
+.side{display:flex;flex-direction:column;gap:16px}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-weight:600;font-size:13px}
+.b-draft{background:var(--warn-bg);color:var(--warn)}.b-ok{background:var(--ok-bg);color:var(--ok)}.b-bad{background:var(--bad-bg);color:var(--bad)}.b-run{background:var(--edit-bg);color:var(--edit)}
+.field{margin-bottom:14px}
+.field label{display:flex;gap:6px;align-items:center;font-weight:600;font-size:14px;flex-wrap:wrap}
+.req{color:var(--bad)}
+.hint{color:var(--muted);font-size:12.5px;margin:2px 0 5px}
+input,select,textarea{width:100%;font:inherit;color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+textarea{min-height:64px;resize:vertical}
+.tag{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px}
+.t-unc{background:var(--warn-bg);color:var(--warn)}.t-edit{background:var(--edit-bg);color:var(--edit)}.t-null{background:var(--bg);color:var(--muted);border:1px solid var(--border)}
+.field.unc :is(input,select,textarea){border-color:var(--warn)}
+.field.edited :is(input,select,textarea){border-color:var(--edit)}
+.field.invalid :is(input,select,textarea){border-color:var(--bad)}
+.err{color:var(--bad);font-size:12.5px;margin-top:4px}
+.orig{font-size:12.5px;color:var(--muted);margin-top:3px}
+.orig button,.link{all:unset;color:var(--accent);cursor:pointer;text-decoration:underline}
+.actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+button.btn{font:inherit;font-weight:600;border-radius:8px;padding:9px 14px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+button.danger{color:var(--bad)}
+button.btn:disabled{opacity:.5;cursor:not-allowed}
+.transcript{white-space:pre-wrap;background:var(--field);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:14px}
+mark{background:var(--warn-bg);color:inherit;padding:0 2px;border-radius:3px}
+audio{width:100%;margin:6px 0 10px}
+.note{border-left:4px solid var(--warn);background:var(--warn-bg);padding:10px 12px;border-radius:6px;margin-bottom:12px;font-size:14px}
+.note.info{border-left-color:var(--accent);background:var(--field)}
+.opt{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0}
+.opt button{font:inherit;font-size:13.5px;padding:7px 11px;border-radius:8px;border:1px solid var(--border);background:var(--field);color:var(--text);cursor:pointer}
+.opt button.on{border-color:var(--accent);outline:2px solid var(--accent)}
+.rec-dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--bad);margin-right:6px;animation:p 1s infinite}
+@keyframes p{50%{opacity:.3}}
+ul.log{padding-left:18px;margin:0;font-size:13px;color:var(--muted)}
+ul.log b{color:var(--text);font-weight:600}
+.spin{display:inline-block;width:14px;height:14px;border:2px solid var(--border);border-top-color:var(--edit);border-radius:50%;animation:s .8s linear infinite;vertical-align:-2px;margin-right:6px}
+@keyframes s{to{transform:rotate(360deg)}}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:10px 14px;border-radius:10px;display:none;gap:10px;align-items:center;z-index:9;max-width:calc(100% - 32px)}
+.toast button{font:inherit;font-weight:600;background:var(--bg);color:var(--text);border:0;border-radius:6px;padding:5px 10px;cursor:pointer}
+.tbtn{font:inherit;font-size:12.5px;padding:4px 9px;border-radius:6px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer}
+dialog{border:1px solid var(--border);border-radius:12px;background:var(--card);color:var(--text);max-width:440px;width:calc(100% - 32px)}
+footer{color:var(--muted);font-size:12.5px;padding:0 0 30px}
+#print{display:none}
+@media print{
+  body{background:#fff;color:#000}
+  .wrap,.toast{display:none!important}
+  #print{display:block;font:12pt/1.4 Helvetica,Arial,sans-serif;color:#000}
+  #print table{border-collapse:collapse;width:100%}
+  #print td{border-bottom:1px solid #bbb;padding:6px;vertical-align:top}
+  #print td.k{font-weight:bold;width:32%}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1 id="title"></h1><div class="sub" id="sub"></div></div>
+    <div class="toolbar"><span class="badge" id="badge"></span><button class="tbtn" id="restart"></button><button class="tbtn" id="lang">EN</button></div>
+  </header>
+  <div class="roles" id="roles"></div>
+  <div class="steps" id="steps"></div>
+  <main>
+    <section class="card" id="screen"></section>
+    <aside class="side">
+      <section class="card" id="sidecard"></section>
+      <section class="card"><h2 id="h-log"></h2><ul class="log" id="log"></ul></section>
+    </aside>
+  </main>
+  <footer id="foot"></footer>
+</div>
+<div class="toast" id="toast"><span id="toast-t"></span><button id="toast-b"></button></div>
+<div id="print"></div>
+<dialog id="dlg"><form method="dialog">
+  <h2 id="dlg-h" style="font-size:16px;margin-top:0"></h2>
+  <textarea id="dlg-text" rows="4"></textarea>
+  <div class="actions" style="justify-content:flex-end"><button class="btn" value="cancel" id="dlg-c"></button><button class="btn primary" value="ok" id="dlg-ok"></button></div>
+</form></dialog>
+<script>
+const P = /*__PAYLOAD__*/null;
+const spec = P.spec, S = P.sample;
+const T = {
+fi:{sub:"Prototyyppi · roolit ja vaiheet luettu BPMN:stä, lomake blueprintin kenttämäärittelystä",
+  restart:"Uusi tapaus",log:"Tapahtumat",yourTask:"Sinun tehtäväsi",noTask:"Ei tehtäviä sinulle juuri nyt.",
+  waitingFor:"Tapaus on vaiheessa",byRole:"– vastuussa",aiRunning:"Tekoäly käsittelee",
+  submit:"Lähetä",useSample:"Esimerkkiäänite",record:"Nauhoita",upload:"Lataa tiedosto",stop:"Lopeta nauhoitus",
+  recording:"Nauhoitetaan…",micErr:"Mikrofonia ei saatu käyttöön; käytä esimerkkiä tai lataa tiedosto.",
+  addNote:"Lisätieto esimiehelle (valinnainen)",textInput:"Kirjoita tai lataa",
+  returnedNote:"Esimies palautti tapauksen korjattavaksi:",ownAudio:"Prototyyppi ei litteroi omaa äänitettä: lomakkeen arvot ovat esimerkkiajon (R12) tulos.",
+  approve:"Hyväksy",ret:"Palauta korjattavaksi",reject:"Hylkää",resetAi:"Palauta tekoälyn arvot",
+  form:"Tiketti tarkistettavaksi",source:"Lähde",checks:"Tarkistukset",
+  valOk:"Lähdetarkistus läpi",valBad:"Lähdetarkistus: mahdollisia keksittyjä arvoja",allValid:"Kaikki kentät kelvollisia",invalid:"kenttää vaatii korjausta",
+  unc:"epävarma",edited:"muokattu",nul:"ei mainittu",orig:"Tekoäly:",undo:"palauta",
+  reqErr:"Pakollinen kenttä",enumErr:"Sallitut arvot: ",fmtErr:"Muoto: ",list:"Pilkuilla erotettu lista",
+  dlgH:"Mitä pitää korjata?",cancel:"Peruuta",send:"Palauta",
+  done:"Tapaus valmis",approvedTicket:"Hyväksytty tiketti",rejected:"Tapaus hylätty",exports:"Vie",
+  st_draft:"Odottaa syötettä",st_run:"Tekoäly käsittelee",st_review:"Odottaa hyväksyntää",st_returned:"Palautettu",st_done:"Hyväksytty",st_rejected:"Hylätty",
+  moved:"Tehtävä siirtyi roolille",switchTo:"Vaihda",round:"kierros",
+  ev_submit:"lähetti",ev_ai:"valmis",ev_approve:"hyväksyi",ev_return:"palautti",ev_reject:"hylkäsi",ev_edit:"muutti kenttää",ev_export:"vei",
+  foot:"Huom. BPMN:n hylkäyshaara päättää prosessin, eikä siinä ole paluuta syötteen antajalle. Palauta korjattavaksi on prototyypin lisäys: se palaa ensimmäiseen käyttäjätehtävään. Hylkää seuraa BPMN:ää."},
+en:{sub:"Prototype · roles and steps read from the BPMN, form from the blueprint's field specification",
+  restart:"New case",log:"Events",yourTask:"Your task",noTask:"Nothing for you right now.",
+  waitingFor:"The case is at",byRole:"– owned by",aiRunning:"AI is processing",
+  submit:"Submit",useSample:"Sample recording",record:"Record",upload:"Upload file",stop:"Stop recording",
+  recording:"Recording…",micErr:"No microphone access; use the sample or upload a file.",
+  addNote:"Note to the supervisor (optional)",textInput:"Type or upload",
+  returnedNote:"The supervisor returned the case for correction:",ownAudio:"The prototype does not transcribe your own recording: the form shows the sample run (R12).",
+  approve:"Approve",ret:"Return for correction",reject:"Reject",resetAi:"Restore AI values",
+  form:"Ticket for review",source:"Source",checks:"Checks",
+  valOk:"Grounding check passed",valBad:"Grounding check: possible invented values",allValid:"All fields valid",invalid:"field(s) need fixing",
+  unc:"uncertain",edited:"edited",nul:"not stated",orig:"AI:",undo:"restore",
+  reqErr:"Required field",enumErr:"Allowed values: ",fmtErr:"Format: ",list:"Comma-separated list",
+  dlgH:"What needs correcting?",cancel:"Cancel",send:"Return",
+  done:"Case complete",approvedTicket:"Approved ticket",rejected:"Case rejected",exports:"Export",
+  st_draft:"Awaiting input",st_run:"AI processing",st_review:"Awaiting approval",st_returned:"Returned",st_done:"Approved",st_rejected:"Rejected",
+  moved:"Task moved to",switchTo:"Switch",round:"round",
+  ev_submit:"submitted",ev_ai:"done",ev_approve:"approved",ev_return:"returned",ev_reject:"rejected",ev_edit:"changed",ev_export:"exported",
+  foot:"Note: the BPMN's rejection branch ends the process; it has no way back to whoever gave the input. Return for correction is the prototype's addition: it goes back to the first user task. Reject follows the BPMN."}};
+let lang = "fi"; const t = (k) => T[lang][k];
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g,(c)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);
+const clone = (o) => JSON.parse(JSON.stringify(o));
+
+// ---- process model from the BPMN ----
+const N = Object.fromEntries(P.process.nodes.map((n)=>[n.id,n]));
+const lanes = P.process.lanes.map((l,i)=>({...l,color:`var(--l${i%4})`}));
+const laneOf = (id) => lanes.find((l)=>l.id===N[id]?.lane);
+const out = (id) => P.process.flows.filter((f)=>f.from===id);
+const isHumanTask = (n) => n && (n.kind==="userTask"||n.kind==="manualTask");
+const isAuto = (n) => n && /Task$|^task$/.test(n.kind) && !isHumanTask(n);
+const start = P.process.nodes.find((n)=>n.kind==="startEvent");
+// Main line for the stepper: follow the flows, at a gateway the "Yes" branch.
+const line = []; for (let id = start.id, guard = 0; id && guard < 50; guard++){
+  const n = N[id]; if (/Task$|^task$/.test(n.kind)) line.push(n);
+  const o = out(id); id = (o.find((f)=>/^(yes|kyllä|approved?)$/i.test(f.name)) || o[0])?.to; }
+const inputTask = line.find(isHumanTask);
+const reviewTask = line.find((n)=>isHumanTask(n) && n!==inputTask);
+const humanLanes = lanes.filter((l)=>l.human);
+const reviewGateway = reviewTask && N[out(reviewTask.id)[0]?.to];
+const returnMissing = !!reviewGateway && out(reviewGateway.id).filter((f)=>!/^(yes|kyllä|approved?)$/i.test(f.name)).every((f)=>N[f.to]?.kind==="endEvent");
+
+// ---- case state ----
+let C, role = humanLanes[0]?.id;
+function newCase(){
+  C = {node:null, status:"draft", round:1, inputs:{}, note:"", comment:"", rec:null, orig:null, done:new Set(), events:[], ownAudio:false};
+  for (const d of inputTask.outputs) C.inputs[d] = /audio|voice|recording|ääni/i.test(d) ? {mode:"sample", src:S.audio, name:S.audioName} : {mode:"text", text:""};
+  enter(start.id, true);
+}
+function ev(laneId, key, extra){ C.events.push({at:new Date(), lane:laneId, key, extra}); }
+function enter(id, quiet){
+  const n = N[id]; C.node = id;
+  if (n.kind==="startEvent") return enter(out(id)[0].to, quiet);
+  if (n.kind==="endEvent"){ C.status = /reject/i.test(n.name) ? "rejected" : "done"; return render(); }
+  if (isAuto(n)){
+    C.status = "run"; render();
+    setTimeout(()=>{
+      if (C.node!==id) return;
+      if (n.outputs.some((o)=>/json|ticket|record|result/i.test(o)) && !C.rec){ C.rec = clone(S.record); C.orig = clone(S.record); }
+      C.done.add(id); ev(n.lane,"ev_ai",n.name); enter(out(id)[0].to);
+    }, 1100);
+    return;
+  }
+  if (n.kind==="exclusiveGateway") return; // decided by the review buttons
+  C.status = n===inputTask ? (C.round>1 ? "returned" : "draft") : "review";
+  render();
+  const l = laneOf(id);
+  if (!quiet && l && l.id!==role) toast(`${t("moved")}: ${l.name}`, ()=>{ role = l.id; render(); });
+}
+function decide(approve){
+  const g = N[out(reviewTask.id)[0].to];
+  const flows = out(g.id);
+  const f = approve ? flows.find((x)=>/^(yes|kyllä|approved?)$/i.test(x.name)) : flows.find((x)=>!/^(yes|kyllä|approved?)$/i.test(x.name));
+  C.done.add(reviewTask.id); enter(f.to);
+}
+
+// ---- form (from target_output_spec) ----
+const FORMATS = {"DD/MM/YYYY":/^(0[1-9]|[12]\d|3[01])\/(0[1-9]|1[0-2])\/\d{4}$/,"YYYY-MM-DD":/^\d{4}-\d{2}-\d{2}$/,"HH:MM":/^([01]\d|2[0-3]):[0-5]\d$/};
+const fmtOf = (f) => Object.keys(FORMATS).find((k)=>(spec.field_descriptions[f]||"").includes(k));
+const isList = (f) => /^list/.test(spec.field_types[f]||"");
+const uncField = spec.fields.find((f)=>/uncertain/.test(f) && isList(f));
+const human = (f) => f.replace(/_/g," ").replace(/^./,(c)=>c.toUpperCase());
+const show = (v) => v==null ? "" : Array.isArray(v) ? v.join(", ") : String(v);
+const same = (a,b) => show(a)===show(b);
+function errorOf(f){
+  const v = C.rec[f], empty = v==null || show(v).trim()==="";
+  if (spec.required_fields.includes(f) && empty) return t("reqErr");
+  if (empty) return "";
+  const allowed = (spec.allowed_values||{})[f]; if (allowed && !allowed.includes(v)) return t("enumErr")+allowed.join(", ");
+  const fmt = fmtOf(f); if (fmt && !FORMATS[fmt].test(v)) return t("fmtErr")+fmt;
+  return "";
+}
+const badCount = () => spec.fields.filter((f)=>f!==uncField && errorOf(f)).length;
+function formEl(locked){
+  const box = document.createElement("div");
+  const uncertain = new Set(uncField ? (C.rec[uncField]||[]) : []);
+  for (const f of spec.fields){
+    if (f===uncField) continue;
+    const err = locked ? "" : errorOf(f), edited = !same(C.rec[f], C.orig[f]);
+    const w = document.createElement("div");
+    w.className = "field"+(uncertain.has(f)?" unc":"")+(edited?" edited":"")+(err?" invalid":"");
+    w.innerHTML = `<label for="f_${f}"><span>${human(f)}</span>${spec.required_fields.includes(f)?'<span class="req">*</span>':""}${uncertain.has(f)?`<span class="tag t-unc">${t("unc")}</span>`:""}${edited?`<span class="tag t-edit">${t("edited")}</span>`:""}${C.orig[f]==null&&!edited?`<span class="tag t-null">${t("nul")}</span>`:""}</label><div class="hint">${esc(spec.field_descriptions[f]||"")}${isList(f)?" · "+t("list"):""}</div>`;
+    let el; const allowed = (spec.allowed_values||{})[f];
+    if (allowed){ el = document.createElement("select"); el.innerHTML = `<option value=""></option>`+allowed.map((a)=>`<option>${esc(a)}</option>`).join(""); el.value = C.rec[f] ?? ""; }
+    else if (/description|actions|notes|summary/.test(f) || show(C.rec[f]).length>60){ el = document.createElement("textarea"); el.value = show(C.rec[f]); }
+    else { el = document.createElement("input"); el.value = show(C.rec[f]); const fm = fmtOf(f); if (fm) el.placeholder = fm; }
+    el.id = "f_"+f; el.disabled = locked;
+    el.addEventListener("change", ()=>{
+      const raw = el.value.trim(), before = show(C.rec[f]);
+      const next = raw==="" ? null : isList(f) ? raw.split(",").map((s)=>s.trim()).filter(Boolean) : raw;
+      if (show(next)===before) return;
+      C.rec[f] = next;
+      if (uncField && !same(next, C.orig[f])) C.rec[uncField] = (C.rec[uncField]||[]).filter((x)=>x!==f);
+      ev(role,"ev_edit",`${human(f)}: “${before||"—"}” → “${show(next)||"—"}”`); render();
+    });
+    w.appendChild(el);
+    if (edited && !locked){
+      const o = document.createElement("div"); o.className = "orig";
+      o.innerHTML = `${t("orig")} <em>${esc(show(C.orig[f])||"—")}</em> · <button type="button">${t("undo")}</button>`;
+      o.querySelector("button").onclick = ()=>{ C.rec[f] = clone(C.orig[f]); render(); };
+      w.appendChild(o);
+    }
+    if (err){ const e = document.createElement("div"); e.className = "err"; e.textContent = err; w.appendChild(e); }
+    box.appendChild(w);
+  }
+  return box;
+}
+
+// ---- screens ----
+let media = null;
+function inputScreen(el){
+  el.innerHTML = `<h2>${t("yourTask")}: ${esc(inputTask.name)}</h2>`;
+  if (C.round>1) el.insertAdjacentHTML("beforeend", `<div class="note"><b>${t("returnedNote")}</b><br>${esc(C.comment)}</div>`);
+  for (const [d, v] of Object.entries(C.inputs)){
+    const box = document.createElement("div"); box.className = "field";
+    box.innerHTML = `<label>${esc(d)} <span class="req">*</span></label>`;
+    if (v.mode!=="text"){
+      const opt = document.createElement("div"); opt.className = "opt";
+      for (const [m, label] of [["sample",t("useSample")],["record",t("record")],["upload",t("upload")]]){
+        const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.className = v.mode===m ? "on" : "";
+        b.onclick = async ()=>{
+          if (m==="sample"){ Object.assign(v,{mode:"sample",src:S.audio,name:S.audioName}); return render(); }
+          if (m==="upload"){ const i = document.createElement("input"); i.type="file"; i.accept="audio/*";
+            i.onchange = ()=>{ const f = i.files[0]; if (f){ Object.assign(v,{mode:"upload",src:URL.createObjectURL(f),name:f.name}); render(); } }; return i.click(); }
+          try{
+            const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+            const chunks = []; media = new MediaRecorder(stream);
+            media.ondataavailable = (e)=>chunks.push(e.data);
+            media.onstop = ()=>{ stream.getTracks().forEach((x)=>x.stop()); Object.assign(v,{mode:"record",src:URL.createObjectURL(new Blob(chunks,{type:media.mimeType})),name:"recording"}); media = null; render(); };
+            media.start(); v.mode = "recording"; render();
+          } catch { alert(t("micErr")); }
+        };
+        opt.appendChild(b);
+      }
+      box.appendChild(opt);
+      if (v.mode==="recording"){
+        const s = document.createElement("button"); s.className = "btn danger"; s.innerHTML = `<span class="rec-dot"></span>${t("stop")}`; s.onclick = ()=>media && media.stop(); box.appendChild(s);
+      } else if (v.src){
+        box.insertAdjacentHTML("beforeend", `<audio controls src="${v.src}"></audio><div class="hint">${esc(v.name)}</div>`);
+      }
+    } else {
+      const ta = document.createElement("textarea"); ta.placeholder = t("textInput"); ta.value = v.text; ta.oninput = ()=>{ v.text = ta.value; }; box.appendChild(ta);
+    }
+    el.appendChild(box);
+  }
+  el.insertAdjacentHTML("beforeend", `<div class="field"><label for="note">${t("addNote")}</label><textarea id="note"></textarea></div>`);
+  $("note").value = C.note; $("note").oninput = (e)=>{ C.note = e.target.value; };
+  const ok = Object.values(C.inputs).every((v)=>v.mode==="text" ? v.text.trim() : v.src && v.mode!=="recording");
+  const b = document.createElement("button"); b.className = "btn primary"; b.textContent = t("submit"); b.disabled = !ok;
+  b.onclick = ()=>{
+    C.ownAudio = Object.values(C.inputs).some((v)=>v.mode==="record"||v.mode==="upload");
+    C.rec = null; C.orig = null;
+    ev(inputTask.lane,"ev_submit",(C.note?`“${C.note}”`:"")); C.done.add(inputTask.id); enter(out(inputTask.id)[0].to);
+  };
+  const a = document.createElement("div"); a.className = "actions"; a.appendChild(b); el.appendChild(a);
+}
+function reviewScreen(el){
+  el.innerHTML = `<h2>${t("yourTask")}: ${esc(reviewTask.name)}</h2>`;
+  if (C.ownAudio) el.insertAdjacentHTML("beforeend", `<div class="note info">${t("ownAudio")}</div>`);
+  if (C.note) el.insertAdjacentHTML("beforeend", `<div class="note info">${esc(laneOf(inputTask.id)?.name)}: “${esc(C.note)}”</div>`);
+  el.appendChild(formEl(false));
+  const a = document.createElement("div"); a.className = "actions";
+  const mk = (txt, cls, fn, dis) => { const b = document.createElement("button"); b.className = "btn "+cls; b.textContent = txt; b.onclick = fn; b.disabled = !!dis; a.appendChild(b); };
+  mk(t("approve"),"primary",()=>{ ev(reviewTask.lane,"ev_approve"); decide(true); }, badCount()>0);
+  mk(t("ret"),"",()=>ask((note)=>{ C.comment = note; C.round++; C.note = ""; ev(reviewTask.lane,"ev_return",`“${note}”`); C.done.clear(); enter(inputTask.id); }));
+  mk(t("reject"),"danger",()=>ask((note)=>{ ev(reviewTask.lane,"ev_reject",`“${note}”`); decide(false); }));
+  mk(t("resetAi"),"",()=>{ C.rec = clone(C.orig); render(); });
+  el.appendChild(a);
+}
+function doneScreen(el){
+  if (C.status==="rejected"){ el.innerHTML = `<h2>${t("rejected")}</h2>`; return; }
+  el.innerHTML = `<h2>${t("approvedTicket")}</h2>`;
+  el.appendChild(formEl(true));
+  const a = document.createElement("div"); a.className = "actions";
+  for (const k of ["JSON","CSV","PDF"]){ const b = document.createElement("button"); b.className = "btn"; b.textContent = `${t("exports")} ${k}`; b.onclick = ()=>exportAs(k); a.appendChild(b); }
+  el.appendChild(a);
+}
+function sourceCard(el){
+  const v = Object.values(C.inputs).find((x)=>x.src);
+  let tr = esc(S.transcript);
+  if (C.orig) for (const f of spec.fields){ const x = C.orig[f]; if (typeof x==="string" && x.length>2 && tr.includes(esc(x))) tr = tr.split(esc(x)).join(`<mark title="${human(f)}">${esc(x)}</mark>`); }
+  el.innerHTML = `<h2>${t("source")}</h2>${v && v.mode!=="recording" ? `<audio controls src="${v.src}"></audio>` : ""}${C.rec ? `<div class="transcript">${tr}</div>` : ""}`;
+  if (C.rec){
+    const val = S.validation, bad = badCount();
+    el.insertAdjacentHTML("beforeend", `<h2 style="margin-top:14px">${t("checks")}</h2><div class="actions">${val?`<span class="badge ${val.passed?"b-ok":"b-bad"}">${val.passed?t("valOk"):t("valBad")}</span>`:""}<span class="badge ${bad?"b-bad":"b-ok"}">${bad?bad+" "+t("invalid"):t("allValid")}</span></div>`);
+  }
+}
+
+function render(){
+  document.documentElement.lang = lang;
+  $("title").textContent = P.title; $("sub").textContent = t("sub");
+  $("restart").textContent = t("restart"); $("lang").textContent = lang==="fi" ? "EN" : "FI"; $("h-log").textContent = t("log");
+  // Only when the BPMN itself has no loop back from the review.
+  $("foot").textContent = returnMissing ? t("foot") : "";
+  for (const [id,k] of [["dlg-h","dlgH"],["dlg-c","cancel"],["dlg-ok","send"]]) $(id).textContent = t(k);
+  const stCls = {draft:"b-draft",returned:"b-bad",run:"b-run",review:"b-draft",done:"b-ok",rejected:"b-bad"}[C.status];
+  $("badge").className = "badge "+stCls; $("badge").textContent = t("st_"+C.status) + (C.round>1 ? ` · ${t("round")} ${C.round}` : "");
+  // roles
+  const cur = N[C.node], curLane = laneOf(C.node);
+  $("roles").innerHTML = "";
+  for (const l of humanLanes){
+    const b = document.createElement("button"); b.className = "role"+(l.id===role?" on":""); b.style.color = l.color;
+    const mine = isHumanTask(cur) && cur.lane===l.id;
+    b.innerHTML = `<span class="dot"></span><span style="color:var(--text)">${esc(l.name)}</span>${mine?'<span class="n">1</span>':""}`;
+    b.onclick = ()=>{ role = l.id; render(); }; $("roles").appendChild(b);
+  }
+  // stepper
+  $("steps").innerHTML = line.map((n)=>{
+    const l = laneOf(n.id), done = C.done.has(n.id) || C.status==="done", now = n.id===C.node && !["done","rejected"].includes(C.status);
+    return `<div class="step${done?" done":""}${now?" cur":""}" style="color:${l?.color}"><span class="lane">${esc(l?.name||"")}</span><b>${now&&isAuto(n)?'<span class="spin"></span>':""}${esc(n.name)}</b></div>`;
+  }).join("");
+  // screen
+  const el = $("screen"); el.innerHTML = "";
+  if (["done","rejected"].includes(C.status)) doneScreen(el);
+  else if (isHumanTask(cur) && cur.lane===role) (cur===inputTask ? inputScreen : reviewScreen)(el);
+  else if (C.status==="run") el.innerHTML = `<h2><span class="spin"></span>${t("aiRunning")}: ${esc(cur.name)}</h2>`;
+  else el.innerHTML = `<h2>${t("noTask")}</h2><p class="sub">${t("waitingFor")} <b>${esc(cur?.name)}</b> ${t("byRole")} <b>${esc(curLane?.name)}</b>.</p>`;
+  $("sidecard").style.display = C.rec ? "" : "none";
+  if (C.rec) sourceCard($("sidecard"));
+  $("log").innerHTML = C.events.slice().reverse().map((e)=>{
+    const time = e.at.toLocaleTimeString(lang==="fi"?"fi-FI":"en-GB",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
+    const who = lanes.find((l)=>l.id===e.lane)?.name || "";
+    return `<li>${time} · <b>${esc(who)}</b> ${t(e.key)} ${esc(e.extra||"")}</li>`;
+  }).join("");
+}
+
+function ask(cb){
+  $("dlg-text").value = ""; $("dlg").showModal();
+  $("dlg").onclose = ()=>{ const v = $("dlg-text").value.trim(); if ($("dlg").returnValue==="ok" && v) cb(v); };
+}
+let toastTimer;
+function toast(text, fn){
+  $("toast-t").textContent = text; $("toast-b").textContent = t("switchTo");
+  $("toast-b").onclick = ()=>{ $("toast").style.display = "none"; fn(); };
+  $("toast").style.display = "flex"; clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ $("toast").style.display = "none"; }, 6000);
+}
+function download(name, type, text){ const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([text],{type})); a.download = name; a.click(); }
+function exportAs(k){
+  const r = {...C.rec, review_status:"approved", approved_at:new Date().toISOString()}, fname = (spec.schema_name||"record").toLowerCase();
+  if (k==="JSON") download(fname+".json","application/json",JSON.stringify(r,null,2));
+  if (k==="CSV"){ const keys = Object.keys(r), q = (v)=>`"${show(v).replace(/"/g,'""')}"`; download(fname+".csv","text/csv;charset=utf-8","﻿"+keys.join(",")+"\n"+keys.map((x)=>q(r[x])).join(",")+"\n"); }
+  if (k==="PDF"){
+    const p = $("print");
+    p.innerHTML = `<h2>${esc(P.title)}</h2><p>${t("st_done")} ${new Date().toLocaleString(lang==="fi"?"fi-FI":"en-GB")}</p><table>${spec.fields.filter((f)=>f!==uncField).map((f)=>`<tr><td class="k">${human(f)}</td><td>${esc(show(r[f])||"—")}</td></tr>`).join("")}</table><h3>${t("source")}</h3><p>${esc(S.transcript)}</p>`;
+    window.print();
+  }
+  ev(role,"ev_export",k); render();
+}
+$("restart").onclick = ()=>{ role = humanLanes[0]?.id; newCase(); };
+$("lang").onclick = ()=>{ lang = lang==="fi" ? "en" : "fi"; render(); };
+newCase();
+</script>
+</body>
+</html>

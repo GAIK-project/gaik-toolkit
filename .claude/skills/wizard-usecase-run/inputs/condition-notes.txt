@@ -1,0 +1,23 @@
+Kuntotarkastuksen muistiinpanot (keksitty kohde ja keksityt henkilöt)
+
+Kohde: Asunto Oy Mallikylän Esimerkkitie 1
+Tarkastuspäivä: 3.11.2026
+Tarkastaja: Veikko Esimerkki
+
+Rakenteet
+- Julkisivun elementtisaumat halkeilleet etelä- ja länsisivulla, sauman ikä noin 20 vuotta.
+- Sokkelissa kosteusjälki B-rapun kohdalla, syöksytorven alapää irti sadevesikaivosta.
+- Vesikaton kermin saumat ehjät, läpivientien tiivisteissä haurastumaa.
+
+LVI
+- Käyttövesiputkissa vihreää hapettumaa liitoksissa kellarin jakotukilla.
+- Viemärin tuuletusputken hattu puuttuu.
+- Ilmanvaihdon poistokoneen laakeriääni voimakas, suodattimet vaihdettu 2025.
+
+Sähkö
+- Ryhmäkeskuksissa tulppasulakkeet, vikavirtasuojat puuttuvat huoneistoista A1-A6.
+- Porrasvalaistuksen ajastin ei toimi C-rapussa.
+
+Muuta
+- Pesuhuoneiden kosteusmittaus huoneistoissa A2 ja B4: A2 normaali, B4 kohonnut lattiakaivolla.
+- Autopaikkojen lämmitystolppia ei tarkastettu.

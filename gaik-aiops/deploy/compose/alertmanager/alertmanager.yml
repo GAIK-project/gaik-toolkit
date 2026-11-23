@@ -1,0 +1,20 @@
+# Routing only. Real receivers (e-mail, chat, incident tool) are a customer
+# decision; until then alerts are visible in Alertmanager and Grafana.
+route:
+  receiver: default
+  group_by: [alertname, service_name]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - matchers: [severity="critical"]
+      receiver: default
+      repeat_interval: 1h
+
+receivers:
+  - name: default
+
+inhibit_rules:
+  # When the collector is down, per-service alerts are noise.
+  - source_matchers: [alertname="CollectorDown"]
+    target_matchers: [severity=~"warning|info"]

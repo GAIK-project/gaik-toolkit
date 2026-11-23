@@ -21,14 +21,43 @@ from solution_wizard.blueprint import Blueprint
 from solution_wizard.scaffolder import scaffold_poc, validate_generated_python
 from solution_wizard.validator import validate
 
-# The root of the GAIK repo -- outputs must never go inside here.
 _WIZARD_ROOT = Path(__file__).parent.parent.resolve()
-_REPO_ROOT = _WIZARD_ROOT.parent.parent.resolve()
+
+
+def _find_repo_root(start: Path) -> Path | None:
+    """The git checkout this script lives in, or None when it is an installed
+    package with no checkout to protect.
+
+    This used to be a fixed ``parent.parent``, which is right for a checkout but
+    resolved to "/" once the package was installed at the image root. Every
+    absolute output dir then looked like it was inside the repo, so the guard
+    below refused all of them (#180). A marker walk cannot resolve to "/" unless
+    "/" really is a checkout, which the caller treats as no repo either way.
+
+    The repository's layout counts as a marker too: the demo's image copies the
+    wizard to /app/implementation_layer/solution_wizard without .git, and its
+    output still must not land inside /app (outside .wizard_workspaces).
+    """
+    for candidate in (start, *start.parents):
+        if candidate == Path(candidate.anchor):
+            continue
+        if (candidate / ".git").exists():
+            return candidate
+        if (candidate / "implementation_layer" / "solution_wizard").is_dir():
+            return candidate
+    return None
+
+
+# The root of the GAIK repo -- outputs must never go inside here.
+_REPO_ROOT = _find_repo_root(_WIZARD_ROOT)
 
 
 def _check_output_dir(output_dir: Path) -> None:
     """Refuse to write inside the GAIK repo (implementation_layer/ or above).
-    Exception: .wizard_workspaces paths are managed by the demo app server."""
+    Exceptions: .wizard_workspaces paths are managed by the demo app server, and
+    an installed package has no repo to write into."""
+    if _REPO_ROOT is None:
+        return
     resolved = output_dir.resolve()
     # Allow server-managed wizard workspace directories
     if ".wizard_workspaces" in resolved.parts:
@@ -149,16 +178,16 @@ Your PoC has been generated at: {poc_dir}
 
 To run it:
   1. Install dependencies:
-         pip install -r {poc_dir / 'requirements.txt'}
+         pip install -r {poc_dir / "requirements.txt"}
   2. Set up your environment:
-         cp {poc_dir / '.env.example'} {poc_dir / '.env'}
+         cp {poc_dir / ".env.example"} {poc_dir / ".env"}
          -- then open .env and fill in your API key
   3. Add a sample input file:
-         See {poc_dir / 'README.md'} for the expected input format
+         See {poc_dir / "README.md"} for the expected input format
   4. Run the pipeline (it prints counts and file names; add --verbose for the values):
-         python {poc_dir / 'run_poc.py'}
+         python {poc_dir / "run_poc.py"}
   5. Inspect the output:
-         Check {poc_dir / 'output'} for the generated result
+         Check {poc_dir / "output"} for the generated result
 
 When you are ready, paste the output here or describe what you see.
 The wizard will help you interpret the result and refine if needed (Gate 3).

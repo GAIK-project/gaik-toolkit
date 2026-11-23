@@ -37,6 +37,14 @@ def test_llm_subpackage_is_in_the_internal_ignore_list(audit_registry):
     assert "gaik.software_components.llm" in audit_registry.INTERNAL_ONLY_SUBPACKAGES
 
 
+def test_agentic_report_pipeline_is_in_the_internal_ignore_list(audit_registry):
+    """Reached only through MultiSourceReportGenerator(agentic=True), whose card
+    documents the option; it has no component identity of its own."""
+    nested = "gaik.software_modules.multi_source_report_generator.agentic"
+
+    assert nested in audit_registry.INTERNAL_ONLY_SUBPACKAGES
+
+
 def test_schema_generator_subpackage_is_in_the_alias_list(audit_registry):
     assert (
         audit_registry.ALIAS_SUBPACKAGES["gaik.software_components.schema_generator"]
@@ -45,10 +53,10 @@ def test_schema_generator_subpackage_is_in_the_alias_list(audit_registry):
 
 
 def test_schema_generator_alias_reexports_the_canonical_class():
-    from gaik.software_components.extractor import SchemaGenerator as CanonicalSchemaGenerator
-    from gaik.software_components.schema_generator import SchemaGenerator as AliasSchemaGenerator
+    extractor = pytest.importorskip("gaik.software_components.extractor")
+    schema_generator = pytest.importorskip("gaik.software_components.schema_generator")
 
-    assert AliasSchemaGenerator is CanonicalSchemaGenerator
+    assert schema_generator.SchemaGenerator is extractor.SchemaGenerator
 
 
 def test_check_new_does_not_flag_an_exempted_subpackage(audit_registry, monkeypatch):

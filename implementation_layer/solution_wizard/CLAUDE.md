@@ -85,3 +85,13 @@ with no effort its requirements parses send GPT-6 Sol/Luna and GPT-5.6
 `reasoning_effort='none'`, so their `temperature=0` applies. Follow SKILL.md Phase 6 and
 the card's current options instead of the obsolete blanket restriction against every
 model newer than GPT-5.4.
+
+## One SKILL.md, four hosts
+
+The demo's wizard chat, the `solution-wizard` Claude Code skill, the interactive runner
+and Solution Wizard v2 all follow `SKILL.md`. An instruction for one host says so: "the
+wizard's web app", "the web session" and "the sandbox" are v2's, and the others follow
+the "elsewhere" instruction. The paragraph "Where this skill runs" is the rule (v2 is
+the host with the `reopen_gate` tool); keep a new v2-only instruction inside it, and
+`toolkit_demo_app/api/tests/test_solution_wizard_skill_hosts.py` keeps the demo's prompt
+in step with it.

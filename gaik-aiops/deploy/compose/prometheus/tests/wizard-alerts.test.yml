@@ -1,0 +1,359 @@
+# Run: promtool test rules prometheus/tests/wizard-alerts.test.yml
+rule_files:
+  - ../rules/thresholds.yml
+  - ../rules/wizard-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: no metrics from the api fires WizardApiDown, metrics keep it quiet
+    interval: 1m
+    input_series:
+      - series: 'wizard_up{service_name="wizard-v2-api"}'
+        values: '1x5 _x10'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: WizardApiDown
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: WizardApiDown
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: The Wizard API has sent no metrics for 5 minutes
+
+  - name: a new process start time is a restart
+    interval: 1m
+    input_series:
+      - series: 'wizard_process_start_time{service_name="wizard-v2-api", instance="a"}'
+        values: '1000x10'
+      - series: 'wizard_process_start_time{service_name="wizard-v2-api", instance="b"}'
+        values: '_x10 2000x10'
+    alert_rule_test:
+      - eval_time: 9m
+        alertname: WizardApiRestarted
+        exp_alerts: []
+      - eval_time: 14m
+        alertname: WizardApiRestarted
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api restarted in the last 15 minutes"
+
+  - name: live agents above 80 % of the limit for 2 minutes
+    interval: 1m
+    input_series:
+      - series: 'wizard_agents_live{service_name="wizard-v2-api"}'
+        values: '10x3 50x5'
+      - series: 'wizard_agents_limit{service_name="wizard-v2-api"}'
+        values: '55x8'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: WizardAgentsNearLimit
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: WizardAgentsNearLimit
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: live agents at 90.91% of WIZARD_MAX_LIVE_AGENTS"
+
+  - name: any capacity refusal fires, other refusals do not
+    interval: 1m
+    input_series:
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="agent_capacity"}'
+        values: '0x5 2x5'
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="not_found"}'
+        values: '0+5x10'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: WizardCapacityRefusals
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: WizardCapacityRefusals
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, code: agent_capacity, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 2 requests refused with agent_capacity in 10 minutes"
+
+  - name: the sessions volume warns at 80 % and is critical at 90 %
+    interval: 1m
+    input_series:
+      - series: 'wizard_sessions_volume_used{service_name="wizard-v2-api"}'
+        values: '50x5 85x15 95x10'
+      - series: 'wizard_sessions_volume_capacity{service_name="wizard-v2-api"}'
+        values: '100x30'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: WizardSessionsVolumeFilling
+        exp_alerts: []
+      - eval_time: 17m
+        alertname: WizardSessionsVolumeFilling
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: the sessions volume is 85% full"
+      - eval_time: 17m
+        alertname: WizardSessionsVolumeFull
+        exp_alerts: []
+      - eval_time: 27m
+        alertname: WizardSessionsVolumeFull
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: critical}
+            exp_annotations:
+              summary: "wizard-v2-api: the sessions volume is 95% full; new sessions and runs will fail"
+
+  - name: a turn running past the threshold locks its session
+    interval: 1m
+    input_series:
+      - series: 'wizard_turns_oldest_running{service_name="wizard-v2-api"}'
+        values: '600 3100'
+    alert_rule_test:
+      - eval_time: 0m
+        alertname: WizardTurnStuck
+        exp_alerts: []
+      - eval_time: 1m
+        alertname: WizardTurnStuck
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: a chat turn has been running for 51m 40s; its session is locked"
+
+  - name: turn failures above 20 % with enough turns
+    interval: 1m
+    input_series:
+      - series: 'wizard_turns_total{service_name="wizard-v2-api", outcome="completed"}'
+        values: '0+2x15'
+      - series: 'wizard_turns_total{service_name="wizard-v2-api", outcome="failed"}'
+        values: '0+1x15'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: WizardTurnFailures
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 33.33% of chat turns failed in 15 minutes"
+
+  - name: rate limits from the model provider
+    interval: 1m
+    input_series:
+      - series: 'wizard_agent_errors_total{service_name="wizard-v2-api", kind="rate_limited"}'
+        values: '0x2 5x8'
+      - series: 'wizard_agent_errors_total{service_name="wizard-v2-api", kind="other"}'
+        values: '0+3x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: WizardModelProviderErrors
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, kind: rate_limited, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 5 agent failures of kind rate_limited in 10 minutes"
+
+  - name: sandbox failures need at least three runs
+    interval: 1m
+    input_series:
+      - series: 'wizard_sandbox_runs_total{service_name="wizard-v2-api", kind="run", phase="failed"}'
+        values: '0 1 1 1 1 3 3 3 3 3'
+      - series: 'wizard_sandbox_runs_total{service_name="wizard-v2-api", kind="run", phase="succeeded"}'
+        values: '0x9'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: WizardSandboxFailures
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: WizardSandboxFailures
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 100% of sandbox runs did not succeed in 30 minutes"
+
+  - name: sessions past the retention period for an hour
+    interval: 1m
+    input_series:
+      - series: 'wizard_sessions{service_name="wizard-v2-api", state="overdue"}'
+        values: '0x10 3x80'
+      - series: 'wizard_sessions{service_name="wizard-v2-api", state="total"}'
+        values: '100x90'
+    alert_rule_test:
+      - eval_time: 40m
+        alertname: WizardSessionsOverdue
+        exp_alerts: []
+      - eval_time: 80m
+        alertname: WizardSessionsOverdue
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 3 sessions are past the retention period and not removed"
+
+  - name: a failed deletion fires at once
+    interval: 1m
+    input_series:
+      - series: 'wizard_session_deletes_total{service_name="wizard-v2-api", reason="retention", outcome="failed"}'
+        values: '0 0 1 1'
+      - series: 'wizard_session_deletes_total{service_name="wizard-v2-api", reason="owner", outcome="deleted"}'
+        values: '0+4x3'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: WizardSessionDeleteFailed
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: WizardSessionDeleteFailed
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, reason: retention, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: a session deletion (retention) failed; part of the session may remain"
+
+  - name: many requests for other users' sessions
+    interval: 1m
+    input_series:
+      - series: 'wizard_ownership_denied_total{service_name="wizard-v2-api"}'
+        values: '0x2 15x5'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: WizardOwnershipDenials
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: WizardOwnershipDenials
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 15 requests for other users' sessions in 10 minutes"
+
+  - name: a new owner whose first export already holds a burst is caught
+    interval: 1m
+    input_series:
+      - series: 'wizard_sessions_created_total{service_name="wizard-v2-api", owner="o_cccccccccccccccccccccccccccccccc"}'
+        values: '_x3 12x5'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: WizardSessionBurst
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, owner: o_cccccccccccccccccccccccccccccccc, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: owner o_cccccccccccccccccccccccccccccccc created 12 sessions in 10 minutes"
+
+  - name: one owner creating sessions in a burst
+    interval: 1m
+    input_series:
+      - series: 'wizard_sessions_created_total{service_name="wizard-v2-api", owner="o_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}'
+        values: '0+4x5'
+      - series: 'wizard_sessions_created_total{service_name="wizard-v2-api", owner="o_bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}'
+        values: '0+1x5'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: WizardSessionBurst
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, owner: o_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: owner o_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa created 20 sessions in 10 minutes"
+
+  - name: the shared runner key reminder waits an hour and clears when a key is set
+    interval: 1m
+    input_series:
+      - series: 'wizard_config_shared_runner_key{service_name="wizard-v2-api"}'
+        values: '1x80 0x30'
+    alert_rule_test:
+      - eval_time: 30m
+        alertname: WizardRunsUseSharedModelKey
+        exp_alerts: []
+      - eval_time: 70m
+        alertname: WizardRunsUseSharedModelKey
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: info}
+            exp_annotations:
+              summary: "wizard-v2-api: sandbox runs use the shared model key; give them a key with a spending cap"
+      - eval_time: 100m
+        alertname: WizardRunsUseSharedModelKey
+        exp_alerts: []
+
+  - name: a lower threshold in thresholds.yml is all it takes to change an alert
+    interval: 1m
+    input_series:
+      - series: 'wizard_db_size{service_name="wizard-v2-api"}'
+        values: '5000000000x40'
+    alert_rule_test:
+      - eval_time: 35m
+        alertname: WizardDatabaseLarge
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: the wizard database is 4.657GiB"
+
+  - name: a scanner that stops answering is critical after 3 minutes
+    interval: 1m
+    input_series:
+      - series: 'wizard_malware_scanner_up{service_name="wizard-v2-api"}'
+        values: '1x3 0x6'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: WizardMalwareScannerDown
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: WizardMalwareScannerDown
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: critical}
+            exp_annotations:
+              summary: "wizard-v2-api: the malware scanner does not answer; uploads are refused"
+
+  - name: uploads refused because they could not be checked
+    interval: 1m
+    input_series:
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="scanner_unavailable"}'
+        values: '0x3 2x5'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: WizardUploadsScannerUnavailable
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: WizardUploadsScannerUnavailable
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 2 uploads refused in 10 minutes because they could not be checked"
+
+  - name: one unsafe upload fires at once, other refusals do not
+    interval: 1m
+    input_series:
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="input_unsafe"}'
+        values: '0 0 1 1'
+      - series: 'wizard_refusals_total{service_name="wizard-v2-api", code="input_rejected"}'
+        values: '0+3x3'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: WizardUnsafeUploadRefused
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: WizardUnsafeUploadRefused
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: 1 uploads refused as unsafe in 15 minutes"
+
+  - name: signatures older than two days for an hour
+    interval: 1m
+    input_series:
+      - series: 'wizard_malware_scanner_signatures_age{service_name="wizard-v2-api"}'
+        values: '1000x10 175000+60x80'
+    alert_rule_test:
+      - eval_time: 50m
+        alertname: WizardMalwareSignaturesStale
+        exp_alerts: []
+      - eval_time: 75m
+        alertname: WizardMalwareSignaturesStale
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: the malware signatures are 2d 1h 40m 40s old; updates are not getting through"
+
+  - name: uploads stored without a check
+    interval: 1m
+    input_series:
+      - series: 'wizard_config_malware_scan{service_name="wizard-v2-api"}'
+        values: '0x15'
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: WizardUploadsNotScanned
+        exp_alerts:
+          - exp_labels: {service_name: wizard-v2-api, severity: warning}
+            exp_annotations:
+              summary: "wizard-v2-api: uploads are stored without a malware check; set WIZARD_MALWARE_SCANNER"

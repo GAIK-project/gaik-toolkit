@@ -1,0 +1,1392 @@
+"""A small web page for trying this solution on your own computer.
+
+    python app.py            # then open http://127.0.0.1:8000
+    python app.py --port 8080
+
+The page (``ui/index.html``) takes the solution's inputs, starts ``run_poc.py`` and shows
+what it wrote. Another front end can call the same server:
+
+    GET  /api/solution                    what the solution is, takes in and gives out
+    POST /api/run                         multipart form: ``files`` (any number), and the
+                                          optional text fields ``question`` and ``text``
+    GET  /api/status                      whether a run is going, and the end of its log
+    GET  /api/runs/<id>/files/<name>      one output file of a run
+    GET  /api/source                      this package's source code as a zip
+
+``POST /api/run`` answers with JSON: ``ok``, ``exit_code``, ``log_tail``, ``outputs``
+(``name``, ``kind``, ``size``, ``url``), ``result`` (the main JSON output, when there is
+one) and ``source_trace`` (the source check's report, when the solution writes one).
+A refusal is ``{"ok": false, "error": {"code": ..., "message": ...}}``.
+
+Every run gets a working folder of its own in the system's temporary folder: the
+package's code, the files sent with the request in ``sample_input/`` and an empty
+``output/``. The package's own ``sample_input/`` and ``output/`` are never written to.
+A request that sends no file runs on the examples in the package's ``sample_input/``.
+
+``GET /api/source`` zips what the package is made of, and only that: its Python files
+(this server among them), ``README.md``, ``config.yaml``, ``requirements.txt``,
+``.env.example`` (unless it gives a key a value) and ``.gitignore``, the text files in
+``schemas/`` and ``prompts/``, and this page's own files in ``ui/``. Nothing else goes
+in: no other hidden file (``.env`` and its keys among them), no file whose name says it
+holds a credential, nothing from ``sample_input/``, ``output/`` or ``evals/ground_truth/``
+whatever the case of their names, no virtual environment, run folder or link. It is off
+while the server listens on the network.
+
+There is no sign-in. The server listens on this computer only (127.0.0.1) unless you
+start it with ``--host``; do that only on a network you trust. Ctrl+C, SIGTERM and
+SIGHUP (the terminal closing) stop a run that is going and remove the working folders.
+Standard library only. Run as ``python app.py``, the package's folder heads ``sys.path``;
+the server takes it out before its other imports, so a file there named like a library
+module is not imported in the library's place.
+"""
+
+# The other imports wait until sys.path is cleaned.
+# ruff: noqa: E402
+import os
+import sys
+
+if __name__ == "__main__":
+    # A secrets.py or ipaddress.py next to this file would otherwise be imported
+    # in place of the standard library's and change what this unchanged server
+    # does. It needs no module of the package's: run_poc.py runs as a process of
+    # its own. os and sys are loaded before this file is.
+    _HERE = os.path.normcase(os.path.dirname(os.path.realpath(__file__)))
+    sys.path[:] = [
+        p for p in sys.path if os.path.normcase(os.path.realpath(p or os.curdir)) != _HERE
+    ]
+
+import argparse
+import atexit
+import io
+import ipaddress
+import json
+import re
+import secrets
+import shutil
+import signal
+import socket
+import subprocess
+import tempfile
+import threading
+import time
+import traceback
+import zipfile
+from email.message import Message
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path, PurePosixPath
+from urllib.parse import quote, unquote, urlsplit
+
+PACKAGE_DIR = Path(__file__).resolve().parent
+
+#: What one request may carry in all, and in how many files.
+MAX_UPLOAD_BYTES = 50 * 1024 * 1024
+MAX_FILES = 20
+#: A question or a pasted text longer than this is a document: send it as a file.
+MAX_TEXT_CHARS = 20_000
+#: How long one run may take before it is stopped, in seconds.
+RUN_TIMEOUT_SECONDS = 900
+#: How long a connection may send nothing, and how long a request's files may take
+#: to arrive in all, in seconds: a request that stops sending holds the one run.
+IDLE_TIMEOUT_SECONDS = 30
+BODY_TIMEOUT_SECONDS = 300
+#: Working folders of earlier runs kept for their download links.
+KEEP_RUNS = 3
+#: The end of the run's log that goes into an answer.
+LOG_TAIL_LINES = 200
+LOG_TAIL_BYTES = 64 * 1024
+#: A main result larger than this is offered as a download only.
+MAX_RESULT_BYTES = 2 * 1024 * 1024
+MAX_OUTPUT_FILES = 200
+
+ENTRYPOINT = "run_poc.py"
+SAMPLE_DIR = "sample_input"
+OUTPUT_DIR = "output"
+#: The names of the files a user added, one a line; input_bundle.py reads it and
+#: takes those files before the package's examples.
+UPLOADED_NAMES_FILE = ".uploaded"
+#: The text files the RAG entrypoint reads as questions, one a line.
+QUESTION_SUFFIXES = (".txt", ".md")
+#: Names Windows keeps for devices, whatever their case and ending: a file of such
+#: a name cannot be written there.
+_DEVICE_NAMES = {"CON", "PRN", "AUX", "NUL"} | {
+    f"{d}{n}" for d in ("COM", "LPT") for n in "123456789"
+}
+#: Never copied into a run's working folder.
+_SKIP_DIRS = {SAMPLE_DIR, OUTPUT_DIR, "ui", "__pycache__", ".venv", "venv", ".git", "node_modules"}
+
+#: Output files the page lists and the server hands out, by kind. Anything else in
+#: output/ (a vector store's own files, for one) stays where it is.
+_OUTPUT_KINDS = {
+    ".json": "json",
+    ".txt": "text",
+    ".md": "text",
+    ".log": "text",
+    ".csv": "table",
+    ".xlsx": "table",
+    ".pdf": "document",
+    ".docx": "document",
+    ".html": "document",
+    ".png": "image",
+    ".jpg": "image",
+    ".jpeg": "image",
+    ".wav": "audio",
+    ".mp3": "audio",
+}
+_CONTENT_TYPES = {
+    ".json": "application/json; charset=utf-8",
+    ".txt": "text/plain; charset=utf-8",
+    ".md": "text/plain; charset=utf-8",
+    ".log": "text/plain; charset=utf-8",
+    ".csv": "text/csv; charset=utf-8",
+    ".pdf": "application/pdf",
+}
+#: The main result is the first output file with one of these endings, in this order.
+_RESULT_ENDINGS = ("_result.json", "_ticket.json", "query_result.json", "session_results.json")
+_NOT_RESULT_ENDINGS = ("_validation.json", "_source_trace.json")
+_TRACE_ENDING = "_source_trace.json"
+
+#: The page's own files beside index.html (ui/): its fonts and the GAIK mark.
+_PAGE_ASSET_TYPES = {
+    ".woff2": "font/woff2",
+    ".svg": "image/svg+xml",
+}
+#: The source zip takes these files and nothing else (see _is_source). At the
+#: package's root: its settings, its instructions and the keys' template ...
+_SOURCE_ROOT_NAMES = {
+    "README.md",
+    "config.yaml",
+    "requirements.txt",
+    ".env.example",
+    ".gitignore",
+}
+#: ... in schemas/ and prompts/: their text files ...
+_SOURCE_TEXT_SUFFIXES = {".py", ".json", ".md", ".txt", ".yaml", ".yml", ".hash"}
+#: ... in ui/: the test page's own files, as the scaffolder writes them ...
+_PAGE_FILES = {
+    "index.html",
+    "solution.json",
+    "gaik.svg",
+    "fonts/OFL.txt",
+    "fonts/sora-latin-wght-normal.woff2",
+    "fonts/sora-latin-ext-wght-normal.woff2",
+}
+#: ... and anywhere else, the package's Python files. Never what is under these
+#: folders, whatever the case of their names (on Windows and macOS ``Output/`` is
+#: ``output/``): the inputs, the results and the user's own ground truth ...
+_NOT_SOURCE_PATHS = (SAMPLE_DIR, OUTPUT_DIR, "evals/ground_truth")
+#: ... nor in a folder of these names, at any depth (or a hidden one) ...
+_NOT_SOURCE_DIRS = {"__pycache__", "venv", "env", "node_modules", "site-packages"}
+#: ... nor a file whose name says it holds a credential, whatever its kind.
+_CREDENTIAL_NAME = re.compile(
+    r"credential|secret|passw|api[-_]?key|service[-_]?account|private[-_]?key"
+    r"|(^|[-_.])tokens?([-_.]|$)"
+    r"|^id_(rsa|dsa|ecdsa|ed25519)|\.(pem|key|p12|pfx|jks|keystore)$",
+    re.IGNORECASE,
+)
+MAX_SOURCE_FILE_BYTES = 5 * 1024 * 1024
+MAX_SOURCE_FILES = 2000
+#: What the zip may hold in all, before compression.
+MAX_SOURCE_BYTES = 20 * 1024 * 1024
+
+_RUN_ID_RE = re.compile(r"[0-9a-f]{16}")
+_LOOPBACK_NAMES = {"localhost", "127.0.0.1", "::1"}
+#: ``--host`` values that listen on every address of this computer.
+_EVERY_ADDRESS = {"", "0.0.0.0", "::"}
+#: A Host header: a name or a bracketed IPv6 address, and at most one port.
+_HOST_HEADER = re.compile(r"(?:\[([0-9A-Za-z:.%]+)\]|([^\[\]:]+))(?::[0-9]{1,5})?")
+#: Signals that stop the server: Ctrl+C (SIGINT), SIGTERM and SIGHUP, the terminal
+#: closing. Windows has no SIGHUP, and SIGBREAK is its Ctrl+Break.
+_STOP_SIGNALS = ("SIGINT", "SIGTERM", "SIGHUP", "SIGBREAK")
+_BUSY_MESSAGE = "A run is already going. Wait for it to finish."
+_SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "Referrer-Policy": "no-referrer",
+    "Cache-Control": "no-store",
+}
+#: The page carries its own style and script and loads nothing from elsewhere; its
+#: font files and the GAIK mark come from this server (ui/).
+_PAGE_POLICY = (
+    "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; "
+    "connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; "
+    "form-action 'none'; frame-ancestors 'none'"
+)
+#: An asset opened as a document of its own runs nothing.
+_ASSET_POLICY = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'"
+
+
+class RefusalError(Exception):
+    """A request the server will not carry out; the message is shown to the user."""
+
+    def __init__(self, status: int, code: str, message: str):
+        super().__init__(message)
+        self.status = status
+        self.code = code
+        self.message = message
+
+
+# ---------------------------------------------------------------------------
+# The request body
+# ---------------------------------------------------------------------------
+
+
+def parse_multipart(content_type: str, body: bytes) -> tuple[dict[str, str], list[tuple]]:
+    """The text fields and the files of a ``multipart/form-data`` body.
+
+    Returns ``(fields, files)``; a file is ``(field name, file name, bytes)``. The
+    parts are cut at the boundary as bytes, so a file arrives as it was sent; only
+    each part's few header lines go through the ``email`` package.
+    """
+    header = Message()
+    header["Content-Type"] = content_type
+    if header.get_content_type() != "multipart/form-data":
+        raise RefusalError(415, "not_a_form", "Send the inputs as a multipart form.")
+    boundary = header.get_param("boundary")
+    if not isinstance(boundary, str) or not boundary or len(boundary) > 200:
+        raise RefusalError(400, "bad_form", "The form has no boundary.")
+    delimiter = b"--" + boundary.encode("latin-1", "replace")
+    fields: dict[str, str] = {}
+    files: list[tuple] = []
+    # What comes before the first delimiter and after the closing one is not a part.
+    for chunk in body.split(delimiter)[1:]:
+        if chunk.startswith(b"--"):
+            break
+        chunk = chunk.removeprefix(b"\r\n")
+        raw_headers, separator, content = chunk.partition(b"\r\n\r\n")
+        if not separator:
+            continue
+        content = content.removesuffix(b"\r\n")
+        part = Message()
+        for line in raw_headers.decode("utf-8", "replace").split("\r\n"):
+            name, colon, value = line.partition(":")
+            if colon and name.strip().lower() == "content-disposition":
+                part["Content-Disposition"] = value.strip()
+        field = part.get_param("name", header="content-disposition")
+        if not isinstance(field, str):
+            continue
+        filename = part.get_filename()
+        if filename is None:
+            fields[field] = content.decode("utf-8", "replace")
+        elif filename or content:
+            # A file field left empty comes as an empty name and no bytes.
+            files.append((field, filename, content))
+    return fields, files
+
+
+def safe_name(name: str) -> str:
+    """A file name that stays one name inside the folder it is written to."""
+    name = name.replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if ch.isprintable() and ch not in '<>:"|?*').strip(" .")
+    if not name:
+        raise RefusalError(400, "bad_name", "A file has no usable name.")
+    if name.split(".", 1)[0].strip().upper() in _DEVICE_NAMES:
+        name = "_" + name
+    stem, dot, suffix = name.rpartition(".")
+    if dot and stem:
+        return stem[:120] + "." + suffix[:16]
+    return name[:120]
+
+
+def _unused_name(name: str, taken: set[str]) -> str:
+    """``name``, or ``name`` with a number before its ending when it is taken."""
+    if name.lower() not in taken:
+        return name
+    stem, dot, suffix = name.rpartition(".")
+    if not dot or not stem:
+        stem, suffix = name, ""
+    for n in range(1, 1000):
+        candidate = f"{stem}-{n}.{suffix}" if suffix else f"{stem}-{n}"
+        if candidate.lower() not in taken:
+            return candidate
+    raise RefusalError(400, "bad_name", "Too many files with the same name.")
+
+
+# ---------------------------------------------------------------------------
+# The solution and its runs
+# ---------------------------------------------------------------------------
+
+
+def _regular_files(folder: Path) -> list[Path]:
+    """The files under ``folder`` that are files of its own: no links, nothing outside."""
+    if not folder.is_dir():
+        return []
+    root = folder.resolve()
+    found = []
+    for current, dirs, names in os.walk(folder, followlinks=False):
+        dirs[:] = sorted(d for d in dirs if not Path(current, d).is_symlink())
+        for name in sorted(names):
+            path = Path(current, name)
+            if path.is_symlink() or not path.is_file():
+                continue
+            if path.resolve().is_relative_to(root):
+                found.append(path)
+    return found
+
+
+def _source_too_large() -> RefusalError:
+    return RefusalError(
+        413,
+        "too_large",
+        f"The package is too large to download as source code: at most "
+        f"{MAX_SOURCE_FILES} files and {MAX_SOURCE_BYTES // (1024 * 1024)} MB.",
+    )
+
+
+def _not_source_folder(relative: PurePosixPath) -> bool:
+    """Whether nothing under this folder of the package goes into the source zip."""
+    path = relative.as_posix().lower()
+    if any(path == top or path.startswith(top + "/") for top in _NOT_SOURCE_PATHS):
+        return True
+    return any(part.lower() in _NOT_SOURCE_DIRS or part.startswith(".") for part in relative.parts)
+
+
+# A variable of ``.env.example`` as wizard_api's check reads it
+# (poc_service.env_example_key_values, which keeps a key out of the file there):
+# ``NAME=value`` and ``export NAME=value``, or commented out, ``# NAME=value``.
+_ENV_ASSIGNMENT = re.compile(r"^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=(.*)$")
+_ENV_COMMENTED_ASSIGNMENT = re.compile(r"^\s*#\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)=(.*)$")
+_ENV_QUOTED = re.compile(r"^([\"'])(.*)\1\s*(?:#.*)?$")
+#: A part of a variable's name ending in one of these names a credential:
+#: AZURE_API_KEY, HF_TOKEN, CLIENT_SECRET. MAX_TOKENS and KEYWORDS do not.
+_ENV_CREDENTIAL_WORDS = ("KEY", "SECRET", "TOKEN", "PASSWORD")
+_ENV_CREDENTIAL_NAMES = frozenset({"GOOGLE_SERVICE_ACCOUNT_JSON"})
+
+
+def _env_value(raw: str) -> str:
+    """A value as ``.env.example`` writes it, without its quotes or a trailing comment."""
+    text = raw.strip()
+    if text.startswith("#"):
+        return ""
+    quoted = _ENV_QUOTED.match(text)
+    if quoted:
+        return quoted.group(2)
+    for at, char in enumerate(text):
+        if char == "#" and at > 0 and text[at - 1].isspace():
+            return text[:at].rstrip()
+    return text
+
+
+def _env_example_key_values(text: str) -> list[str]:
+    """The variables of ``.env.example`` that give a credential a value, by name.
+
+    A credential may stand there empty or with a placeholder (``<your key>``,
+    ``your-key-here``, ``xxxx``), also commented out; a model name, an API version
+    or an endpoint keeps its example value. A byte order mark before the first
+    line (as Windows editors write one) is not part of its name.
+    """
+    found: list[str] = []
+    for line in text.removeprefix("\ufeff").splitlines():
+        match = _ENV_COMMENTED_ASSIGNMENT.match(line) or _ENV_ASSIGNMENT.match(line)
+        if match is None:
+            continue
+        name, value = match.group(1), _env_value(match.group(2)).strip()
+        upper = name.upper()
+        credential = upper in _ENV_CREDENTIAL_NAMES or any(
+            part.endswith(_ENV_CREDENTIAL_WORDS) for part in upper.split("_") if part
+        )
+        placeholder = (
+            not value
+            or (value.startswith("<") and value.endswith(">"))
+            or value.lower().startswith("your")
+            or set(value) <= set("xX*.-_")
+        )
+        if credential and not placeholder and name not in found:
+            found.append(name)
+    return found
+
+
+def _gives_a_key_a_value(data: bytes) -> bool:
+    """Whether ``.env.example``, as bytes, gives a key a value or cannot be read to tell."""
+    try:
+        text = data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return True  # not UTF-8 (UTF-16, say): left out rather than read wrong
+    return bool(_env_example_key_values(text))
+
+
+def _is_source(relative: PurePosixPath) -> bool:
+    """Whether a file of the package, by its path inside it, goes into the source zip.
+
+    An allow-list, so a file nobody thought of stays out: the Python files, at the
+    root ``README.md``, ``config.yaml``, ``requirements.txt``, ``.env.example`` and
+    ``.gitignore``, the text files in ``schemas/`` and ``prompts/``, and the test
+    page's own files in ``ui/`` (:meth:`Solution.source_zip` leaves out a
+    ``.env.example`` that gives a key a value). Never a file under ``sample_input/``,
+    ``output/`` or ``evals/ground_truth/``, in a hidden folder, an environment or a
+    cache; never
+    another hidden file (``.env``, ``.netrc``, ``.npmrc``, ``.pypirc``,
+    ``.git-credentials``); never a file whose name says it holds a credential
+    (``credentials.json``, ``service-account.json``, ``secrets.toml``, ``id_rsa``).
+    """
+    *folders, name = relative.parts
+    if folders and _not_source_folder(PurePosixPath(*folders)):
+        return False
+    if _CREDENTIAL_NAME.search(name):
+        return False
+    if not folders:
+        if name in _SOURCE_ROOT_NAMES:
+            return True
+    if name.startswith("."):
+        return False
+    top = folders[0] if folders else ""
+    if top == "ui":
+        return "/".join(relative.parts[1:]) in _PAGE_FILES
+    if top in ("schemas", "prompts"):
+        return PurePosixPath(name).suffix.lower() in _SOURCE_TEXT_SUFFIXES
+    return name.endswith(".py")
+
+
+def _tail(path: Path, lines: int = LOG_TAIL_LINES) -> str:
+    """The last lines of a log file."""
+    try:
+        with open(path, "rb") as fh:
+            fh.seek(0, os.SEEK_END)
+            size = fh.tell()
+            fh.seek(max(0, size - LOG_TAIL_BYTES))
+            text = fh.read().decode("utf-8", "replace")
+    except OSError:
+        return ""
+    return "\n".join(text.splitlines()[-lines:])
+
+
+def _remove(path: Path) -> None:
+    try:
+        path.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _kill_tree(process: subprocess.Popen) -> None:
+    """Stop a run and every process it started.
+
+    The run was started as the head of a group of its own, so the group is what
+    is stopped: an entrypoint that started a process of its own does not leave
+    it behind, holding the model connection and the working folder.
+    """
+    try:
+        if os.name == "nt":
+            # Without a console of ours: a second Ctrl+C or Ctrl+Break while the
+            # server stops would end taskkill too, before it ends the run.
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=20,
+                check=False,
+                creationflags=subprocess.CREATE_NO_WINDOW,
+            )
+        else:
+            os.killpg(process.pid, signal.SIGKILL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+    try:
+        if process.poll() is None:
+            process.kill()
+    except OSError:
+        pass
+
+
+class Solution:
+    """The package this server stands in: what it takes in, and its runs."""
+
+    def __init__(
+        self,
+        package_dir: Path = PACKAGE_DIR,
+        *,
+        timeout: float = RUN_TIMEOUT_SECONDS,
+        max_upload_bytes: int = MAX_UPLOAD_BYTES,
+        max_files: int = MAX_FILES,
+        keep_runs: int = KEEP_RUNS,
+    ):
+        self.package_dir = Path(package_dir).resolve()
+        self.timeout = timeout
+        self.max_upload_bytes = max_upload_bytes
+        self.max_files = max_files
+        self.keep_runs = max(1, keep_runs)
+        self.runs_root = Path(tempfile.mkdtemp(prefix="poc-test-page-"))
+        atexit.register(self.close)
+        # One run at a time. Reentrant: the server takes it before it reads a
+        # request's body (reserve), and run() takes it again in the same thread.
+        self._lock = threading.RLock()
+        self._runs: dict[str, Path] = {}
+        # Whether a request holds the run while its files arrive, and when it started.
+        self._reserved = False
+        self._started: float | None = None
+        self._log_path: Path | None = None
+        # The process of the run that is going, and whether close() was called:
+        # once it was, no run starts, so none outlives the server.
+        self._state = threading.Lock()
+        self._process: subprocess.Popen | None = None
+        self._closed = False
+
+    def close(self) -> None:
+        """Stop a run that is going and remove every run's working folder."""
+        with self._state:
+            self._closed = True
+            process = self._process
+        if process is not None and process.poll() is None:
+            _kill_tree(process)
+            try:
+                process.wait(timeout=10)
+            except subprocess.SubprocessError:
+                pass
+        # The stopped run closes its log first: Windows does not remove an open file.
+        if self._lock.acquire(timeout=10):
+            self._lock.release()
+        shutil.rmtree(self.runs_root, ignore_errors=True)
+
+    # -- what the page reads ------------------------------------------------
+
+    def description(self) -> dict:
+        """ui/solution.json, with what this server allows and what the package has."""
+        try:
+            text = (self.package_dir / "ui" / "solution.json").read_text(encoding="utf-8")
+            described = json.loads(text)
+        except (OSError, ValueError):
+            described = {}
+        if not isinstance(described, dict):
+            described = {}
+        described["limits"] = {
+            "max_upload_bytes": self.max_upload_bytes,
+            "max_files": self.max_files,
+            "max_text_chars": MAX_TEXT_CHARS,
+            "timeout_seconds": self.timeout,
+        }
+        samples = [
+            p.relative_to(self.package_dir / SAMPLE_DIR).as_posix()
+            for p in _regular_files(self.package_dir / SAMPLE_DIR)
+            if p.name != UPLOADED_NAMES_FILE
+        ]
+        described["sample_files"] = samples[:50]
+        described["env_file"] = (self.package_dir / ".env").is_file()
+        return described
+
+    def accepted_suffixes(self) -> set[str] | None:
+        """The file endings the solution takes, or None when it names none."""
+        inputs = self.description().get("inputs")
+        if not isinstance(inputs, list) or not inputs:
+            return None
+        accepted: set[str] = set()
+        for item in inputs:
+            endings = item.get("extensions") if isinstance(item, dict) else None
+            if not isinstance(endings, list) or not endings:
+                return None
+            accepted.update(str(e).lower() for e in endings)
+        return accepted
+
+    def status(self) -> dict:
+        started, log_path = self._started, self._log_path
+        if started is None or log_path is None:
+            # A request whose files are still arriving holds the run as well.
+            return {"busy": self._reserved, "elapsed_seconds": 0, "log_tail": ""}
+        return {
+            "busy": True,
+            "elapsed_seconds": round(time.monotonic() - started, 1),
+            "log_tail": _tail(log_path, 12),
+        }
+
+    # -- one run ------------------------------------------------------------
+
+    def reserve(self) -> bool:
+        """Take the one run there may be; False while another request holds it.
+
+        The server calls this before it reads a request's body, so requests that
+        would only be refused as busy do not each hold up to the upload limit in
+        memory. Give it back with :meth:`release`.
+        """
+        if not self._lock.acquire(blocking=False):
+            return False
+        self._reserved = True
+        return True
+
+    def release(self) -> None:
+        self._reserved = False
+        self._lock.release()
+
+    def run(self, fields: dict[str, str], files: list[tuple]) -> dict:
+        """Run the solution once on what the request carried; one run at a time."""
+        uploads = self._checked_uploads(fields, files)
+        question_sent = bool(fields.get("question", "").strip())
+        examples = self._examples(sent_files=bool(files), question_sent=question_sent)
+        if not uploads and not examples:
+            raise RefusalError(400, "no_input", "Add a file or a text first.")
+        if question_sent and not files and not self._has_documents(examples):
+            # A package as delivered has no sample_input/: a question alone has
+            # nothing to be asked of, and the run would only fail.
+            raise RefusalError(
+                400,
+                "no_documents",
+                "Add at least one document: the question is asked of the documents you add.",
+            )
+        if not self._lock.acquire(blocking=False):
+            raise RefusalError(409, "busy", _BUSY_MESSAGE)
+        try:
+            return self._run(uploads, examples)
+        finally:
+            self._started = None
+            self._log_path = None
+            self._lock.release()
+
+    def _examples(self, sent_files: bool, question_sent: bool) -> list[Path]:
+        """The package's own sample_input/ files a run without a sent file works on.
+
+        With a question in the request the examples' own question files are left
+        out: the run answers what was asked, not the sample questions as well.
+        """
+        if sent_files:
+            return []
+        found = [
+            p
+            for p in _regular_files(self.package_dir / SAMPLE_DIR)
+            if p.name != UPLOADED_NAMES_FILE
+        ]
+        if question_sent:
+            found = [p for p in found if p.suffix.lower() not in QUESTION_SUFFIXES]
+        return found
+
+    def _has_documents(self, examples: list[Path]) -> bool:
+        """Whether a solution that answers questions has an example document to search."""
+        if not self.description().get("asks_question"):
+            return True
+        accepted = self.accepted_suffixes()
+        return any(accepted is None or p.suffix.lower() in accepted for p in examples)
+
+    def _checked_uploads(self, fields: dict[str, str], files: list[tuple]) -> list[tuple]:
+        """``(file name, bytes)`` for every file and text of the request, names made safe."""
+        if len(files) > self.max_files:
+            raise RefusalError(
+                413, "too_many_files", f"At most {self.max_files} files can be sent at once."
+            )
+        accepted = self.accepted_suffixes()
+        taken: set[str] = {UPLOADED_NAMES_FILE}
+        uploads: list[tuple] = []
+        for _field, filename, content in files:
+            name = safe_name(filename)
+            suffix = Path(name).suffix.lower()
+            if accepted is not None and suffix not in accepted:
+                raise RefusalError(
+                    400,
+                    "bad_extension",
+                    f"{name} is not a file this solution takes ({', '.join(sorted(accepted))}).",
+                )
+            name = _unused_name(name, taken)
+            taken.add(name.lower())
+            uploads.append((name, content))
+        # The RAG entrypoint reads a text file beside the documents as its questions,
+        # one a line, when the run has no terminal; a pasted text is an input file.
+        for field, filename in (("question", "question.txt"), ("text", "input.txt")):
+            text = fields.get(field, "").strip()
+            if not text:
+                continue
+            if len(text) > MAX_TEXT_CHARS:
+                raise RefusalError(
+                    413, "text_too_long", "The text is too long. Send it as a file instead."
+                )
+            name = _unused_name(filename, taken)
+            taken.add(name.lower())
+            uploads.append((name, (text + "\n").encode("utf-8")))
+        return uploads
+
+    def _run(self, uploads: list[tuple], examples: list[Path]) -> dict:
+        if not (self.package_dir / ENTRYPOINT).is_file():
+            raise RefusalError(500, "no_entrypoint", f"{ENTRYPOINT} is missing from the package.")
+        if self._closed:
+            raise RefusalError(503, "stopping", "The test page is stopping.")
+        run_id = secrets.token_hex(8)
+        run_dir = self.runs_root / run_id
+        log_path = self.runs_root / f"{run_id}.log"
+        try:
+            self._prepare(run_dir, uploads, examples)
+            self._log_path = log_path
+            self._started = time.monotonic()
+            exit_code, timed_out = self._execute(run_dir, log_path)
+        except BaseException:
+            # Nothing of a run that did not happen stays: the folder holds the
+            # user's files and, from the first copied file on, maybe the keys.
+            shutil.rmtree(run_dir, ignore_errors=True)
+            _remove(log_path)
+            if self._closed:
+                # close() came while the folder was being made, which made the
+                # runs' folder again.
+                shutil.rmtree(self.runs_root, ignore_errors=True)
+            raise
+        finally:
+            # The keys were needed for the run only; the working folder of a
+            # finished run stays for its downloads.
+            _remove(run_dir / ".env")
+        duration = round(time.monotonic() - self._started, 1)
+        used_examples = bool(examples)
+
+        self._runs[run_id] = run_dir
+        self._forget_old_runs()
+        outputs = self._outputs(run_id, run_dir)
+        answer = {
+            "ok": exit_code == 0 and not timed_out,
+            "run_id": run_id,
+            "exit_code": exit_code,
+            "duration_seconds": duration,
+            "used_examples": used_examples,
+            "log_tail": _tail(log_path),
+            "outputs": outputs,
+            "result": self._read_json(run_dir, self._main_result(outputs)),
+            "source_trace": self._read_json(
+                run_dir, next((o["name"] for o in outputs if o["name"].endswith(_TRACE_ENDING)), "")
+            ),
+        }
+        if timed_out:
+            answer["error"] = {
+                "code": "timeout",
+                "message": f"The run was stopped after {int(self.timeout)} seconds.",
+            }
+        elif exit_code != 0:
+            answer["error"] = {
+                "code": "run_failed",
+                "message": "The run ended with an error. The log says why.",
+            }
+        return answer
+
+    def _prepare(self, run_dir: Path, uploads: list[tuple], examples: list[Path]) -> None:
+        """The run's working folder: the package's code, then the inputs."""
+        self._copy_package(run_dir)
+        sample_dir = run_dir / SAMPLE_DIR
+        sample_dir.mkdir()
+        (run_dir / OUTPUT_DIR).mkdir()
+        # No file sent (a question or a text at most): the package's own examples
+        # are the material.
+        for source in examples:
+            target = sample_dir / source.relative_to(self.package_dir / SAMPLE_DIR)
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        for name, content in uploads:
+            (sample_dir / name).write_bytes(content)
+        if uploads:
+            (sample_dir / UPLOADED_NAMES_FILE).write_text(
+                "".join(f"{name}\n" for name, _ in uploads), encoding="utf-8"
+            )
+
+    def _copy_package(self, run_dir: Path) -> None:
+        """The package's code and settings, without its inputs, results and this page."""
+        for source in _regular_files(self.package_dir):
+            relative = source.relative_to(self.package_dir)
+            if relative.parts[0] in _SKIP_DIRS or "__pycache__" in relative.parts:
+                continue
+            target = run_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        run_dir.mkdir(parents=True, exist_ok=True)
+
+    def _execute(self, run_dir: Path, log_path: Path) -> tuple[int | None, bool]:
+        """Start run_poc.py in ``run_dir``; its output goes to ``log_path``."""
+        env = dict(os.environ)
+        env.update({"PYTHONIOENCODING": "utf-8", "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1"})
+        # The run heads a process group of its own, so a timeout can stop what
+        # the entrypoint started as well.
+        if os.name == "nt":
+            group = {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
+        else:
+            group = {"start_new_session": True}
+        with open(log_path, "wb") as log:
+            with self._state:
+                if self._closed:
+                    raise RefusalError(503, "stopping", "The test page is stopping.")
+                # A closed pipe, not the null device: on Windows that one counts as
+                # a terminal, and the entrypoint would wait for a typed question.
+                process = subprocess.Popen(
+                    [sys.executable, ENTRYPOINT],
+                    cwd=run_dir,
+                    env=env,
+                    stdin=subprocess.PIPE,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    **group,
+                )
+                self._process = process
+            try:
+                if process.stdin is not None:
+                    process.stdin.close()
+                return process.wait(timeout=self.timeout), False
+            except subprocess.TimeoutExpired:
+                _kill_tree(process)
+                process.wait()
+                return None, True
+            finally:
+                self._process = None
+
+    def _forget_old_runs(self) -> None:
+        while len(self._runs) > self.keep_runs:
+            run_id = next(iter(self._runs))
+            shutil.rmtree(self._runs.pop(run_id), ignore_errors=True)
+            (self.runs_root / f"{run_id}.log").unlink(missing_ok=True)
+
+    def _outputs(self, run_id: str, run_dir: Path) -> list[dict]:
+        out_dir = run_dir / OUTPUT_DIR
+        outputs = []
+        for path in _regular_files(out_dir):
+            kind = _OUTPUT_KINDS.get(path.suffix.lower())
+            if kind is None:
+                continue
+            name = path.relative_to(out_dir).as_posix()
+            outputs.append(
+                {
+                    "name": name,
+                    "kind": kind,
+                    "size": path.stat().st_size,
+                    "url": f"/api/runs/{run_id}/files/{quote(name)}",
+                }
+            )
+            if len(outputs) >= MAX_OUTPUT_FILES:
+                break
+        return outputs
+
+    @staticmethod
+    def _main_result(outputs: list[dict]) -> str:
+        """The name of the output file that holds the result, or ''."""
+        names = [
+            o["name"]
+            for o in outputs
+            if o["kind"] == "json" and "/" not in o["name"]
+            if not o["name"].endswith(_NOT_RESULT_ENDINGS)
+        ]
+        for ending in _RESULT_ENDINGS:
+            for name in names:
+                if name.endswith(ending):
+                    return name
+        return names[0] if len(names) == 1 else ""
+
+    @staticmethod
+    def _read_json(run_dir: Path, name: str):
+        if not name:
+            return None
+        path = run_dir / OUTPUT_DIR / name
+        try:
+            if path.stat().st_size > MAX_RESULT_BYTES:
+                return None
+            return json.loads(path.read_text(encoding="utf-8-sig"))
+        except (OSError, ValueError):
+            return None
+
+    def page_asset(self, name: str) -> Path:
+        """The page's own file ``name`` under ui/ (a font, the mark); a RefusalError otherwise."""
+        missing = RefusalError(404, "not_found", "No such file.")
+        if not name or "\\" in name or "\x00" in name or name.startswith("/"):
+            raise missing
+        parts = PurePosixPath(name).parts
+        if any(part in ("", ".", "..") or part.startswith(".") for part in parts):
+            raise missing
+        if PurePosixPath(name).suffix.lower() not in _PAGE_ASSET_TYPES:
+            raise missing
+        ui_dir = (self.package_dir / "ui").resolve()
+        path = ui_dir.joinpath(*parts)
+        if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(ui_dir):
+            raise missing
+        return path
+
+    # -- the source code ----------------------------------------------------
+
+    def source_name(self) -> str:
+        """The source zip's name without its ending: ``<solution id>-source``."""
+        solution_id = str(self.description().get("id") or "")
+        safe = re.sub(r"[^A-Za-z0-9._-]+", "-", solution_id).strip("-.")[:80]
+        return f"{safe or 'solution'}-source"
+
+    def source_files(self) -> list[tuple[str, Path]]:
+        """``(name in the zip, file)`` for what the package is made of.
+
+        Real files of the package only (no link, nothing reached through one, no
+        file with a second hard link, which may be a file from elsewhere), and of
+        those what :func:`_is_source` lets through. A virtual environment under any
+        name, the runs' working folders and files too large to be source code are
+        left out as well; such folders are not walked into at all. More than
+        ``MAX_SOURCE_FILES`` files or ``MAX_SOURCE_BYTES`` in all is refused.
+        """
+        root = self.package_dir
+        runs_root = self.runs_root.resolve()
+
+        def walked(folder: Path) -> bool:
+            if folder.is_symlink() or (folder / "pyvenv.cfg").exists():
+                return False
+            if _not_source_folder(PurePosixPath(folder.relative_to(root).as_posix())):
+                return False
+            real = folder.resolve()
+            return real.is_relative_to(root) and not real.is_relative_to(runs_root)
+
+        found: list[tuple[str, Path]] = []
+        total = 0
+        for current, dirs, names in os.walk(root, followlinks=False):
+            dirs[:] = sorted(d for d in dirs if walked(Path(current, d)))
+            for name in sorted(names):
+                path = Path(current, name)
+                relative = PurePosixPath(path.relative_to(root).as_posix())
+                if path.is_symlink() or not path.is_file() or not _is_source(relative):
+                    continue
+                if not path.resolve().is_relative_to(root):
+                    continue
+                status = path.stat()
+                if status.st_nlink > 1 or status.st_size > MAX_SOURCE_FILE_BYTES:
+                    continue
+                total += status.st_size
+                found.append((str(relative), path))
+                if len(found) > MAX_SOURCE_FILES or total > MAX_SOURCE_BYTES:
+                    raise _source_too_large()
+        return found
+
+    def source_zip(self) -> tuple[str, bytes]:
+        """``(file name, bytes)`` of the package's source code as a zip, in one folder.
+
+        Built in memory, so what is read is held to ``MAX_SOURCE_BYTES`` in all,
+        also when a file grew after :meth:`source_files` looked at it. A
+        ``.env.example`` that gives a key a value stays out: the key would go
+        wherever the zip goes.
+        """
+        folder = self.source_name()
+        buffer = io.BytesIO()
+        budget = MAX_SOURCE_BYTES
+        with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as archive:
+            for name, path in self.source_files():
+                try:
+                    entry = zipfile.ZipInfo.from_file(
+                        path, f"{folder}/{name}", strict_timestamps=False
+                    )
+                    with open(path, "rb") as fh:
+                        data = fh.read(MAX_SOURCE_FILE_BYTES + 1)
+                except OSError:
+                    continue
+                if len(data) > MAX_SOURCE_FILE_BYTES:
+                    continue
+                if name == ".env.example" and _gives_a_key_a_value(data):
+                    continue
+                budget -= len(data)
+                if budget < 0:
+                    raise _source_too_large()
+                archive.writestr(entry, data, compress_type=zipfile.ZIP_DEFLATED)
+        return f"{folder}.zip", buffer.getvalue()
+
+    def output_file(self, run_id: str, name: str) -> Path:
+        """The output file ``name`` of run ``run_id``; a RefusalError when there is none."""
+        missing = RefusalError(404, "not_found", "No such file.")
+        run_dir = self._runs.get(run_id) if _RUN_ID_RE.fullmatch(run_id) else None
+        if run_dir is None or not name or "\\" in name or "\x00" in name:
+            raise missing
+        parts = PurePosixPath(name).parts
+        if name.startswith("/") or any(part in ("", ".", "..") for part in parts):
+            raise missing
+        if PurePosixPath(name).suffix.lower() not in _OUTPUT_KINDS:
+            raise missing
+        out_dir = (run_dir / OUTPUT_DIR).resolve()
+        path = out_dir.joinpath(*parts)
+        if path.is_symlink() or not path.is_file() or not path.resolve().is_relative_to(out_dir):
+            raise missing
+        return path
+
+
+# ---------------------------------------------------------------------------
+# HTTP
+# ---------------------------------------------------------------------------
+
+
+class Handler(BaseHTTPRequestHandler):
+    server_version = "PocTestPage"
+    sys_version = ""
+    #: Each read and write on the connection waits this long at most.
+    timeout = IDLE_TIMEOUT_SECONDS
+
+    @property
+    def solution(self) -> Solution:
+        return self.server.solution  # type: ignore[attr-defined]
+
+    def log_message(self, format, *args):  # noqa: A002 (the base class's name)
+        if "/api/status" not in (self.path or ""):
+            super().log_message(format, *args)
+
+    # -- answers ------------------------------------------------------------
+
+    def _send(self, status: int, body: bytes | None, content_type: str, extra: dict | None = None):
+        """Answer ``body``; None answers a HEAD with the headers alone, its length unknown."""
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
+        if body is not None:
+            self.send_header("Content-Length", str(len(body)))
+        for name, value in {**_SECURITY_HEADERS, **(extra or {})}.items():
+            self.send_header(name, value)
+        self.end_headers()
+        if body is not None and self.command != "HEAD":
+            self.wfile.write(body)
+
+    def _json(self, status: int, payload: dict):
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self._send(status, body, "application/json; charset=utf-8")
+
+    def _refuse(self, refusal: RefusalError):
+        self._json(
+            refusal.status,
+            {"ok": False, "error": {"code": refusal.code, "message": refusal.message}},
+        )
+
+    def _handle(self, action):
+        try:
+            self._check_host()
+            action()
+        except RefusalError as refusal:
+            self._refuse(refusal)
+        except (BrokenPipeError, ConnectionError, TimeoutError):
+            # The other end went or stopped answering; a timeout leaves the
+            # connection in no state to be used again.
+            self.close_connection = True
+        except Exception:
+            # The terminal gets the details; the answer says only that it went wrong.
+            traceback.print_exc()
+            self._refuse(
+                RefusalError(500, "server_error", "The test page hit an error. See its terminal.")
+            )
+
+    def _check_host(self):
+        """A page on another site must not reach this server through the browser.
+
+        The name in the request is one of the server's own (:func:`_host_names`):
+        a name of another site there is a foreign page's, which had its name point
+        at this computer. A request a page sends carries that page's origin, which
+        must be this server.
+        """
+        host = _host_name(self.headers.get("Host") or "")
+        server = self.server
+        if not _host_allowed(host, server.host_names, server.every_address):  # type: ignore[attr-defined]
+            raise RefusalError(403, "forbidden", "This address is not the test page's own.")
+        origin = self.headers.get("Origin")
+        if origin and urlsplit(origin).netloc != (self.headers.get("Host") or ""):
+            raise RefusalError(403, "forbidden", "The request comes from another site.")
+
+    # -- routes -------------------------------------------------------------
+
+    def do_GET(self):  # noqa: N802 (the base class's name)
+        self._handle(self._get)
+
+    do_HEAD = do_GET  # noqa: N815
+
+    def do_POST(self):  # noqa: N802
+        self._handle(self._post)
+
+    def _get(self):
+        path = urlsplit(self.path).path
+        if path in ("/", "/index.html"):
+            try:
+                page = (self.solution.package_dir / "ui" / "index.html").read_bytes()
+            except OSError:
+                raise RefusalError(404, "not_found", "ui/index.html is missing.") from None
+            self._send(
+                200, page, "text/html; charset=utf-8", {"Content-Security-Policy": _PAGE_POLICY}
+            )
+        elif path == "/api/solution":
+            described = self.solution.description()
+            described["source_download"] = self.server.source_download  # type: ignore[attr-defined]
+            self._json(200, described)
+        elif path == "/api/status":
+            self._json(200, self.solution.status())
+        elif path == "/api/source":
+            if not self.server.source_download:  # type: ignore[attr-defined]
+                # Anyone who can reach the address would get the package's code.
+                raise RefusalError(
+                    403,
+                    "source_off",
+                    "The source code download is off while the test page listens on the "
+                    "network (--host). Start it without --host to download the source code.",
+                )
+            # The name is the solution's id cut down to letters, digits, ".", "_" and "-".
+            disposition = f'attachment; filename="{self.solution.source_name()}.zip"'
+            if self.command == "HEAD":
+                # Answered without building the zip, but refused as GET is when the
+                # package is over the limits (listing it reads no file).
+                self.solution.source_files()
+                self._send(200, None, "application/zip", {"Content-Disposition": disposition})
+                return
+            _, body = self.solution.source_zip()
+            self._send(200, body, "application/zip", {"Content-Disposition": disposition})
+        elif path.startswith("/ui/"):
+            asset = self.solution.page_asset(unquote(path.removeprefix("/ui/")))
+            self._send(
+                200,
+                asset.read_bytes(),
+                _PAGE_ASSET_TYPES[asset.suffix.lower()],
+                {"Content-Security-Policy": _ASSET_POLICY},
+            )
+        elif path.startswith("/api/runs/"):
+            run_id, separator, name = path.removeprefix("/api/runs/").partition("/files/")
+            if not separator:
+                raise RefusalError(404, "not_found", "No such address.")
+            self._send_file(self.solution.output_file(run_id, unquote(name)))
+        else:
+            raise RefusalError(404, "not_found", "No such address.")
+
+    def _send_file(self, path: Path):
+        body = path.read_bytes()
+        content_type = _CONTENT_TYPES.get(path.suffix.lower(), "application/octet-stream")
+        # Always a download: an output file is never opened as a page of this server.
+        disposition = f"attachment; filename*=UTF-8''{quote(path.name)}"
+        self._send(200, body, content_type, {"Content-Disposition": disposition})
+
+    def _post(self):
+        if urlsplit(self.path).path != "/api/run":
+            raise RefusalError(404, "not_found", "No such address.")
+        length = self._length()
+        # One run at a time, and a request that would only be refused as busy is
+        # refused before its body is read into memory.
+        if not self.solution.reserve():
+            self._skip(length)
+            raise RefusalError(409, "busy", _BUSY_MESSAGE)
+        try:
+            body = self._read_body(length)
+            fields, files = parse_multipart(self.headers.get("Content-Type") or "", body)
+            answer = self.solution.run(fields, files)
+        finally:
+            self.solution.release()
+        self._json(200, answer)
+
+    def _read_body(self, length: int) -> bytes:
+        """The request's body, refused when it does not arrive in time.
+
+        It holds the one run while it arrives (see ``_post``), so it is read a
+        piece at a time against :data:`BODY_TIMEOUT_SECONDS`: no wait for a piece
+        lasts past that deadline, and a body that ends after it is refused.
+        """
+        deadline = time.monotonic() + BODY_TIMEOUT_SECONDS
+        pieces: list[bytes] = []
+        remaining = length
+        try:
+            while remaining > 0:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    raise TimeoutError
+                # read1: at most one read from the connection, which waits no longer
+                # than the time left, however slowly the bytes come.
+                self.connection.settimeout(min(self.timeout, left))
+                piece = self.rfile.read1(min(remaining, 1024 * 1024))
+                if not piece:
+                    break
+                pieces.append(piece)
+                remaining -= len(piece)
+            if time.monotonic() > deadline:
+                raise TimeoutError
+        except TimeoutError:
+            self.close_connection = True
+            raise RefusalError(
+                408, "too_slow", "The files did not arrive in time. Send them again."
+            ) from None
+        finally:
+            # The answer is written with the connection's own timeout again.
+            self.connection.settimeout(self.timeout)
+        return b"".join(pieces)
+
+    def _skip(self, length: int) -> None:
+        """Read ``length`` bytes of the body away, a piece at a time.
+
+        Without this a refusal may not reach the browser: it sees the connection
+        closed under a body it is still sending.
+        """
+        remaining = length
+        while remaining > 0:
+            chunk = self.rfile.read(min(remaining, 1024 * 1024))
+            if not chunk:
+                break
+            remaining -= len(chunk)
+
+    def _length(self) -> int:
+        """The request body's length, refused before the body is read when it is over the limit."""
+        try:
+            length = int(self.headers.get("Content-Length") or "")
+        except ValueError:
+            raise RefusalError(
+                411, "no_length", "The request does not say how long it is."
+            ) from None
+        limit = self.solution.max_upload_bytes
+        if length < 0:
+            raise RefusalError(400, "bad_form", "The request's length is not a size.")
+        if length > limit + 64 * 1024:
+            # Read a moderate overshoot away so the answer reaches the browser;
+            # a far larger body is left unread and the connection closes.
+            if length <= 4 * limit + 1024 * 1024:
+                self._skip(length)
+            else:
+                self.close_connection = True
+            megabytes = max(1, limit // (1024 * 1024))
+            raise RefusalError(
+                413, "too_large", f"The files are too large: at most {megabytes} MB in all."
+            )
+        return length
+
+
+def _host_names(host: str, address: str) -> frozenset[str]:
+    """The names a request to this server may carry in its Host header.
+
+    The loopback names, the name the server was started with (``--host``) and the
+    address it listens on. Listening on every address (``--host 0.0.0.0``), other
+    computers reach it by this computer's name as well; see :func:`_host_allowed`.
+    """
+    names = set(_LOOPBACK_NAMES) | {host.lower(), str(address).lower()}
+    if host in _EVERY_ADDRESS:
+        try:
+            names |= {socket.gethostname().lower(), socket.getfqdn().lower()}
+        except OSError:
+            pass
+    return frozenset(names - _EVERY_ADDRESS)
+
+
+def _is_loopback(address: str) -> bool:
+    """Whether ``address`` is one only this computer reaches (127.0.0.0/8, ::1)."""
+    try:
+        return ipaddress.ip_address(str(address).split("%", 1)[0]).is_loopback
+    except ValueError:
+        return False
+
+
+def _host_allowed(host: str, names: frozenset[str], every_address: bool) -> bool:
+    """Whether ``host``, from a request's Host header, is one of this server's own names.
+
+    Listening on every address, any IP address is taken as well: a page of another
+    site can only put its own name there, never an address.
+    """
+    if host in names:
+        return True
+    if not every_address:
+        return False
+    try:
+        address = ipaddress.ip_address(host.split("%", 1)[0])
+    except ValueError:
+        return False
+    # 0.0.0.0, :: and group addresses are no address of this computer's.
+    return not (address.is_unspecified or address.is_multicast)
+
+
+def _host_name(header: str) -> str:
+    """The name in a Host header, lowercased; '' when the header is not ``name[:port]``.
+
+    Parsed as the authority of a URL, ``attacker.example@127.0.0.1:8000`` would be
+    127.0.0.1, so a header with userinfo, a path, a query, a fragment, white space
+    or a second port is no name of this server's.
+    """
+    if any(ch in header for ch in "@/?#\\") or any(ch.isspace() for ch in header):
+        return ""
+    match = _HOST_HEADER.fullmatch(header)
+    if match is None:
+        return ""
+    return (match.group(1) or match.group(2)).lower()
+
+
+class _IPv6Server(ThreadingHTTPServer):
+    address_family = socket.AF_INET6
+
+
+class _DualStackServer(_IPv6Server):
+    """``--host ::``: every address of this computer, its IPv4 ones as well."""
+
+    #: Whether the IPv4 addresses are in as well; not where the system has no dual stack.
+    dual_stack = False
+
+    def server_bind(self):
+        try:
+            self.socket.setsockopt(socket.IPPROTO_IPV6, socket.IPV6_V6ONLY, 0)
+            self.dual_stack = True
+        except (AttributeError, OSError):
+            pass  # IPv6 alone
+        super().server_bind()
+
+
+def _server_class(host: str) -> type[ThreadingHTTPServer]:
+    """IPv4 for a name or an IPv4 address, IPv6 for an IPv6 one, both for ``::``."""
+    if host == "::":
+        return _DualStackServer
+    return _IPv6Server if ":" in host else ThreadingHTTPServer
+
+
+def _shown_host(host: str, server: ThreadingHTTPServer) -> str:
+    """The address of this computer to open the page at, as a URL writes it."""
+    if host == "0.0.0.0":
+        return "127.0.0.1"
+    if host == "::":
+        # Listening on IPv6 alone, 127.0.0.1 would not answer.
+        return "127.0.0.1" if getattr(server, "dual_stack", False) else "[::1]"
+    return f"[{host}]" if ":" in host else host
+
+
+def create_server(
+    package_dir: Path = PACKAGE_DIR, host: str = "127.0.0.1", port: int = 8000, **limits
+) -> ThreadingHTTPServer:
+    """The server for the package in ``package_dir``; ``limits`` go to :class:`Solution`."""
+    server = _server_class(host)((host, port), Handler)
+    server.daemon_threads = True
+    server.host_names = _host_names(host, server.server_address[0])  # type: ignore[attr-defined]
+    server.every_address = host in _EVERY_ADDRESS  # type: ignore[attr-defined]
+    # The source zip only while the server listens on this computer alone.
+    server.source_download = _is_loopback(server.server_address[0])  # type: ignore[attr-defined]
+    server.solution = Solution(package_dir, **limits)  # type: ignore[attr-defined]
+    return server
+
+
+def _stop_on_signals() -> None:
+    """Make SIGTERM and SIGHUP stop the server as Ctrl+C does, and the stop run to its end.
+
+    Left as they are, either signal ends Python at once, with no ``finally`` and no
+    atexit: the run's working folder, with its copy of ``.env`` and the user's
+    files, stayed in the temporary folder, and ``run_poc.py``, which runs in a
+    session of its own, went on without its time limit. The first of these signals,
+    Ctrl+C (SIGINT) among them, stops the server; every one after it is ignored, so
+    a second Ctrl+C during the cleanup does not cut it short.
+    """
+    stopping = []
+
+    def stop(signum, frame):
+        for name in _STOP_SIGNALS:
+            if hasattr(signal, name):
+                signal.signal(getattr(signal, name), signal.SIG_IGN)
+        # One that arrived before the line above took effect is ignored here.
+        if stopping:
+            return
+        stopping.append(signum)
+        raise KeyboardInterrupt
+
+    for name in _STOP_SIGNALS:
+        if hasattr(signal, name):
+            signal.signal(getattr(signal, name), stop)
+
+
+def _say(text: str) -> None:
+    """Print, unless the terminal is gone (the server is stopping because it closed)."""
+    try:
+        print(text, flush=True)
+    except (OSError, ValueError):
+        pass
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description="A local web page for trying this solution.")
+    parser.add_argument("--host", default="127.0.0.1", help="address to listen on")
+    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--timeout", type=float, default=RUN_TIMEOUT_SECONDS, help="seconds one run may take"
+    )
+    args = parser.parse_args()
+
+    try:
+        server = create_server(PACKAGE_DIR, args.host, args.port, timeout=args.timeout)
+    except OSError as exc:
+        print(f"Cannot listen on {args.host}:{args.port}: {exc}", file=sys.stderr)
+        print("Try another port: python app.py --port 8080", file=sys.stderr)
+        sys.exit(1)
+    shown_host = _shown_host(args.host, server)
+    print(f"Test page: http://{shown_host}:{server.server_address[1]}", flush=True)
+    if args.host not in _LOOPBACK_NAMES:
+        print(
+            "NOTE: the page has no sign-in, and now other computers on the network can "
+            "reach it and start runs with your model credentials."
+        )
+    print("Stop with Ctrl+C.", flush=True)
+    _stop_on_signals()
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        _say("\nStopped.")
+    finally:
+        server.server_close()
+        server.solution.close()  # type: ignore[attr-defined]
+
+
+if __name__ == "__main__":
+    main()

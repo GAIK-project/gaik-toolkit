@@ -1,0 +1,2 @@
+# Never commit real secrets — only the .example template is tracked.
+secrets.yaml

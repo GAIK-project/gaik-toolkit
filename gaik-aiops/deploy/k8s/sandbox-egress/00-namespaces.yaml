@@ -1,0 +1,16 @@
+# Test fixture: an application namespace and a separate namespace for jobs that run generated code.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gaik-app
+  labels:
+    gaik.io/tier: app
+    pod-security.kubernetes.io/enforce: restricted
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: gaik-sandbox
+  labels:
+    gaik.io/tier: sandbox
+    pod-security.kubernetes.io/enforce: restricted

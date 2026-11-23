@@ -1,4 +1,5 @@
-"""Load independent provider credentials and settings for each PoC stage."""
+"""Load independent provider credentials and settings for each PoC stage, and check
+the package and keys of a service outside GAIK (external_service)."""
 
 import os
 import re
@@ -140,6 +141,46 @@ def _stage_provider(config: dict, stage: str, settings: dict, *, warn: bool = Tr
     return resolve_provider(provider)
 
 
+#: Settings that belong to the provider that was asked for, not to Azure: a model or
+#: deployment name of another provider's catalog does not exist on the Azure resource.
+_PROVIDER_SPECIFIC = (
+    "model",
+    "embedding_model",
+    "transcription_model",
+    "base_url",
+    "api_key",
+    "model_family",
+)
+
+
+def _azure_instead(config: dict, provider: str, error: Exception) -> bool:
+    """The sandbox holds only the Azure credentials. A stage whose provider has no key
+    there (the agent often records ``openai`` for a case that names no provider) cannot
+    run; when Azure is available it can run on Azure instead. Only in the sandbox, whose
+    Job sets WIZARD_RUN_ID: anywhere else the user chose the provider, and a missing key
+    is theirs to set, not a reason to send the data to another one. Never when the
+    blueprint allows no external model API: Azure is one."""
+    return (
+        bool(os.environ.get("WIZARD_RUN_ID"))
+        and provider != "azure"
+        and not external_model_forbidden(config)
+        and "not found in environment" in str(error)
+        and bool(os.environ.get("AZURE_API_KEY") and os.environ.get("AZURE_ENDPOINT"))
+    )
+
+
+def _on_azure(stage: str, provider: str, settings: dict) -> dict:
+    dropped = sorted(key for key in settings if key in _PROVIDER_SPECIFIC)
+    print(
+        f"WARNING: stage {stage}: provider {provider!r} has no credentials here; "
+        "using Azure OpenAI instead"
+        + (f" (dropped {', '.join(dropped)}: they name {provider} models)" if dropped else "")
+        + "."
+    )
+    kept = {key: value for key, value in settings.items() if key not in _PROVIDER_SPECIFIC}
+    return get_llm_config("azure", **kept)
+
+
 #: Settings that name the chat endpoint a model or deployment name belongs to.
 _CHAT_ADDRESS_SETTINGS = ("base_url", "azure_endpoint")
 #: Settings that describe a borrowed chat model: a custom Azure deployment name needs its
@@ -228,11 +269,13 @@ def get_stage_config(config: dict, stage: str) -> dict:
         return {**settings, "provider": provider, "use_azure": provider == "azure"}
     try:
         result = get_llm_config(provider, **settings)
-    except ValueError:
+    except ValueError as exc:
         # Self-hosted Whisper takes LOCAL_TRANSCRIBER_* constructor arguments; OpenAI/Azure
         # credentials are then needed only for optional transcript enhancement.
         if stage == "transcription" and settings.get("transcription_model") == "whisper_local":
             result = {**settings, "provider": provider, "use_azure": provider == "azure"}
+        elif _azure_instead(config, provider, exc):
+            result = _on_azure(stage, provider, settings)
         else:
             raise
     if stage == "embedding" and not result.get("embedding_model"):
@@ -293,3 +336,53 @@ def local_transcriber_options(
             "and in local_transcriber_options()."
         )
     return {"local_api_base": api_base, "local_api_key": api_key}
+
+
+def transcription_response_format(api_config: dict, wanted: str = "srt") -> str:
+    """Return a response_format the configured transcription model accepts.
+
+    gpt-4o-transcribe answers only "json" or "text"; "srt", "vtt" and "verbose_json"
+    need a whisper deployment. Timestamps are lost when the format is downgraded.
+    """
+    model = str(api_config.get("transcription_model") or "").lower()
+    if "gpt-4o" in model and wanted not in {"text", "json"}:
+        print(
+            f"WARNING: {model} does not support response_format={wanted!r}; using 'text'. "
+            "Configure a whisper deployment for timestamps."
+        )
+        return "text"
+    return wanted
+
+
+def external_service(name: str, module: str, env_vars: tuple = ()):
+    """The package of a service outside GAIK, or None when its step is to be skipped.
+
+    A step that calls a third-party API or framework (README, "External services")
+    imports its package here, never with an import statement of its own: where the
+    package is not installed or one of its variables in .env is empty -- as in the
+    wizard's test run, which installs nothing and holds only the model provider's key --
+    this prints one SKIPPED line and returns None. The step then uses its fallback and
+    the run goes on with the GAIK steps. Read only the service's own variables, never a
+    model provider's key.
+
+    Only the module itself (or a package it is in) missing counts as "not installed".
+    An installed package that fails to import, for want of one of its own dependencies
+    or with an error of its own, is a broken install: that error is raised.
+    """
+    import importlib
+
+    problems = []
+    try:
+        package = importlib.import_module(module)
+    except ModuleNotFoundError as exc:
+        if not exc.name or not (exc.name == module or module.startswith(exc.name + ".")):
+            raise
+        package = None
+        problems.append(f"package {module!r} is not installed (pip install -r requirements.txt)")
+    missing = [var for var in env_vars if not os.environ.get(var, "").strip()]
+    if missing:
+        problems.append(f"{', '.join(missing)} not set in .env")
+    if problems:
+        print(f"SKIPPED {name}: {'; '.join(problems)}. The run goes on without it.")
+        return None
+    return package

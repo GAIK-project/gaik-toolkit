@@ -26,10 +26,11 @@ Public API mirrors ``visualizer.py``:
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from .blueprint import Blueprint
+from .blueprint import Blueprint, Participant
 
 # ---------------------------------------------------------------------------
 # Layout constants
@@ -42,30 +43,183 @@ LANE_LABEL_W = 30  # left band of a lane inside the pool
 CONTENT_X0 = POOL_X + POOL_LABEL_W + LANE_LABEL_W + 30  # first node column centre-ish
 X_SPACING = 200  # horizontal distance between ranks
 COL_W = 100  # nominal column width (for column centring)
-# Each row inside a lane is split into a data-object zone (top) and a task zone
-# (bottom), so every task carries its own data objects directly above it -- even
-# when two parallel tasks are stacked in the same column of the same lane.
+# Each row inside a lane is split into a data-object zone (top) and the task zone.
+# Task labels follow official BPMN conventions (verb-object, optional [CODE] prefix)
+# and sit inside the shape — no custom caption overlay zone.
 ROW_DATA_H = 95  # data-object zone height per row (gap above the task)
+TASK_LABEL_H = 24  # small gap between data objects and the task box
 ROW_TASK_H = 120  # task zone height per row
-ROW_H = ROW_DATA_H + ROW_TASK_H
+ROW_H = ROW_DATA_H + TASK_LABEL_H + ROW_TASK_H
 DATA_OBJ_TOP_PAD = 8  # gap from the row top to the data object
-LANE_PAD_TOP = 12  # padding at the top of a lane
-LANE_PAD_BOTTOM = 12  # padding at the bottom of a lane
+LANE_PAD_TOP = 22  # padding at the top of a lane
+LANE_PAD_BOTTOM = 22  # padding at the bottom of a lane
 DATA_OBJ_GAP = 70  # horizontal gap between several data objects of one task
-BASE_LANE_H = 150
+BASE_LANE_H = 300  # minimum lane height (swimlane readability)
 EXT_POOL_H = 70
 EXT_POOL_GAP = 30
 
-# Standard BPMN element sizes. Tasks are larger than the bpmn-js default
-# (100x80) so multi-word labels with a [Component] line fit inside the box.
+# Standard BPMN element sizes (Camunda / bpmn-js friendly).
 SIZE = {
     "event": (36, 36),
-    "task": (130, 90),
+    "task": (130, 80),
     "gateway": (50, 50),
     "dataObject": (36, 50),
     "dataStore": (50, 50),
     "annotation": (180, 50),
 }
+
+# Short component codes for implementation-level task labels (GAIK modeling guide).
+# Format: "[STR] Transcribe Audio" — readable name first; code is optional aid.
+_COMPONENT_CODES: Dict[str, str] = {
+    "Transcriber": "STR",
+    "WhisperTranscriber": "STR",
+    "transcriber": "STR",
+    "whisper": "STR",
+    "DataExtractor": "SE",
+    "Extractor": "SE",
+    "extractor": "SE",
+    "data_extractor": "SE",
+    "SchemaGenerator": "SSG",
+    "schema_generator": "SSG",
+    "RequirementParser": "RP",
+    "PyMuPDFParser": "PAR",
+    "DoclingParser": "PAR",
+    "parser": "PAR",
+    "LLMJudge": "JUD",
+    "EnhanceTranscript": "ENH",
+    "enhance_transcript": "ENH",
+    "TextToSpeech": "TTS",
+    "tts": "TTS",
+    "Classifier": "CLS",
+    "classifier": "CLS",
+    "AudioToStructuredData": "A2S",
+    "DocumentsToStructuredData": "D2S",
+    "RAGWorkflow": "RAG",
+    "rag": "RAG",
+    "pgvector": "RAG",
+}
+
+
+def _component_code(component: Optional[str]) -> Optional[str]:
+    """Return a short bracket code for a GAIK component, or None."""
+    if not component:
+        return None
+    if component in _COMPONENT_CODES:
+        return _COMPONENT_CODES[component]
+    # Case-insensitive lookup for common aliases (UI may send lowercase ids).
+    lower_map = {k.lower(): v for k, v in _COMPONENT_CODES.items()}
+    hit = lower_map.get(component.lower())
+    if hit:
+        return hit
+    # CamelCase / snake_case → up to 3 uppercase initials
+    parts = re.findall(r"[A-Z][a-z]*|[a-z]+|[0-9]+", component.replace("-", "_"))
+    if not parts:
+        return component[:3].upper()
+    initials = "".join(p[0].upper() for p in parts if p)
+    return (initials or component[:3].upper())[:4]
+
+
+def _humanize_token(token: str) -> str:
+    """snake_case / camelCase / kebab → Title Case words."""
+    spaced = re.sub(r"[_\-]+", " ", str(token))
+    spaced = re.sub(r"([a-z])([A-Z])", r"\1 \2", spaced)
+    return " ".join(w.capitalize() for w in spaced.split() if w)
+
+
+# Prefer type-based data-object labels when the artifact id is opaque.
+_ARTIFACT_TYPE_LABELS: Dict[str, str] = {
+    "audio": "Audio File",
+    "pdf": "PDF Document",
+    "image": "Image",
+    "video": "Media File",
+    "transcript": "Transcript",
+    "parsed_text": "Parsed Text",
+    "text": "Text",
+    "structured_json": "Structured JSON",
+    "validation_report": "Validation Report",
+    "schema": "Extraction Schema",
+    "subtitle": "Subtitle File",
+    "index": "Search Index",
+}
+
+
+def _data_object_label(art_id: str, art: Any = None) -> str:
+    """Human-readable data object name (official BPMN samples + modeling guide)."""
+    label = str(getattr(art, "label", "") or "").strip()
+    if label:
+        return label
+    type_key = ""
+    if art is not None:
+        type_key = str(getattr(art, "type", "") or "").lower()
+    # Exact id matches known type labels (e.g. structured_json → Structured JSON).
+    if art_id in _ARTIFACT_TYPE_LABELS:
+        return _ARTIFACT_TYPE_LABELS[art_id]
+    # Prefer a readable id (voice_note_audio → Voice Note Audio) unless it is
+    # a generic placeholder like src/out/artifact_*.
+    opaque = bool(re.fullmatch(r"(src|out|input|output|data|artifact)(_\w+)?", art_id, re.I))
+    if not opaque and art_id:
+        return _humanize_token(art_id)
+    if type_key in _ARTIFACT_TYPE_LABELS:
+        return _ARTIFACT_TYPE_LABELS[type_key]
+    if type_key:
+        return _humanize_token(type_key)
+    return _humanize_token(art_id) if art_id else "Data"
+
+
+# ---------------------------------------------------------------------------
+# Derived lanes
+# ---------------------------------------------------------------------------
+
+#: The lanes drawn when business_process.participants is empty, per node
+#: category: (participant id, lane id, lane priority, bpmn_mapping path).
+_DERIVED_LANES: dict[str, tuple[str, str, int, str]] = {
+    "user": ("users", "Lane_users", 0, "derived:business_spec.intended_users"),
+    "ai": ("system", "Lane_gaik_ai", 1, "derived:system"),
+    "review": ("reviewers", "Lane_reviewers", 2, "derived:business_spec.reviewers"),
+}
+#: The ids of the derived participants; a step's performed_by may name one when
+#: there are no participants.
+DERIVED_PARTICIPANT_IDS = frozenset(spec[0] for spec in _DERIVED_LANES.values())
+
+
+def _derived_participant(blueprint: Blueprint, category: str) -> Participant:
+    """The participant behind the derived lane of a node category."""
+    spec = blueprint.business_spec if isinstance(blueprint.business_spec, dict) else {}
+    if category == "ai":
+        # Official GAIK samples use "GenAI" for the software/AI lane.
+        return Participant(
+            id="system", name="GenAI", kind="system", default_lane_for=["automated_task"]
+        )
+    if category == "review":
+        reviewers = spec.get("reviewers") or []
+        name = (
+            " / ".join(r.replace("_", " ").title() for r in reviewers) if reviewers else "Reviewer"
+        )
+        return Participant(id="reviewers", name=name, default_lane_for=["human_review"])
+    users = spec.get("intended_users") or []
+    name = " / ".join(u.replace("_", " ").title() for u in users) if users else "User"
+    return Participant(id="users", name=name, default_lane_for=["user_task"])
+
+
+def derived_participants(blueprint: Blueprint) -> list[Participant]:
+    """The participants behind the lanes the generator derives when
+    ``business_process.participants`` is empty, in lane order.
+
+    Only the lanes the generator would draw are returned. Setting the result as
+    the participants draws the same lanes, with the same names, in the same order.
+    """
+    if not blueprint.workflow.steps:
+        return []
+    process = blueprint.business_process.model_copy(update={"participants": []})
+    builder = _BpmnBuilder(blueprint.model_copy(update={"business_process": process}))
+    builder.build()
+    category_of = {lane_id: category for category, (_, lane_id, _, _) in _DERIVED_LANES.items()}
+    ordered = sorted(builder.lanes.values(), key=lambda lane: (lane.priority, lane.id))
+    return [
+        _derived_participant(blueprint, category_of[lane.id])
+        for lane in ordered
+        if lane.id in category_of
+    ]
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +257,7 @@ class _Node:
         self.name = name
         self.lane = lane  # lane id
         self.w, self.h = SIZE[size_key]
+        self.documentation = ""
         self.rank = 0
         self.x = 0
         self.y = 0
@@ -145,9 +300,26 @@ class _Lane:
 # ---------------------------------------------------------------------------
 
 
+#: The lane priority of the first extra lane (``generate_bpmn``'s
+#: ``extra_lane_ids``): after every other lane, in the participants' order.
+_EXTRA_LANE_PRIORITY = 10
+
+
 class _BpmnBuilder:
-    def __init__(self, blueprint: Blueprint):
+    def __init__(
+        self,
+        blueprint: Blueprint,
+        include_data_objects: bool = True,
+        extra_lane_ids: frozenset[str] = frozenset(),
+    ):
         self.bp = blueprint
+        self.extra_lane_ids = frozenset(extra_lane_ids)
+        # Without data objects the per-row data band is not reserved, so every
+        # row (and the minimum lane height) loses ROW_DATA_H.
+        self.include_data_objects = include_data_objects
+        self.row_data_h = ROW_DATA_H if include_data_objects else 0
+        self.row_h = self.row_data_h + TASK_LABEL_H + ROW_TASK_H
+        self.base_lane_h = BASE_LANE_H if include_data_objects else BASE_LANE_H - ROW_DATA_H
         self.nodes: Dict[str, _Node] = {}
         self.lanes: Dict[str, _Lane] = {}
         self.flows: List[_Flow] = []
@@ -199,16 +371,36 @@ class _BpmnBuilder:
 
     # -- lanes ------------------------------------------------------------
 
-    def _participant_lane(self, predicate) -> Optional[Tuple[str, str]]:
-        """Return (lane_id, name) for the first business_process participant
-        matching predicate, or None."""
+    def _participant_lane(self, predicate) -> Optional[Tuple[str, str, int]]:
+        """Return (lane_id, name, priority) for the first business_process
+        participant matching predicate, or None."""
         for i, p in enumerate(self.bp.business_process.participants):
             if predicate(p):
                 lid = f"Lane_{_safe(p.id)}"
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
-                return lid, p.name
+                return lid, p.name, self._priority(p)
         return None
+
+    def _priority(self, p) -> int:
+        """A participant's lane order: an extra lane (``extra_lane_ids``) after
+        every other lane, in the participants' order; else by its role."""
+        if getattr(p, "id", None) in self.extra_lane_ids:
+            ids = [q.id for q in self.bp.business_process.participants]
+            return _EXTRA_LANE_PRIORITY + ids.index(p.id)
+        return self._participant_priority(p)
+
+    @staticmethod
+    def _participant_priority(p) -> int:
+        """Lane order of a participant, from its role, so the lane keeps its
+        place however a node reaches it (a category or a step's performed_by):
+        users 0, the system 1, reviewers 2, as the derived lanes."""
+        lanes_for = getattr(p, "default_lane_for", [])
+        if getattr(p, "kind", "") == "system" or "automated_task" in lanes_for:
+            return _DERIVED_LANES["ai"][2]
+        if "human_review" in lanes_for and "user_task" not in lanes_for:
+            return _DERIVED_LANES["review"][2]
+        return _DERIVED_LANES["user"][2]
 
     def _ensure_lane(self, lid: str, name: str, priority: int) -> str:
         if lid not in self.lanes:
@@ -218,55 +410,41 @@ class _BpmnBuilder:
     def _lane_for_category(self, category: str) -> str:
         """Resolve a lane id for a node category, creating lanes lazily.
 
-        Categories: 'user', 'ai', 'review', 'manual'.
+        Categories: 'user', 'ai', 'review', 'manual'. Without a matching
+        participant the lane is the derived one (``_derived_participant``).
         """
-        spec = self.bp.business_spec if isinstance(self.bp.business_spec, dict) else {}
-
         if category == "ai":
             hit = self._participant_lane(lambda p: getattr(p, "kind", "") == "system")
-            if hit:
-                return self._ensure_lane(hit[0], hit[1], 1)
-            lid = self._ensure_lane("Lane_gaik_ai", "GAIK AI System", 1)
-            if lid not in self.mapping:
-                self._map(lid, "lane", "derived:system")
-            return lid
-
-        if category == "review":
+        elif category == "review":
             hit = self._participant_lane(
                 lambda p: "human_review" in getattr(p, "default_lane_for", [])
             )
-            if hit:
-                return self._ensure_lane(hit[0], hit[1], 2)
-            reviewers = spec.get("reviewers") or []
-            name = (
-                " / ".join(r.replace("_", " ").title() for r in reviewers)
-                if reviewers
-                else "Reviewer"
+        else:  # user / manual default
+            category = "user"
+            hit = self._participant_lane(
+                lambda p: "user_task" in getattr(p, "default_lane_for", [])
             )
-            lid = self._ensure_lane("Lane_reviewers", name, 2)
-            if lid not in self.mapping:
-                self._map(lid, "lane", "derived:business_spec.reviewers")
-            return lid
-
-        # user / manual default
-        hit = self._participant_lane(lambda p: "user_task" in getattr(p, "default_lane_for", []))
+        _, lid, priority, source = _DERIVED_LANES[category]
         if hit:
-            return self._ensure_lane(hit[0], hit[1], 0)
-        users = spec.get("intended_users") or []
-        name = " / ".join(u.replace("_", " ").title() for u in users) if users else "User"
-        lid = self._ensure_lane("Lane_users", name, 0)
+            return self._ensure_lane(*hit)
+        lid = self._ensure_lane(lid, _derived_participant(self.bp, category).name, priority)
         if lid not in self.mapping:
-            self._map(lid, "lane", "derived:business_spec.intended_users")
+            self._map(lid, "lane", source)
         return lid
 
     def _lane_for_participant(self, participant_id: str, fallback_category: str) -> str:
         for i, p in enumerate(self.bp.business_process.participants):
             if p.id == participant_id:
                 lid = f"Lane_{_safe(p.id)}"
-                priority = 1 if getattr(p, "kind", "") == "system" else 0
                 if lid not in self.mapping:
                     self._map(lid, "lane", f"business_process.participants[{i}]")
-                return self._ensure_lane(lid, p.name, priority)
+                return self._ensure_lane(lid, p.name, self._priority(p))
+        if not self.bp.business_process.participants:
+            # Derived lanes: a derived participant id names its lane.
+            for category, (derived_id, _, _, _) in _DERIVED_LANES.items():
+                if derived_id == participant_id:
+                    return self._lane_for_category(category)
+        # An unknown id falls back to the category lane (validator rule 16 reports it).
         return self._lane_for_category(fallback_category)
 
     # -- step -> node -----------------------------------------------------
@@ -276,22 +454,38 @@ class _BpmnBuilder:
             return f"Gateway_{_safe(step.id)}"
         return f"Activity_{_safe(step.id)}"
 
+    def _step_display_name(self, step) -> str:
+        """Official BPMN task naming: verb-object; optional [CODE] for automated steps.
+
+        Matches GAIK modeling guide + public/bpmn/official samples — no custom
+        ``\\n[User input]`` / ``\\n[Component]`` caption suffixes.
+        """
+        name = (step.name or step.id or "").strip()
+        if step.type == "automated_task" and step.component:
+            code = _component_code(step.component)
+            if code:
+                return f"[{code}] {name}"
+        return name
+
     def _build_step_nodes(self) -> None:
         steps = self.bp.workflow.steps
         for i, step in enumerate(steps):
             nid = self._step_node_id(step)
             if step.type == "user_task":
-                tag, size, lane = "bpmn:userTask", "task", self._lane_for_category("user")
+                tag, size, category = "bpmn:userTask", "task", "user"
             elif step.type == "human_review":
-                tag, size, lane = "bpmn:userTask", "task", self._lane_for_category("review")
+                tag, size, category = "bpmn:userTask", "task", "review"
             elif step.type == "decision":
-                tag, size, lane = "bpmn:exclusiveGateway", "gateway", self._lane_for_category("ai")
+                tag, size, category = "bpmn:exclusiveGateway", "gateway", "ai"
             else:  # automated_task
-                tag, size, lane = "bpmn:serviceTask", "task", self._lane_for_category("ai")
-            name = step.name
-            if step.type == "automated_task" and step.component:
-                name = f"{step.name}\n[{step.component}]"
+                tag, size, category = "bpmn:serviceTask", "task", "ai"
+            if step.performed_by:
+                lane = self._lane_for_participant(step.performed_by, category)
+            else:
+                lane = self._lane_for_category(category)
+            name = self._step_display_name(step)
             node = _Node(nid, tag, name, lane, size)
+            node.documentation = (step.description or "").strip()
             self.nodes[nid] = node
             self._map(nid, step.type, f"workflow.steps[{i}]")
 
@@ -305,6 +499,18 @@ class _BpmnBuilder:
             node = _Node(nid, tag, ms.name, lane, "task")
             self.nodes[nid] = node
             self._map(nid, "manual_step", f"business_process.manual_steps[{i}]")
+
+    def _build_participant_lanes(self) -> None:
+        """The extra lanes (``extra_lane_ids``) are drawn also while no step is
+        in them, so a step can be moved into a lane the user added. Other
+        participants are lanes only when a node reaches them."""
+        for i, p in enumerate(self.bp.business_process.participants):
+            if p.id not in self.extra_lane_ids:
+                continue
+            lid = f"Lane_{_safe(p.id)}"
+            if lid not in self.mapping:
+                self._map(lid, "lane", f"business_process.participants[{i}]")
+            self._ensure_lane(lid, p.name, self._priority(p))
 
     # -- base sequence-flow graph -----------------------------------------
 
@@ -349,7 +555,15 @@ class _BpmnBuilder:
             indeg[b] = indeg.get(b, 0) + 1
 
         # 2. start event -> entry steps (no dependencies)
-        start = _Node("StartEvent_1", "bpmn:startEvent", "Start", "", "event")
+        # Descriptive start/end names match official samples ("Started …").
+        uc_name = (self.bp.use_case.name or "Process").strip()
+        start = _Node(
+            "StartEvent_1",
+            "bpmn:startEvent",
+            f"Started {uc_name}",
+            "",
+            "event",
+        )
         self.nodes["StartEvent_1"] = start
         self._map("StartEvent_1", "start_event", "derived:start")
 
@@ -404,7 +618,14 @@ class _BpmnBuilder:
             self._add_flow(src_node, tgt_node)
 
         # 4. end event(s) from terminal steps
-        end = _Node("EndEvent_success", "bpmn:endEvent", "Process complete", "", "event")
+        uc_name = (self.bp.use_case.name or "Process").strip()
+        end = _Node(
+            "EndEvent_success",
+            "bpmn:endEvent",
+            f"{uc_name} completed",
+            "",
+            "event",
+        )
         self.nodes["EndEvent_success"] = end
         self._map("EndEvent_success", "end_event", "derived:end")
         terminal = [s for s in steps if not dependents[s.id]]
@@ -552,8 +773,13 @@ class _BpmnBuilder:
             return
         for idx, target in enumerate(targets):
             ds_id = f"DataStore_{_safe(target)}"
-            ds_name = target.replace("_", " ").title()
-            self.data_stores.append((ds_id, ds_name, target))
+            ds_name = _humanize_token(target)
+            # Persistent repositories use clean names (e.g. "Incident Reporting Database").
+            if not ds_name.lower().endswith(("database", "repository", "system", "store")):
+                ds_label = f"{ds_name} Repository"
+            else:
+                ds_label = ds_name
+            self.data_stores.append((ds_id, ds_label, target))
             self._map(ds_id, "data_store", f"technical_spec.integration_targets[{idx}]")
 
             send_id = f"Activity_submit_{_safe(target)}"
@@ -783,7 +1009,8 @@ class _BpmnBuilder:
         for art_id, art in artifacts.items():
             ref_id = f"DataObjectRef_{_safe(art_id)}"
             obj_id = f"DataObject_{_safe(art_id)}"
-            self.data_objs.append((ref_id, obj_id, art_id, art_id))
+            label = _data_object_label(art_id, art)
+            self.data_objs.append((ref_id, obj_id, label, art_id))
             self._dataobj_ref_for_artifact[art_id] = ref_id
             self._map(ref_id, "data_object", f"artifacts.{art_id}")
 
@@ -888,7 +1115,7 @@ class _BpmnBuilder:
         top = float(POOL_Y)
         for lane in ordered_lanes:
             rows = max_stack_per_lane.get(lane.id, 1)
-            lane.height = max(BASE_LANE_H, LANE_PAD_TOP + rows * ROW_H + LANE_PAD_BOTTOM)
+            lane.height = max(self.base_lane_h, LANE_PAD_TOP + rows * self.row_h + LANE_PAD_BOTTOM)
             lane.top = top
             top += lane.height
         pool_height = top - POOL_Y
@@ -904,8 +1131,8 @@ class _BpmnBuilder:
             self.node_row[node.id] = idx
             lane = self.lanes[node.lane]
             col_cx = CONTENT_X0 + node.rank * X_SPACING + COL_W / 2
-            row_top = lane.top + LANE_PAD_TOP + idx * ROW_H
-            task_cy = row_top + ROW_DATA_H + ROW_TASK_H / 2
+            row_top = lane.top + LANE_PAD_TOP + idx * self.row_h
+            task_cy = row_top + self.row_data_h + TASK_LABEL_H + ROW_TASK_H / 2
             node.x = col_cx - node.w / 2
             node.y = task_cy - node.h / 2
             self.bounds[node.id] = (node.x, node.y, node.w, node.h)
@@ -932,7 +1159,7 @@ class _BpmnBuilder:
                 ax, ay, aw, ah = self.bounds[anchor]
                 lane = self.lanes[self.nodes[anchor].lane]
                 idx = self.node_row[anchor]
-                row_top = lane.top + LANE_PAD_TOP + idx * ROW_H
+                row_top = lane.top + LANE_PAD_TOP + idx * self.row_h
                 # sit near the top of the data zone so there is a clear gap down
                 # to the task below it
                 oy = row_top + DATA_OBJ_TOP_PAD
@@ -989,6 +1216,7 @@ class _BpmnBuilder:
     def build(self) -> str:
         self._build_step_nodes()
         self._build_manual_steps()
+        self._build_participant_lanes()
         self._build_base_edges()
         self._enrich_approval()
         self._enrich_decision_points()
@@ -998,7 +1226,8 @@ class _BpmnBuilder:
         # review approves the output before the PDF is rendered.
         self._enrich_pdf_generation()
         self._enrich_integration()
-        self._build_data_objects()
+        if self.include_data_objects:
+            self._build_data_objects()
         self._build_external_parties()
         self._build_annotations()
         self._assign_lane_membership()
@@ -1095,6 +1324,11 @@ class _BpmnBuilder:
 
     def _emit_node(self, L: List[str], node: _Node) -> None:
         inner: List[str] = []
+        if node.documentation:
+            # BPMN puts documentation first among an element's children.
+            inner.append(
+                f"      <bpmn:documentation>{_esc(node.documentation)}</bpmn:documentation>"
+            )
         for fid in node.incoming:
             inner.append(f"      <bpmn:incoming>{fid}</bpmn:incoming>")
         for fid in node.outgoing:
@@ -1234,20 +1468,17 @@ class _BpmnBuilder:
         # last-resort (should not happen now that every element is in bounds)
         return CONTENT_X0, POOL_Y
 
-    def _border_point(self, element_id: str, toward: Tuple[float, float]) -> Tuple[float, float]:
-        """Point on element_id's rectangle border on the ray toward `toward`."""
+    def _element_rect(self, element_id: str) -> tuple[float, float, float, float]:
         b = self.bounds.get(element_id)
-        if b is None:
-            return self._element_center(element_id)
-        x, y, w, h = b
-        cx, cy = x + w / 2, y + h / 2
-        dx, dy = toward[0] - cx, toward[1] - cy
-        if abs(dx) < 1e-6 and abs(dy) < 1e-6:
-            return cx, cy
-        sx = (w / 2) / abs(dx) if abs(dx) > 1e-6 else float("inf")
-        sy = (h / 2) / abs(dy) if abs(dy) > 1e-6 else float("inf")
-        s = min(sx, sy)
-        return cx + dx * s, cy + dy * s
+        if b is not None:
+            return b
+        cx, cy = self._element_center(element_id)
+        return cx, cy, 0.0, 0.0
+
+    @staticmethod
+    def _emit_waypoints(lines: list[str], points: list[tuple[int, int]]) -> None:
+        for x, y in points:
+            lines.append(f'        <omgdi:waypoint x="{x}" y="{y}" />')
 
     def _emit_edge(self, L: List[str], f: _Flow) -> None:
         src = self.nodes.get(f.src)
@@ -1268,36 +1499,23 @@ class _BpmnBuilder:
             L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(low)}" />')
             L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
         else:
-            sx, sy = src.x + src.w, src.cy
-            tx, ty = tgt.x, tgt.cy
-            if abs(sy - ty) < 1:
-                L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
-            else:
-                midx = (sx + tx) / 2
-                L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(midx)}" y="{int(sy)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(midx)}" y="{int(ty)}" />')
-                L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
+            points = route_edge((src.x, src.y, src.w, src.h), (tgt.x, tgt.y, tgt.w, tgt.h))
+            self._emit_waypoints(L, points)
         L.append("      </bpmndi:BPMNEdge>")
 
     def _emit_data_edge(self, L: List[str], edge_id: str, a_id: str, b_id: str) -> None:
         """A dashed data-association edge from a_id to b_id, attached to each
-        shape's border (never the centre) so it does not run through shapes."""
-        ax, ay = self._border_point(a_id, self._element_center(b_id))
-        bx, by = self._border_point(b_id, self._element_center(a_id))
+        shape's border (never the centre) and drawn with right angles."""
+        points = route_edge(self._element_rect(a_id), self._element_rect(b_id))
         L.append(f'      <bpmndi:BPMNEdge id="{edge_id}_di" bpmnElement="{edge_id}">')
-        L.append(f'        <omgdi:waypoint x="{int(ax)}" y="{int(ay)}" />')
-        L.append(f'        <omgdi:waypoint x="{int(bx)}" y="{int(by)}" />')
+        self._emit_waypoints(L, points)
         L.append("      </bpmndi:BPMNEdge>")
 
     def _emit_msg_edge(self, L: List[str], mid: str, src: str, tgt: str) -> None:
         # attach at borders so the dashed message flow meets the pool / task cleanly
-        sx, sy = self._border_point(src, self._element_center(tgt))
-        tx, ty = self._border_point(tgt, self._element_center(src))
+        points = route_edge(self._element_rect(src), self._element_rect(tgt))
         L.append(f'      <bpmndi:BPMNEdge id="{mid}_di" bpmnElement="{mid}">')
-        L.append(f'        <omgdi:waypoint x="{int(sx)}" y="{int(sy)}" />')
-        L.append(f'        <omgdi:waypoint x="{int(tx)}" y="{int(ty)}" />')
+        self._emit_waypoints(L, points)
         L.append("      </bpmndi:BPMNEdge>")
 
 
@@ -1306,8 +1524,56 @@ class _BpmnBuilder:
 # ---------------------------------------------------------------------------
 
 
-def generate_bpmn(blueprint: Blueprint) -> str:
+def route_edge(
+    src: tuple[int, int, int, int], tgt: tuple[int, int, int, int]
+) -> list[tuple[int, int]]:
+    """Right-angle waypoints for a connection from shape `src` to shape `tgt`.
+
+    Both shapes are ``(x, y, width, height)``. Consecutive waypoints share x or
+    y; the first lies on the source's border and the last on the target's.
+
+    - target to the right: exit right, enter left, with a middle vertical
+      segment when the centres' ys differ;
+    - shapes stacked (their x ranges overlap): one vertical segment;
+    - target to the left: loop back below both shapes, as the rework loop does.
+    """
+    sx, sy, sw, sh = src
+    tx, ty, tw, th = tgt
+    s_cy, t_cy = sy + sh / 2, ty + th / 2
+    if tx >= sx + sw:
+        x0, x1 = int(sx + sw), int(tx)
+        y0, y1 = int(s_cy), int(t_cy)
+        if abs(s_cy - t_cy) < 1:
+            return [(x0, y0), (x1, y0)]
+        midx = int((sx + sw + tx) / 2)
+        return [(x0, y0), (midx, y0), (midx, y1), (x1, y1)]
+    left, right = max(sx, tx), min(sx + sw, tx + tw)
+    if left <= right:
+        x = int((left + right) / 2)
+        if t_cy >= s_cy:
+            return [(x, int(sy + sh)), (x, int(ty))]
+        return [(x, int(sy)), (x, int(ty + th))]
+    low = int(max(sy + sh, ty + th) + 50)
+    xs, xt = int(sx + sw / 2), int(tx + tw / 2)
+    return [(xs, int(sy + sh)), (xs, low), (xt, low), (xt, int(ty + th))]
+
+
+def generate_bpmn(
+    blueprint: Blueprint,
+    *,
+    include_data_objects: bool = True,
+    extra_lane_ids: frozenset[str] = frozenset(),
+) -> str:
     """Generate BPMN 2.0 XML from a blueprint.
+
+    With ``include_data_objects=False`` the artifacts are left out (no data
+    objects, no data associations to them) and the rows lose their data band,
+    so the diagram is more compact. Data stores stay.
+
+    ``extra_lane_ids`` names participants drawn as lanes even when no node is
+    in them (lanes a user added in an editor). They come after every other
+    lane, in their order in ``participants``, so adding one moves no other
+    lane. Without it, a participant no node reaches is not drawn.
 
     Side effect: writes the element->blueprint id map to
     ``blueprint.visualizations["bpmn_mapping"]`` so the linkage is recorded in
@@ -1316,7 +1582,9 @@ def generate_bpmn(blueprint: Blueprint) -> str:
     if not blueprint.workflow.steps:
         # minimal valid empty diagram
         return _empty_bpmn()
-    builder = _BpmnBuilder(blueprint)
+    builder = _BpmnBuilder(
+        blueprint, include_data_objects=include_data_objects, extra_lane_ids=extra_lane_ids
+    )
     xml = builder.build()
     if not isinstance(blueprint.visualizations, dict):
         blueprint.visualizations = {}

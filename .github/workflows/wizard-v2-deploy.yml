@@ -1,0 +1,133 @@
+name: Deploy Wizard V2 (Rahti staging)
+
+# Build + push the wizard_api / solution_wizard_v2 images to the CSC Rahti 2
+# registry and roll out the Deployments. Reuses implementation_layer/deploy/
+# openshift/deploy.sh so the build recipe stays in one place.
+#
+# One-time setup (see implementation_layer/deploy/openshift/README.md):
+#   Rahti service account with deploy rights, then GitHub repo secrets:
+#     RAHTI_SERVER   https://api.2.rahti.csc.fi:6443
+#     RAHTI_TOKEN    token of the deploy service account
+#     RAHTI_PROJECT  the staging project name
+#     NEXT_PUBLIC_SUPABASE_URL / NEXT_PUBLIC_SUPABASE_ANON_KEY  (web build args)
+#   And apply secrets.yaml ONCE manually — secrets never flow through CI.
+#
+#   oc create sa github-deployer -n <project>
+#   oc policy add-role-to-user edit -z github-deployer -n <project>
+#   oc create token github-deployer -n <project> --duration=8760h   # -> RAHTI_TOKEN
+#
+# Instances: the same project can hold a second, independent stack
+# (wizard-v2-<instance>-*, own db, storage, images and URL). Every stack is
+# deployed by hand: "Run workflow" from the branch to deploy, with `instance`
+# set (e.g. s4 for sprint4). Its secrets.yaml must have been applied once with
+# INSTANCE=<instance>. A release tag deploys nothing: the live deployments carry
+# settings the manifests lack, so a release reaches staging target by target
+# (implementation_layer/deploy/openshift/README.md).
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: What to deploy
+        type: choice
+        default: all
+        options: [all, api, web, poc-runner]
+      instance:
+        description: Instance name (empty = the staging stack wizard-v2-*; e.g. s4 -> wizard-v2-s4-*)
+        type: string
+        default: ""
+
+# One deploy at a time per instance; different instances may run in parallel.
+concurrency:
+  group: wizard-v2-deploy-${{ github.event.inputs.instance || 'staging' }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  # A deploy used to take whatever CI thought of the commit — README said
+  # so, and a red sprint4 went to Rahti more than once. The deploy now refuses
+  # a commit whose Solution Wizard V2 checks are not all green. "No checks" is
+  # a refusal too: a commit CI never saw is not a release candidate.
+  require-green-ci:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Every Solution Wizard V2 check on this commit must have passed
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: |
+          runs=$(gh api "repos/$REPO/commits/$SHA/check-runs?per_page=100"             --jq '[.check_runs[] | select(.name == "wizard-api" or .name == "solution-wizard" or .name == "solution-wizard-v2" or .name == "deploy-manifests" or .name == "security")]')
+          # Distinct job names, not check runs: a rerun adds a second run with
+          # the same name, which must not stand in for a job that never ran.
+          count=$(jq '[.[].name] | unique | length' <<<"$runs")
+          echo "Solution Wizard V2 jobs with a check run on $SHA: $count"
+          jq -r '.[] | "  \(.name): \(.status) / \(.conclusion // "-")"' <<<"$runs"
+          if [ "$count" -lt 5 ]; then
+            echo "::error::CI has not run (all five jobs) for $SHA. Push the branch, let solution-wizard-v2.yml finish, then deploy."
+            exit 1
+          fi
+          # Take the latest run per job name; an earlier failure that was rerun does not count.
+          bad=$(jq -r 'group_by(.name) | map(max_by(.started_at)) | .[] | select(.conclusion != "success") | .name' <<<"$runs")
+          if [ -n "$bad" ]; then
+            echo "::error::Not green on $SHA: $(echo "$bad" | tr '\n' ' ')"
+            exit 1
+          fi
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [require-green-ci]
+    environment: rahti-staging   # optional gate: add required reviewers in repo settings
+    env:
+      PROJECT: ${{ secrets.RAHTI_PROJECT }}
+      INSTANCE: ${{ github.event.inputs.instance || '' }}
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+      NEXT_PUBLIC_DEV_AUTH: "false"
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+          # deploy.sh wants the whole history: `git describe --tags` names the
+          # build, and require_pushed_commit asks `git branch -r --contains`
+          # whether the commit exists anywhere but here. A shallow, tagless
+          # checkout answers both wrongly and the deploy refuses itself.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Install oc CLI
+        env:
+          OC_VERSION: "4.22.18"
+          OC_SHA256: "07751676809553e012448cdb3a755ffa7b11d7e25b8a6cc60a5a62a9f4b18159"
+        run: |
+          tarball="$RUNNER_TEMP/openshift-client.tar.gz"
+          curl -fsSL -o "$tarball" \
+            "https://mirror.openshift.com/pub/openshift-v4/clients/ocp/${OC_VERSION}/openshift-client-linux.tar.gz"
+          echo "${OC_SHA256}  ${tarball}" | sha256sum -c -
+          sudo tar -xzf "$tarball" -C /usr/local/bin oc
+          oc version --client
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      # Secrets and inputs reach the shell as environment variables, never
+      # pasted into the script text.
+      - name: Log in to Rahti
+        env:
+          RAHTI_SERVER: ${{ secrets.RAHTI_SERVER }}
+          RAHTI_TOKEN: ${{ secrets.RAHTI_TOKEN }}
+        run: |
+          oc login --server="$RAHTI_SERVER" --token="$RAHTI_TOKEN"
+          oc project "$PROJECT"
+
+      - name: Deploy
+        working-directory: implementation_layer/deploy/openshift
+        env:
+          TARGET: ${{ github.event.inputs.target || 'all' }}
+        run: |
+          chmod +x deploy.sh
+          echo "Deploying instance '${INSTANCE:-<staging>}' to project $PROJECT"
+          ./deploy.sh "$TARGET"

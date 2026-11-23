@@ -1,0 +1,6 @@
+#!/bin/sh
+# Reject tool attribution lines in commit messages.
+if grep -qiE '^co-authored-by:|generated with' "$1"; then
+  echo "commit-msg: remove tool attribution lines (Co-Authored-By / Generated with)." >&2
+  exit 1
+fi

@@ -53,6 +53,7 @@ uv.lock
 Thumbs.db
 
 .venv
+.venv-*/
 venv/
 
 # Claude Code (except shared skills)
@@ -88,6 +89,13 @@ implementation_layer/src/gaik/_version.py
 **/docs/superpowers/
 tmp/pdfs/
 /development_plans
+
+# node_modules at any depth. A worktree that symlinks it for the test run
+# otherwise lets `git add -A` follow the link and commit through it.
+**/node_modules/
+
+# Stack E2E reports written by docker-test.sh
+implementation_layer/wizard_api/.stack-e2e-report/
 
 # Solution Wizard per-session workspaces
 .wizard_workspaces/

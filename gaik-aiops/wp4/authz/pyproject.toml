@@ -1,0 +1,20 @@
+[project]
+name = "gaik-authz"
+version = "0.1.0"
+description = "OIDC token validation and role-based permission checks (WP4 S1 / S2 spike)"
+requires-python = ">=3.11"
+dependencies = ["pyjwt[crypto]>=2.9", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+fastapi = ["fastapi>=0.115"]
+dev = ["pytest>=8.0", "fastapi>=0.115", "httpx>=0.27", "psycopg[binary]>=3.2"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["gaik_authz*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

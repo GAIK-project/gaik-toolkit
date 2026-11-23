@@ -26,7 +26,8 @@
     "output_types": ["<structured_json|answer|classification|transcript>"],
     "language": "<en|fi|...>",
     "human_review_required": false,
-    "integration_targets": []
+    "integration_targets": [],
+    "external_services": []
   },
   "target_output_spec": {
     "schema_name": "<SchemaName, omit for RAG/classification>",

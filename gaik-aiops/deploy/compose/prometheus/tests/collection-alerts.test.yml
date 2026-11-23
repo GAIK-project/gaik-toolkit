@@ -1,0 +1,160 @@
+# Run: promtool test rules prometheus/tests/collection-alerts.test.yml
+rule_files:
+  - ../rules/collection-recording.yml
+  - ../rules/collection-alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: error ratio above threshold fires, low ratio does not
+    interval: 1m
+    input_series:
+      - series: 'traces_span_metrics_calls_total{service_name="api", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_OK"}'
+        values: '0+10x20'
+      - series: 'traces_span_metrics_calls_total{service_name="api", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}'
+        values: '0+2x20'
+      - series: 'traces_span_metrics_calls_total{service_name="web", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_OK"}'
+        values: '0+100x20'
+      - series: 'traces_span_metrics_calls_total{service_name="web", span_kind="SPAN_KIND_SERVER", status_code="STATUS_CODE_ERROR"}'
+        values: '0+1x20'
+    alert_rule_test:
+      - eval_time: 4m
+        alertname: HighErrorRatio
+        exp_alerts: []
+      - eval_time: 10m
+        alertname: HighErrorRatio
+        exp_alerts:
+          - exp_labels: {service_name: api, severity: warning}
+            exp_annotations:
+              summary: "api: 16.67% of requests fail"
+
+  - name: p95 latency above threshold fires after 10 minutes
+    interval: 1m
+    input_series:
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", le="2500"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 8m
+        alertname: HighLatencyP95
+        exp_alerts: []
+      - eval_time: 15m
+        alertname: HighLatencyP95
+        exp_alerts:
+          - exp_labels: {service_name: api, severity: warning}
+            exp_annotations:
+              summary: "api: p95 latency 2.425k ms"
+
+  - name: streaming routes do not count towards p95 latency
+    interval: 1m
+    input_series:
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/chat/stream", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions/{session_id}/runs/{run_id}/stream", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="1000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HighLatencyP95
+        exp_alerts: []
+
+  - name: a slow request-response route still fires next to streaming ones
+    interval: 1m
+    input_series:
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="POST /sessions/{session_id}/chat", le="+Inf"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="1000"}'
+        values: '0x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="60000"}'
+        values: '0+10x30'
+      - series: 'traces_span_metrics_duration_milliseconds_bucket{service_name="api", span_kind="SPAN_KIND_SERVER", span_name="GET /sessions", le="+Inf"}'
+        values: '0+10x30'
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: HighLatencyP95
+        exp_alerts:
+          - exp_labels: {service_name: api, severity: warning}
+            exp_annotations:
+              summary: "api: p95 latency 57.05k ms"
+
+  - name: collector down or missing
+    interval: 1m
+    input_series:
+      - series: 'up{job="otel-collector", instance="otel-collector:8888"}'
+        values: '0x5'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: CollectorDown
+        exp_alerts:
+          - exp_labels: {job: otel-collector, instance: "otel-collector:8888", severity: critical}
+            exp_annotations:
+              summary: The OpenTelemetry Collector is not reachable; no events are collected
+
+  - name: collector never scraped
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: CollectorDown
+        exp_alerts:
+          - exp_labels: {job: otel-collector, severity: critical}
+            exp_annotations:
+              summary: The OpenTelemetry Collector is not reachable; no events are collected
+
+  - name: failed deliveries to storage fire, a healthy pipeline does not
+    interval: 1m
+    input_series:
+      - series: 'otelcol_exporter_send_failed_log_records_total{exporter="otlphttp/sink"}'
+        values: '0x3 5+5x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: EventDeliveryFailing
+        exp_alerts: []
+      - eval_time: 8m
+        alertname: EventDeliveryFailing
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: The collector fails to deliver log and audit records to storage
+
+  - name: delivery backlog warns before records are lost
+    interval: 1m
+    input_series:
+      - series: 'otelcol_exporter_queue_size{exporter="otlphttp/sink", data_type="logs"}'
+        values: '0 0 3 4 6 8 9'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: EventDeliveryBacklog
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: EventDeliveryBacklog
+        exp_alerts:
+          - exp_labels: {exporter: otlphttp/sink, severity: warning}
+            exp_annotations:
+              summary: "otlphttp/sink: 8 batches waiting for delivery"

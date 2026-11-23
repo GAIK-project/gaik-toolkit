@@ -1,0 +1,50 @@
+# The collection and observability stack for Kubernetes / OpenShift. Configuration files are read from
+# deploy/compose and shared/collection, so compose and Kubernetes run the same collector, Prometheus,
+# Grafana and schema. Build with --load-restrictor LoadRestrictionsNone (see README.md).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+labels:
+  - pairs: {app.kubernetes.io/part-of: gaik-aiops}
+
+resources:
+  - postgres.yaml
+  - sink.yaml
+  - mlflow.yaml
+  - otel-collector.yaml
+  - prometheus.yaml
+  - grafana.yaml
+  - networkpolicy.yaml
+
+configMapGenerator:
+  - name: postgres-init
+    files: [postgres-init.sh]
+  - name: collection-sql
+    files: [../../../../shared/collection/sql/001_schema.sql]
+  - name: otel-collector
+    files: [../../../compose/otel-collector.yaml]
+  - name: mlflow-experiments
+    literals: ["MLFLOW_EXPERIMENTS=wizard-v2-api,wizard-v2-web,gaik-poc,example-producer"]
+  - name: prometheus
+    files: [../../../compose/prometheus/prometheus.yml]
+  - name: prometheus-rules
+    files:
+      - ../../../compose/prometheus/rules/collection-alerts.yml
+      - ../../../compose/prometheus/rules/collection-recording.yml
+      - ../../../compose/prometheus/rules/thresholds.yml
+      - ../../../compose/prometheus/rules/wizard-alerts.yml
+  - name: alertmanager
+    files: [../../../compose/alertmanager/alertmanager.yml]
+  - name: grafana-datasources
+    files: [../../../compose/grafana/provisioning/datasources/datasources.yml]
+  - name: grafana-dashboard-providers
+    files: [../../../compose/grafana/provisioning/dashboards/dashboards.yml]
+  - name: grafana-dashboards-monitoring
+    files:
+      - ../../../compose/grafana/dashboards/monitoring/service-health.json
+      - ../../../compose/grafana/dashboards/monitoring/wizard-operations.json
+      - ../../../compose/grafana/dashboards/monitoring/hackathon-live.json
+  - name: grafana-dashboards-security
+    files: [../../../compose/grafana/dashboards/security/audit-trail.json]
+  - name: grafana-setup
+    files: [../../../compose/grafana/setup/security_org.py]

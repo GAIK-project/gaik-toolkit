@@ -1,0 +1,13 @@
+# What OpenShift's restricted SCC does: a high UID from the project's range, primary group 0.
+- op: add
+  path: /spec/template/spec/securityContext/runAsUser
+  value: 1000680000
+- op: add
+  path: /spec/template/spec/securityContext/runAsGroup
+  value: 0
+- op: add
+  path: /spec/template/spec/securityContext/fsGroup
+  value: 1000680000
+- op: add
+  path: /spec/template/spec/containers/0/imagePullPolicy
+  value: IfNotPresent

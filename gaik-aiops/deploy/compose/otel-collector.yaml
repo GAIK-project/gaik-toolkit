@@ -1,0 +1,127 @@
+# Single ingress for the collection layer. Privacy processing happens here,
+# before anything is stored or forwarded.
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  # First in every pipeline: refuse data while the collector nears its memory limit (the container's
+  # cgroup limit on Rahti), so a burst of OTLP, now also from other projects through the ingress
+  # Route, is pushed back to the sender instead of getting the collector killed.
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 80
+    spike_limit_percentage: 20
+  batch: {}
+  # Prometheus accepts cumulative series only; producers may send delta.
+  deltatocumulative: {}
+  # Pseudonymise the user identity and mask client addresses (WP4 S4). One keyed hash here, before any
+  # exporter, so every destination (MLflow, Postgres, Prometheus) sees the same pseudonym.
+  # The OpenBao overlay replaces the key with one held in the vault; keep both in step.
+  # "$$" is the collector's escape for a literal "$" in the replacement.
+  transform/privacy:
+    error_mode: ignore
+    log_statements:
+      - context: log
+        statements:
+          - set(log.attributes["enduser.pseudo.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", log.attributes["enduser.id"]], ""))) where log.attributes["enduser.id"] != nil
+          - delete_key(log.attributes, "enduser.id")
+          - set(log.attributes["gaik.session.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", "session:", log.attributes["gaik.session.id"]], ""))) where log.attributes["gaik.session.id"] != nil
+          - set(log.attributes["session.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", "session:", log.attributes["session.id"]], ""))) where log.attributes["session.id"] != nil
+          - set(log.attributes["gen_ai.conversation.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", "session:", log.attributes["gen_ai.conversation.id"]], ""))) where log.attributes["gen_ai.conversation.id"] != nil
+          - replace_pattern(log.attributes["client.address"], "^(\\d+\\.\\d+\\.\\d+)\\.\\d+$$", "$${1}.0")
+          - replace_pattern(log.attributes["client.address"], "^([0-9a-fA-F]*:[0-9a-fA-F]*:[0-9a-fA-F]*):.*$$", "$${1}::")
+    # The same rules for spans, which go on to MLflow. Prompt and response content is dropped here too,
+    # as a second line of defence behind the producer's own default (content off).
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["enduser.pseudo.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", span.attributes["enduser.id"]], ""))) where span.attributes["enduser.id"] != nil
+          - delete_key(span.attributes, "enduser.id")
+          - replace_pattern(span.attributes["client.address"], "^(\\d+\\.\\d+\\.\\d+)\\.\\d+$$", "$${1}.0")
+          - replace_pattern(span.attributes["client.address"], "^([0-9a-fA-F]*:[0-9a-fA-F]*:[0-9a-fA-F]*):.*$$", "$${1}::")
+          - delete_matching_keys(span.attributes, "^gen_ai\\.(input|output)\\.messages$$")
+          - delete_matching_keys(span.attributes, "^gen_ai\\.(prompt|completion)")
+          - delete_matching_keys(span.attributes, "^mlflow\\.span(Inputs|Outputs)$$")
+          # A session id leads to its owner (the wizard's to a row in its database), so it is
+          # pseudonymised too: same key, its own "session:" prefix. Once a session is deleted, its
+          # traces lead nowhere. MLflow names sessions by session.id, else gen_ai.conversation.id.
+          - set(span.attributes["gaik.session.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", "session:", span.attributes["gaik.session.id"]], ""))) where span.attributes["gaik.session.id"] != nil
+          - set(span.attributes["session.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", "session:", span.attributes["session.id"]], ""))) where span.attributes["session.id"] != nil
+          - set(span.attributes["gen_ai.conversation.id"], SHA256(Concat(["${env:PSEUDONYM_KEY}", "session:", span.attributes["gen_ai.conversation.id"]], ""))) where span.attributes["gen_ai.conversation.id"] != nil
+      - context: spanevent
+        statements:
+          - delete_matching_keys(spanevent.attributes, "^gen_ai\\.(input|output)\\.messages$$")
+          - delete_matching_keys(spanevent.attributes, "^gen_ai\\.(prompt|completion)")
+  # MLflow groups traces into a session by the OTel name session.id; the wizard sends its session
+  # (one wizard case) as gaik.session.id. Both are pseudonymised above; a producer's own session.id wins.
+  # Not a privacy rule, so not in transform/privacy, and the same with or without the OpenBao overlay.
+  transform/session:
+    error_mode: ignore
+    trace_statements:
+      - context: span
+        statements:
+          - set(span.attributes["session.id"], span.attributes["gaik.session.id"]) where span.attributes["gaik.session.id"] != nil and span.attributes["session.id"] == nil
+
+connectors:
+  # Request rate, errors and duration from spans (any producer that emits traces).
+  spanmetrics:
+    metrics_flush_interval: 5s
+    histogram:
+      explicit:
+        buckets: [5ms, 10ms, 25ms, 50ms, 100ms, 250ms, 500ms, 1s, 2.5s, 5s, 10s, 30s, 60s]
+  # Log volume and error counts from log records, after privacy processing.
+  count:
+    logs:
+      gaik.log.records:
+        description: Log records received, by event class
+        attributes:
+          - key: gaik.event.class
+            default_value: log
+      gaik.log.errors:
+        description: Log records with severity ERROR or higher
+        conditions:
+          - severity_number >= SEVERITY_NUMBER_ERROR
+
+exporters:
+  otlphttp/prometheus:
+    endpoint: http://prometheus:9090/api/v1/otlp
+    compression: none
+  otlphttp/sink:
+    endpoint: http://sink:4319
+    encoding: json
+    compression: none
+  # MLflow accepts OTLP/HTTP traces only. All traces go to one experiment for now ("0", Default);
+  # per-application experiments follow with a routing connector on service.name.
+  otlphttp/mlflow:
+    traces_endpoint: http://mlflow:5000/v1/traces
+    headers:
+      x-mlflow-experiment-id: "${env:MLFLOW_TRACES_EXPERIMENT_ID}"
+
+service:
+  # Collector self-monitoring, scraped by Prometheus.
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus:
+                host: 0.0.0.0
+                port: 8888
+  pipelines:
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/privacy, batch]
+      exporters: [otlphttp/sink, count]
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, transform/privacy, transform/session, batch]
+      exporters: [spanmetrics, otlphttp/mlflow]
+    metrics:
+      receivers: [otlp, spanmetrics, count]
+      processors: [memory_limiter, deltatocumulative, batch]
+      exporters: [otlphttp/prometheus]

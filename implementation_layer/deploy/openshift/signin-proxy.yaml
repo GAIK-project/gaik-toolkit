@@ -1,0 +1,122 @@
+# Sign-in in front of a stack's web app: oauth2-proxy signs the user in at the
+# GAIK Keycloak (deploy/keycloak) and forwards the request, with the user's
+# access token in X-Forwarded-Access-Token, to NAME_PLACEHOLDER-web. The web app
+# (WIZARD_AUTH_MODE=proxy, lib/proxy-auth.ts) checks that token's signature,
+# issuer, client, expiry and group itself, so a request that reaches the web app
+# some other way signs nobody in.
+#
+# Opt-in per stack: `deploy.sh signin` applies this file and route-signin.yaml
+# (which points the stack's public Route here) and switches the web app to
+# proxy sign-in. The Secret NAME_PLACEHOLDER-signin (client-id, client-secret,
+# cookie-secret) comes from deploy/keycloak/deploy.sh add-client.
+apiVersion: v1
+kind: List
+items:
+  - apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: NAME_PLACEHOLDER-signin
+      labels:
+        app: NAME_PLACEHOLDER-signin
+    spec:
+      replicas: 1
+      selector:
+        matchLabels:
+          app: NAME_PLACEHOLDER-signin
+      template:
+        metadata:
+          labels:
+            app: NAME_PLACEHOLDER-signin
+        spec:
+          containers:
+            - name: oauth2-proxy
+              # Pinned; update deliberately (release notes) and in this file only.
+              image: quay.io/oauth2-proxy/oauth2-proxy:v7.15.5
+              imagePullPolicy: IfNotPresent
+              args:
+                - --http-address=0.0.0.0:4180
+                - --reverse-proxy=true
+                # X-Forwarded-* are taken only from the cluster network (the
+                # Rahti router), and the callback address is fixed rather than
+                # built from those headers.
+                - --trusted-proxy-ip=10.128.0.0/14
+                - --redirect-url=https://NAME_PLACEHOLDER-web-PROJECT_PLACEHOLDER.2.rahtiapp.fi/oauth2/callback
+                - --provider=keycloak-oidc
+                - --oidc-issuer-url=https://gaik-keycloak-PROJECT_PLACEHOLDER.2.rahtiapp.fi/realms/gaik
+                - --code-challenge-method=S256
+                - --upstream=http://NAME_PLACEHOLDER-web:3000
+                # Only members of wizard-user get past; a new account waits in
+                # pending until an admin moves it (Keycloak, deploy/keycloak/README.md).
+                - --allowed-group=wizard-user
+                - --email-domain=*
+                - --pass-access-token=true
+                - --pass-user-headers=true
+                - --skip-provider-button=true
+                - --cookie-name=_NAME_PLACEHOLDER_signin
+                - --cookie-secure=true
+                - --cookie-samesite=lax
+                - --cookie-expire=8h
+                # Shorter than the access token's 15 minutes, so the token the web
+                # app checks is renewed before it expires.
+                - --cookie-refresh=5m
+                # The chat streams a reply for minutes (the Route allows 15).
+                - --upstream-timeout=15m
+                - --flush-interval=100ms
+                # Sign-out ends the Keycloak session too, from the proxy over the
+                # cluster network, so the next visit asks for the password again
+                # and the browser sees no extra Keycloak confirmation page.
+                - --backend-logout-url=http://gaik-keycloak:8080/realms/gaik/protocol/openid-connect/logout?id_token_hint={id_token}
+                - --silence-ping-logging=true
+                # The GAIK error page; for a 403 it says the account awaits approval.
+                - --custom-templates-dir=/templates
+              env:
+                - name: OAUTH2_PROXY_CLIENT_ID
+                  valueFrom:
+                    secretKeyRef: { name: NAME_PLACEHOLDER-signin, key: client-id }
+                - name: OAUTH2_PROXY_CLIENT_SECRET
+                  valueFrom:
+                    secretKeyRef: { name: NAME_PLACEHOLDER-signin, key: client-secret }
+                - name: OAUTH2_PROXY_COOKIE_SECRET
+                  valueFrom:
+                    secretKeyRef: { name: NAME_PLACEHOLDER-signin, key: cookie-secret }
+              ports:
+                - name: http
+                  containerPort: 4180
+              readinessProbe:
+                httpGet: { path: /ready, port: http }
+                periodSeconds: 10
+              livenessProbe:
+                httpGet: { path: /ping, port: http }
+                periodSeconds: 30
+              resources:
+                requests: { cpu: 100m, memory: 32Mi }
+                limits: { cpu: 500m, memory: 128Mi }
+              volumeMounts:
+                - name: templates
+                  mountPath: /templates
+                  readOnly: true
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+          volumes:
+            # signin-templates/, filled in by deploy.sh signin with this stack's
+            # Keycloak sign-out address.
+            - name: templates
+              configMap:
+                name: NAME_PLACEHOLDER-signin-templates
+
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: NAME_PLACEHOLDER-signin
+      labels:
+        app: NAME_PLACEHOLDER-signin
+    spec:
+      selector:
+        app: NAME_PLACEHOLDER-signin
+      ports:
+        - name: http
+          port: 4180
+          targetPort: 4180

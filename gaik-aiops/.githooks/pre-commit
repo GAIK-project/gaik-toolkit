@@ -1,0 +1,13 @@
+#!/bin/sh
+# Block staged content that must not be published: words listed one per line in
+# .githooks/blocked-words.local (untracked: names, internal paths, customer terms).
+list="$(git rev-parse --show-toplevel)/.githooks/blocked-words.local"
+[ -f "$list" ] || exit 0
+pattern=$(grep -v '^[[:space:]]*$' "$list" | grep -v '^#' | paste -sd'|' -)
+[ -n "$pattern" ] || exit 0
+hits=$(git diff --cached -U0 --no-color | grep '^+' | grep -v '^+++' | grep -inE "$pattern")
+if [ -n "$hits" ]; then
+  echo "pre-commit: staged changes contain blocked words:" >&2
+  echo "$hits" >&2
+  exit 1
+fi

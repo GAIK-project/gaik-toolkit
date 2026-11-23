@@ -1,0 +1,1170 @@
+{
+ "uid": "gaik-wizard-operations",
+ "title": "Wizard operations",
+ "description": "Capacity, failures, data and security of the Solution Wizard API, from its wizard_* metrics. Thresholds of the alerts: prometheus/rules/thresholds.yml.",
+ "schemaVersion": 39,
+ "version": 1,
+ "editable": false,
+ "refresh": "1m",
+ "time": {
+  "from": "now-6h",
+  "to": "now"
+ },
+ "tags": [
+  "wizard"
+ ],
+ "templating": {
+  "list": []
+ },
+ "annotations": {
+  "list": []
+ },
+ "panels": [
+  {
+   "type": "row",
+   "title": "Capacity",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 0,
+    "w": 24,
+    "h": 1
+   },
+   "panels": [],
+   "id": 1
+  },
+  {
+   "type": "gauge",
+   "title": "Live agents of the limit",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 1,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "max": 1,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.8
+       },
+       {
+        "color": "red",
+        "value": 0.9
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_agents_live{service_name=\"wizard-v2-api\"} / wizard_agents_limit{service_name=\"wizard-v2-api\"})"
+    }
+   ],
+   "id": 2
+  },
+  {
+   "type": "gauge",
+   "title": "Sandbox runs of the limit",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 4,
+    "y": 1,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "max": 1,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.8
+       },
+       {
+        "color": "red",
+        "value": 0.9
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_sandbox_runs_active{service_name=\"wizard-v2-api\"} / wizard_sandbox_runs_limit{service_name=\"wizard-v2-api\"})"
+    }
+   ],
+   "id": 3
+  },
+  {
+   "type": "gauge",
+   "title": "api container memory of its limit",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 1,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "max": 1,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.85
+       },
+       {
+        "color": "red",
+        "value": 0.95
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_process_memory_used{service_name=\"wizard-v2-api\"} / wizard_process_memory_limit{service_name=\"wizard-v2-api\"})"
+    }
+   ],
+   "id": 4
+  },
+  {
+   "type": "stat",
+   "title": "Chat turns running",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 1,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_turns_running{service_name=\"wizard-v2-api\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 5
+  },
+  {
+   "type": "stat",
+   "title": "Oldest running turn",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 1,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1800
+       },
+       {
+        "color": "red",
+        "value": 3000
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_turns_oldest_running{service_name=\"wizard-v2-api\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 6
+  },
+  {
+   "type": "stat",
+   "title": "Restarts in 6 h",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 20,
+    "y": 1,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "changes(max(wizard_process_start_time{service_name=\"wizard-v2-api\"})[6h:1m])",
+     "legendFormat": ""
+    }
+   ],
+   "id": 7
+  },
+  {
+   "type": "timeseries",
+   "title": "Live agents and limit",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 6,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_agents_live{service_name=\"wizard-v2-api\"})",
+     "legendFormat": "live"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_agents_limit{service_name=\"wizard-v2-api\"})",
+     "legendFormat": "limit"
+    }
+   ],
+   "id": 8
+  },
+  {
+   "type": "timeseries",
+   "title": "Refusals per 5 min by code",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 6,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (code) (increase(wizard_refusals_total{service_name=\"wizard-v2-api\"}[5m]))",
+     "legendFormat": "{{code}}"
+    }
+   ],
+   "id": 9
+  },
+  {
+   "type": "row",
+   "title": "Turns and runs",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 14,
+    "w": 24,
+    "h": 1
+   },
+   "panels": [],
+   "id": 10
+  },
+  {
+   "type": "timeseries",
+   "title": "Chat turns per 5 min by outcome",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 15,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (outcome) (increase(wizard_turns_total{service_name=\"wizard-v2-api\"}[5m]))",
+     "legendFormat": "{{outcome}}"
+    }
+   ],
+   "id": 11
+  },
+  {
+   "type": "timeseries",
+   "title": "Turn length p50 / p95 and first frame p95",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 15,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "s"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.5, sum by (le) (rate(wizard_turn_duration_seconds_bucket{service_name=\"wizard-v2-api\"}[15m])))",
+     "legendFormat": "length p50"
+    },
+    {
+     "refId": "B",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(wizard_turn_duration_seconds_bucket{service_name=\"wizard-v2-api\"}[15m])))",
+     "legendFormat": "length p95"
+    },
+    {
+     "refId": "C",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "histogram_quantile(0.95, sum by (le) (rate(wizard_turn_first_frame_seconds_bucket{service_name=\"wizard-v2-api\"}[15m])))",
+     "legendFormat": "first frame p95"
+    }
+   ],
+   "id": 12
+  },
+  {
+   "type": "timeseries",
+   "title": "Agent failures per 10 min by kind",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 23,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (kind) (increase(wizard_agent_errors_total{service_name=\"wizard-v2-api\"}[10m]))",
+     "legendFormat": "{{kind}}"
+    }
+   ],
+   "id": 13
+  },
+  {
+   "type": "timeseries",
+   "title": "Sandbox runs per 15 min by phase",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 23,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "custom": {
+      "stacking": {
+       "mode": "normal"
+      }
+     }
+    },
+    "overrides": [
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "succeeded"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "green"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "failed"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "red"
+        }
+       }
+      ]
+     },
+     {
+      "matcher": {
+       "id": "byName",
+       "options": "timeout"
+      },
+      "properties": [
+       {
+        "id": "color",
+        "value": {
+         "mode": "fixed",
+         "fixedColor": "orange"
+        }
+       }
+      ]
+     }
+    ]
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (phase) (increase(wizard_sandbox_runs_total{service_name=\"wizard-v2-api\"}[15m]))",
+     "legendFormat": "{{phase}}"
+    }
+   ],
+   "id": 14
+  },
+  {
+   "type": "row",
+   "title": "Data",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 31,
+    "w": 24,
+    "h": 1
+   },
+   "panels": [],
+   "id": 15
+  },
+  {
+   "type": "gauge",
+   "title": "Sessions volume used",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 32,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit",
+     "min": 0,
+     "max": 1,
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 0.8
+       },
+       {
+        "color": "red",
+        "value": 0.9
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    }
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_sessions_volume_used{service_name=\"wizard-v2-api\"} / wizard_sessions_volume_capacity{service_name=\"wizard-v2-api\"})"
+    }
+   ],
+   "id": 16
+  },
+  {
+   "type": "stat",
+   "title": "Wizard database",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 4,
+    "y": 32,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "bytes",
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 4294967296
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_db_size{service_name=\"wizard-v2-api\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 17
+  },
+  {
+   "type": "stat",
+   "title": "Sessions",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 8,
+    "y": 32,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_sessions{service_name=\"wizard-v2-api\", state=\"total\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 18
+  },
+  {
+   "type": "stat",
+   "title": "Active in 15 min",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 32,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_sessions{service_name=\"wizard-v2-api\", state=\"active\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 19
+  },
+  {
+   "type": "stat",
+   "title": "Past retention, not removed",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 16,
+    "y": 32,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_sessions{service_name=\"wizard-v2-api\", state=\"overdue\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 20
+  },
+  {
+   "type": "stat",
+   "title": "Rows or folders without the other",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 20,
+    "y": 32,
+    "w": 4,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum(max by (kind) (wizard_sessions_mismatch{service_name=\"wizard-v2-api\"}))",
+     "legendFormat": ""
+    }
+   ],
+   "id": 21
+  },
+  {
+   "type": "timeseries",
+   "title": "Sessions volume used",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 37,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {
+     "unit": "percentunit"
+    },
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_sessions_volume_used{service_name=\"wizard-v2-api\"} / wizard_sessions_volume_capacity{service_name=\"wizard-v2-api\"})",
+     "legendFormat": "used"
+    }
+   ],
+   "id": 22
+  },
+  {
+   "type": "timeseries",
+   "title": "Deletions per hour by reason and outcome",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 37,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum by (reason, outcome) (increase(wizard_session_deletes_total{service_name=\"wizard-v2-api\"}[1h]))",
+     "legendFormat": "{{reason}} {{outcome}}"
+    }
+   ],
+   "id": 23
+  },
+  {
+   "type": "row",
+   "title": "Security",
+   "collapsed": false,
+   "gridPos": {
+    "x": 0,
+    "y": 45,
+    "w": 24,
+    "h": 1
+   },
+   "panels": [],
+   "id": 24
+  },
+  {
+   "type": "timeseries",
+   "title": "Requests for other users' sessions per 10 min",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 46,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "sum(increase(wizard_ownership_denied_total{service_name=\"wizard-v2-api\"}[10m]))",
+     "legendFormat": "denied"
+    }
+   ],
+   "id": 25
+  },
+  {
+   "type": "timeseries",
+   "title": "Sessions created per 10 min, busiest owners",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 12,
+    "y": 46,
+    "w": 12,
+    "h": 8
+   },
+   "fieldConfig": {
+    "defaults": {},
+    "overrides": []
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "topk(5, sum by (owner) ((wizard_sessions_created_total{service_name=\"wizard-v2-api\"} - wizard_sessions_created_total{service_name=\"wizard-v2-api\"} offset 10m) or wizard_sessions_created_total{service_name=\"wizard-v2-api\"}))",
+     "legendFormat": "{{owner}}"
+    }
+   ],
+   "id": 26
+  },
+  {
+   "type": "stat",
+   "title": "Sandbox runs use the shared model key",
+   "datasource": {
+    "type": "prometheus",
+    "uid": "prometheus"
+   },
+   "gridPos": {
+    "x": 0,
+    "y": 54,
+    "w": 6,
+    "h": 5
+   },
+   "fieldConfig": {
+    "defaults": {
+     "thresholds": {
+      "mode": "absolute",
+      "steps": [
+       {
+        "color": "green",
+        "value": null
+       },
+       {
+        "color": "orange",
+        "value": 1
+       }
+      ]
+     }
+    },
+    "overrides": []
+   },
+   "options": {
+    "reduceOptions": {
+     "calcs": [
+      "lastNotNull"
+     ]
+    },
+    "colorMode": "background",
+    "graphMode": "none"
+   },
+   "targets": [
+    {
+     "refId": "A",
+     "datasource": {
+      "type": "prometheus",
+      "uid": "prometheus"
+     },
+     "expr": "max(wizard_config_shared_runner_key{service_name=\"wizard-v2-api\"})",
+     "legendFormat": ""
+    }
+   ],
+   "id": 27
+  },
+  {
+   "type": "alertlist",
+   "title": "Active alerts",
+   "gridPos": {
+    "x": 6,
+    "y": 54,
+    "w": 18,
+    "h": 6
+   },
+   "options": {
+    "alertInstanceLabelFilter": "",
+    "datasource": "Alertmanager",
+    "groupMode": "default",
+    "maxItems": 20,
+    "showInstances": true,
+    "sortOrder": 1,
+    "stateFilter": {
+     "firing": true,
+     "pending": true
+    },
+    "viewMode": "list"
+   },
+   "id": 28
+  }
+ ]
+}
