@@ -557,6 +557,60 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
             </ol>
           )}
 
+          {/* Process: above the documents, so the run is in reach without scrolling past them. */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <RunButton
+                running={processing}
+                onRun={processExample}
+                onStop={stopRun}
+                icon={Play}
+                className="h-11 rounded-xl px-6 font-semibold shadow-sm"
+              >
+                {hasResult
+                  ? "Process the example again"
+                  : "Process the example"}
+              </RunButton>
+              <button
+                type="button"
+                onClick={onCreate}
+                className="text-primary inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
+              >
+                <Wand2 className="size-4" />
+                Want other fields or your own documents? Test with your own data
+              </button>
+            </div>
+
+            {(processing || step >= 0) && !hasResult && (
+              <ol className="grid gap-2 sm:grid-cols-3">
+                {stepLabels.map((label, index) => {
+                  const done = index < step;
+                  const current = index === step && processing;
+                  return (
+                    <li
+                      key={label}
+                      className={cn(
+                        "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
+                        done && "border-emerald-500/30 bg-emerald-500/5",
+                        current && "border-primary bg-primary/5",
+                        !done && !current && "text-muted-foreground",
+                      )}
+                    >
+                      {done ? (
+                        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
+                      ) : current ? (
+                        <Loader2 className="text-primary size-4 shrink-0 animate-spin" />
+                      ) : (
+                        <span className="border-muted-foreground/40 size-4 shrink-0 rounded-full border" />
+                      )}
+                      {label}
+                    </li>
+                  );
+                })}
+              </ol>
+            )}
+          </div>
+
           {/* The documents, and what is read from each */}
           <div
             ref={explorerRef}
@@ -668,60 +722,6 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
                 </div>
               </div>
             </div>
-          </div>
-
-          {/* Process */}
-          <div className="space-y-3 border-t pt-5">
-            <div className="flex flex-wrap items-center gap-3">
-              <RunButton
-                running={processing}
-                onRun={processExample}
-                onStop={stopRun}
-                icon={Play}
-                className="h-11 rounded-xl px-6 font-semibold shadow-sm"
-              >
-                {hasResult
-                  ? "Process the example again"
-                  : "Process the example"}
-              </RunButton>
-              <button
-                type="button"
-                onClick={onCreate}
-                className="text-primary inline-flex items-center gap-1.5 text-sm font-medium hover:underline"
-              >
-                <Wand2 className="size-4" />
-                Want other fields or your own documents? Test with your own data
-              </button>
-            </div>
-
-            {(processing || step >= 0) && !hasResult && (
-              <ol className="grid gap-2 sm:grid-cols-3">
-                {stepLabels.map((label, index) => {
-                  const done = index < step;
-                  const current = index === step && processing;
-                  return (
-                    <li
-                      key={label}
-                      className={cn(
-                        "flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors",
-                        done && "border-emerald-500/30 bg-emerald-500/5",
-                        current && "border-primary bg-primary/5",
-                        !done && !current && "text-muted-foreground",
-                      )}
-                    >
-                      {done ? (
-                        <CheckCircle2 className="size-4 shrink-0 text-emerald-600" />
-                      ) : current ? (
-                        <Loader2 className="text-primary size-4 shrink-0 animate-spin" />
-                      ) : (
-                        <span className="border-muted-foreground/40 size-4 shrink-0 rounded-full border" />
-                      )}
-                      {label}
-                    </li>
-                  );
-                })}
-              </ol>
-            )}
           </div>
         </CardContent>
       </Card>

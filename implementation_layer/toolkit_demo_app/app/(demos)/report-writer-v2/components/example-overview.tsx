@@ -2,8 +2,14 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import {
+  ChevronDown,
   Download,
   ExternalLink,
   FileAudio,
@@ -312,52 +318,69 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
           </div>
         </div>
 
-        <div className="space-y-2 border-t pt-4">
-          <div>
-            <h4 className="text-sm font-semibold">
-              The report that will be written: {rw.sections.length} sections
-            </h4>
-            <p className="text-muted-foreground text-xs">
-              An item that no source covers is marked as missing.
-            </p>
-          </div>
-          {/* Two columns read top to bottom, so the sections keep their order. */}
-          <ol className="gap-x-6 md:columns-2">
-            {rw.sections.map((section, index) => {
-              const derived = section.depends_on.length > 0;
-              return (
-                <li
-                  key={effectiveId(section)}
-                  className="mb-3 flex break-inside-avoid gap-3"
-                >
-                  <span className="bg-primary/10 text-primary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
-                    {index + 1}
-                  </span>
-                  <span className="min-w-0 space-y-1">
-                    <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-sm font-medium">
-                        {section.title}
+        {/* Closed at first, so Write the report follows the sources without a long scroll. */}
+        <Collapsible className="border-t pt-4">
+          <CollapsibleTrigger className="group/sections hover:bg-muted/50 -mx-2 flex w-[calc(100%+1rem)] items-center justify-between gap-3 rounded-md px-2 py-1.5 text-left">
+            <span>
+              <span className="block text-sm font-semibold">
+                The report that will be written: {rw.sections.length} sections
+              </span>
+              <span className="text-muted-foreground block text-xs">
+                An item that no source covers is marked as missing.
+              </span>
+            </span>
+            <span className="text-muted-foreground flex shrink-0 items-center gap-1 text-xs font-medium">
+              <span className="group-data-[state=open]/sections:hidden">
+                Show sections
+              </span>
+              <span className="hidden group-data-[state=open]/sections:inline">
+                Hide
+              </span>
+              <ChevronDown
+                aria-hidden
+                className="size-4 transition-transform group-data-[state=open]/sections:rotate-180"
+              />
+            </span>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="pt-3">
+            {/* Two columns read top to bottom, so the sections keep their order. */}
+            <ol className="gap-x-6 md:columns-2">
+              {rw.sections.map((section, index) => {
+                const derived = section.depends_on.length > 0;
+                return (
+                  <li
+                    key={effectiveId(section)}
+                    className="mb-3 flex break-inside-avoid gap-3"
+                  >
+                    <span className="bg-primary/10 text-primary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
+                      {index + 1}
+                    </span>
+                    <span className="min-w-0 space-y-1">
+                      <span className="flex flex-wrap items-center gap-2">
+                        <span className="text-sm font-medium">
+                          {section.title}
+                        </span>
+                        {derived && (
+                          <span className="text-muted-foreground text-xs">
+                            from the other sections
+                          </span>
+                        )}
                       </span>
-                      {derived && (
-                        <span className="text-muted-foreground text-xs">
-                          from the other sections
+                      <span className="text-muted-foreground line-clamp-2 block text-xs">
+                        {section.instructions}
+                      </span>
+                      {(section.required_items?.length ?? 0) > 0 && (
+                        <span className="text-muted-foreground block text-xs">
+                          Must cover {section.required_items!.length} items
                         </span>
                       )}
                     </span>
-                    <span className="text-muted-foreground line-clamp-2 block text-xs">
-                      {section.instructions}
-                    </span>
-                    {(section.required_items?.length ?? 0) > 0 && (
-                      <span className="text-muted-foreground block text-xs">
-                        Must cover {section.required_items!.length} items
-                      </span>
-                    )}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </CollapsibleContent>
+        </Collapsible>
       </CardContent>
     </Card>
   );
