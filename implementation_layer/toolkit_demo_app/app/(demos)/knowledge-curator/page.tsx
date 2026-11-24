@@ -523,8 +523,9 @@ export default function KnowledgeCuratorPage() {
         </section>
 
         <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <Card>
+          {/* Below lg the cards are the grid's items, in step order. */}
+          <div className="contents lg:flex lg:flex-col lg:gap-6">
+            <Card className="order-1 lg:order-none">
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
                 <div className="min-w-[12rem] flex-1">
                   <CardTitle>1. The sources</CardTitle>
@@ -609,7 +610,7 @@ export default function KnowledgeCuratorPage() {
               </CardContent>
             </Card>
 
-            <Card className="flex flex-1 flex-col">
+            <Card className="order-3 flex flex-1 flex-col lg:order-none">
               <CardHeader>
                 <CardTitle>3. Instructions</CardTitle>
                 <CardDescription>
@@ -643,8 +644,9 @@ export default function KnowledgeCuratorPage() {
             </Card>
           </div>
 
-          <div className="flex flex-col gap-6">
-            <Card className="flex-1">
+          {/* Below lg the cards are the grid's items, in step order. */}
+          <div className="contents lg:flex lg:flex-col lg:gap-6">
+            <Card className="order-2 flex-1 lg:order-none">
               <CardHeader>
                 <CardTitle>2. Topics</CardTitle>
                 <CardDescription>
@@ -666,7 +668,7 @@ export default function KnowledgeCuratorPage() {
                   <p className="text-destructive mt-2 text-xs">{problem}</p>
                 )}
                 {!started && (
-                  <p className="mt-2 text-xs font-medium text-amber-700">
+                  <p className="text-muted-foreground mt-2 text-xs">
                     No topic defined yet. Add a title and what to look for, or
                     load an example.
                   </p>
@@ -674,7 +676,7 @@ export default function KnowledgeCuratorPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="order-4 lg:order-none">
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="options" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">

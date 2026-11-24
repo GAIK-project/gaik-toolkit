@@ -14,7 +14,7 @@ export const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Start with one demo",
       description:
-        "Demos open with an example ready to run, so you see a result before you upload anything of your own.",
+        "Every demo has a built-in example one press away, so you see a result before you upload anything of your own.",
       side: "bottom",
       align: "start",
     },
@@ -24,7 +24,7 @@ export const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "The model that answers",
       description:
-        "Pick one of the server's models here, or run the demos on your own API key. The menu says whether the page you are on uses it.",
+        "Pick one of the server's models here, or run the demos on your own API key. On a demo page the menu shows whether that demo uses it.",
       side: "bottom",
       align: "end",
     },
@@ -34,7 +34,7 @@ export const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Your own use case",
       description:
-        "Describe it to the Wizard. Its page shows the two versions and how to get access to each.",
+        "Describe it to the Wizard. Its page says how to get access.",
       side: "bottom",
       align: "start",
     },
@@ -44,7 +44,7 @@ export const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "Finished flows",
       description:
-        "Each one runs a whole task, such as a purchase order into a priced sales order. Open a card to run it.",
+        "Each one chains several of the building blocks below into a whole task, from the input to the finished result.",
       side: "top",
       align: "start",
     },
@@ -54,7 +54,7 @@ export const TOUR_STEPS: DriveStep[] = [
     popover: {
       title: "In your own code",
       description:
-        "Each component is a class in the gaik Python package. Its page has the install command and links to the code and the docs.",
+        "Each one is part of the gaik Python package. Its page has the install command and links to the code and the docs.",
       side: "top",
       align: "start",
     },

@@ -587,21 +587,6 @@ export default function TranscriberPage() {
                 )}
               </div>
 
-              <Option
-                title="Compress audio"
-                htmlFor="compress"
-                description="Kept for compatibility. It has no effect at the moment: the file is sent as it is."
-                disabled
-                control={
-                  <Switch
-                    id="compress"
-                    checked={options.compress}
-                    onCheckedChange={(value) => set({ compress: value })}
-                    disabled={busy}
-                  />
-                }
-              />
-
               <RunButton
                 running={isLoading}
                 onRun={() => void handleSubmit()}

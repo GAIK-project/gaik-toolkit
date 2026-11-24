@@ -127,6 +127,13 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { driver } = await import("driver.js");
+    // A tour started from another page (?tour=1) can run before the home page's
+    // anchors are on screen: wait for the first one briefly, and if none shows,
+    // drive every stop rather than none.
+    for (let wait = 0; wait < 20 && visibleSteps().length === 0; wait++) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    const steps = visibleSteps();
     driver({
       showProgress: true,
       smoothScroll: true,
@@ -134,7 +141,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       nextBtnText: "Next",
       prevBtnText: "Back",
       doneBtnText: "Done",
-      steps: visibleSteps(),
+      steps: steps.length > 0 ? steps : TOUR_STEPS,
     }).drive();
   }, []);
 

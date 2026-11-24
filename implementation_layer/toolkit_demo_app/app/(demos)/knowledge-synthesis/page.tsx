@@ -591,8 +591,9 @@ export default function KnowledgeSynthesisPage() {
         </section>
 
         <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <Card>
+          {/* Below lg the cards are the grid's items, in step order. */}
+          <div className="contents lg:flex lg:flex-col lg:gap-6">
+            <Card className="order-1 lg:order-none">
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
                 <div className="min-w-[12rem] flex-1">
                   <CardTitle>1. Curated knowledge</CardTitle>
@@ -650,7 +651,7 @@ export default function KnowledgeSynthesisPage() {
                     </ul>
                   </>
                 ) : (
-                  <p className="text-xs font-medium text-amber-700">
+                  <p className="text-muted-foreground text-xs">
                     No knowledge yet. Pick a ready-made set above, or add
                     knowledge from the Knowledge Curator.
                   </p>
@@ -681,7 +682,7 @@ export default function KnowledgeSynthesisPage() {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="order-2 lg:order-none">
               <CardHeader>
                 <CardTitle>2. The report</CardTitle>
                 <CardDescription>
@@ -784,7 +785,7 @@ export default function KnowledgeSynthesisPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card>
+            <Card className="order-4 lg:order-none">
               <Accordion type="single" collapsible className="w-full">
                 <AccordionItem value="options" className="border-none">
                   <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">
@@ -924,8 +925,9 @@ export default function KnowledgeSynthesisPage() {
             </Card>
           </div>
 
-          <div className="flex flex-col gap-6">
-            <Card>
+          {/* Below lg the cards are the grid's items, in step order. */}
+          <div className="contents lg:flex lg:flex-col lg:gap-6">
+            <Card className="order-3 lg:order-none">
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
                 <div className="min-w-[12rem] flex-1">
                   <CardTitle>3. Sections</CardTitle>
@@ -955,7 +957,7 @@ export default function KnowledgeSynthesisPage() {
                 />
 
                 {inputs.length === 0 && (
-                  <p className="text-xs font-medium text-amber-700">
+                  <p className="text-muted-foreground text-xs">
                     No sections defined yet. Define your sections above, pick a
                     ready-made set, or start from the knowledge.
                   </p>

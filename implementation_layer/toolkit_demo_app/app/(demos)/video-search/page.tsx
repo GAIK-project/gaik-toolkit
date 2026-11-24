@@ -333,11 +333,11 @@ export default function VideoSearchPage() {
               <AlertCircle className="text-destructive mt-0.5 h-5 w-5 shrink-0" />
               <div>
                 <p className="text-destructive font-medium">
-                  Backend unreachable
+                  Video search is not available right now
                 </p>
                 <p className="text-muted-foreground text-sm">
-                  Start the FastAPI backend or verify the local proxy target in
-                  `BACKEND_URL` before using video search.
+                  The demo&apos;s server did not answer. Reload the page in a
+                  moment.
                 </p>
               </div>
             </CardContent>
