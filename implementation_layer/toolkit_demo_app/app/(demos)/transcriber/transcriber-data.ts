@@ -105,7 +105,7 @@ export const EXAMPLES: TranscriberExample[] = [
     id: "consultation",
     title: "A consultation in English",
     summary:
-      "A 93-second medical consultation summary. Turn the HH server off to read it with the cloud model instead.",
+      "A 93-second medical consultation summary. Pick OpenAI to read it with the cloud model instead.",
     url: "/sample.mp3",
     fileName: "sample.mp3",
     tags: ["English", "93 s"],

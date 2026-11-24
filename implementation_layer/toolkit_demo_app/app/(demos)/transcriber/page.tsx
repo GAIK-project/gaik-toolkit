@@ -27,6 +27,7 @@ import {
   Languages,
   Loader2,
   Mic,
+  Server,
   Sparkles,
   Users,
   Wand2,
@@ -35,6 +36,7 @@ import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { TranscriptView, type TranscribeResult } from "./transcript-view";
+import { DialectComparison, MakerLogo } from "./dialect-comparison";
 import {
   DEFAULT_OPTIONS,
   EXAMPLES,
@@ -52,7 +54,7 @@ const GUIDE_STEPS: GuideStep[] = [
   {
     icon: Languages,
     title: "Choose how to transcribe",
-    text: "Language, the Finnish HH server or the cloud model, speaker detection, hints and error fixing.",
+    text: "Language, the model (the HH server or OpenAI), speaker detection, hints and error fixing.",
   },
   {
     icon: Sparkles,
@@ -66,11 +68,25 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 const GUIDE_NOTES = [
-  "Only the HH server (the Finnish transcriber) times the text and detects speakers. The cloud model returns the text alone.",
+  "Only the HH server times the text and detects speakers. OpenAI returns the text alone.",
+  "Recordings can be up to 30 minutes; the GAIK team has no time limit.",
   "Nothing is saved: the recording and its transcript stay in this session.",
 ];
 
-const ACCEPT = ".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac";
+const ENGINES = [
+  {
+    id: "hh",
+    name: "HH server",
+    note: "Finnish Whisper at Haaga-Helia, with timed text and speakers",
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    note: "Cloud model on Azure, the text only",
+  },
+] as const;
+
+const ACCEPT =".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac";
 const IS_VIDEO = /\.(mp4|webm)$/i;
 
 function Option({
@@ -356,7 +372,8 @@ export default function TranscriberPage() {
               <CardHeader>
                 <CardTitle>1. The recording</CardTitle>
                 <CardDescription>
-                  An audio or video file: MP3, WAV, M4A, MP4, WEBM, OGG or FLAC.
+                  An audio or video file of up to 30 minutes. The GAIK team has
+                  no time limit.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -513,26 +530,80 @@ export default function TranscriberPage() {
                 </p>
               </div>
 
-              <Option
-                title="Finnish transcriber (HH server)"
-                htmlFor="prefer-local-first"
-                description={
-                  aittaSpeech
-                    ? `Off while a CSC Aitta model is picked: ${aittaSpeech} transcribes, and it returns the text without timestamps or speakers.`
-                    : "Try the Whisper server of Haaga-Helia first. It is the more accurate for Finnish, and it times the text and can tell speakers apart. If it cannot be reached, the cloud model is used instead."
-                }
-                disabled={!!aittaSpeech}
-                control={
-                  <Switch
-                    id="prefer-local-first"
-                    checked={options.preferLocalFirst && !aittaSpeech}
-                    onCheckedChange={(value) =>
-                      set({ preferLocalFirst: value })
-                    }
-                    disabled={busy || !!aittaSpeech}
-                  />
-                }
-              />
+              <div className="space-y-2">
+                <Label id="engine-label">Model</Label>
+                <div
+                  role="radiogroup"
+                  aria-labelledby="engine-label"
+                  className="grid gap-2"
+                >
+                  {ENGINES.map((engine) => {
+                    const checked =
+                      !aittaSpeech &&
+                      options.preferLocalFirst === (engine.id === "hh");
+                    return (
+                      <button
+                        key={engine.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        disabled={busy || !!aittaSpeech}
+                        onClick={() =>
+                          set({ preferLocalFirst: engine.id === "hh" })
+                        }
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-[color,background-color,border-color,transform] active:scale-[0.99] disabled:opacity-60",
+                          checked
+                            ? "border-primary bg-primary/10"
+                            : "hover:border-primary/40",
+                        )}
+                      >
+                        {engine.id === "hh" ? (
+                          <Server
+                            className="text-primary size-5 shrink-0"
+                            aria-hidden
+                          />
+                        ) : (
+                          <MakerLogo maker="openai" />
+                        )}
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium">
+                            {engine.name}
+                          </span>
+                          <span className="text-muted-foreground block text-xs">
+                            {engine.note}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <a
+                  href="#dialect-comparison"
+                  className="hover:border-primary/40 flex items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors"
+                >
+                  <MakerLogo maker="gaik" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      GAIK dialect model
+                    </span>
+                    <span className="text-muted-foreground block text-xs">
+                      A third of the errors on dialect speech.{" "}
+                      <span className="text-primary">See the comparison</span>
+                    </span>
+                  </span>
+                  <Badge variant="outline" className="shrink-0 font-normal">
+                    Coming soon
+                  </Badge>
+                </a>
+                <p className="text-muted-foreground text-xs">
+                  {aittaSpeech
+                    ? `Not used while a CSC Aitta model is picked: ${aittaSpeech} transcribes, and it returns the text without timestamps or speakers.`
+                    : options.preferLocalFirst
+                      ? "If the HH server cannot be reached, OpenAI is used instead."
+                      : "Timed text and speaker detection need the HH server."}
+                </p>
+              </div>
 
               <div className="space-y-3">
                 <Option
@@ -551,8 +622,8 @@ export default function TranscriberPage() {
                 />
                 {speakersNeedServer && (
                   <p className="text-xs text-amber-700">
-                    Speaker detection needs the HH server. Turn it on above, or
-                    the cloud model will return the text without speakers.
+                    Speaker detection needs the HH server. Pick it above, or
+                    OpenAI will return the text without speakers.
                   </p>
                 )}
                 {options.diarization && !aittaSpeech && (
@@ -627,6 +698,8 @@ export default function TranscriberPage() {
             />
           )}
         </div>
+
+        <DialectComparison />
       </div>
     </PageTransition>
   );

@@ -2,6 +2,7 @@
 
 import asyncio
 import os
+import subprocess
 import tempfile
 from difflib import SequenceMatcher
 from pathlib import Path
@@ -27,7 +28,51 @@ try:
 except ImportError:
     from api.utils.errors import error_detail
 
+try:
+    from utils.model_settings import request_is_staff
+except ImportError:
+    from api.utils.model_settings import request_is_staff
+
 router = APIRouter()
+
+# The longest recording a visitor may transcribe; the GAIK team (the demo account,
+# Haaga-Helia addresses, the admin: lib/model-tier.ts) has no limit.
+MAX_AUDIO_MINUTES = int(os.getenv("TRANSCRIBER_MAX_MINUTES", "30"))
+
+
+def _audio_seconds(path: str) -> float | None:
+    """The recording's length from ffprobe, or None when it cannot be read."""
+    try:
+        out = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration",
+                "-of",
+                "default=noprint_wrappers=1:nokey=1",
+                path,
+            ],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=True,
+        )
+        return float(out.stdout.strip())
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+
+
+def too_long_detail(seconds: float | None) -> str | None:
+    """Why a recording is refused for being too long, or None when it may run."""
+    if seconds is None or seconds <= MAX_AUDIO_MINUTES * 60:
+        return None
+    return (
+        f"Recordings can be up to {MAX_AUDIO_MINUTES} minutes; "
+        f"this one is {seconds / 60:.0f} minutes. Cut it shorter and try again."
+    )
 
 
 class TranscriptSegment(BaseModel):
@@ -127,6 +172,11 @@ async def transcribe_audio(
         tmp_path = tmp.name
 
     try:
+        if not request_is_staff():
+            seconds = await asyncio.to_thread(_audio_seconds, tmp_path)
+            if (detail := too_long_detail(seconds)) is not None:
+                raise HTTPException(status_code=413, detail=detail)
+
         from gaik.software_components.transcriber import Transcriber, get_openai_config
 
         if aitta:
@@ -230,6 +280,8 @@ async def transcribe_audio(
             vtt_content=result.vtt_content,
             usage=result.usage or None,
         )
+    except HTTPException:
+        raise
     except ImportError as e:
         raise HTTPException(
             status_code=500, detail=error_detail(e, "Loading the transcriber")
