@@ -383,62 +383,7 @@ export default function TranscriberPage() {
           notes={GUIDE_NOTES}
         />
 
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">
-            Start from a ready-made recording
-          </h2>
-          <div
-            role="radiogroup"
-            aria-label="Ready-made recordings"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            {EXAMPLES.map((example) => (
-              <div
-                key={example.id}
-                className={cn(
-                  "flex flex-col gap-2 rounded-xl border-2 p-3 transition-all",
-                  exampleId === example.id
-                    ? "border-primary bg-primary/5"
-                    : "bg-card hover:border-primary/40",
-                )}
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={exampleId === example.id}
-                  disabled={busy}
-                  onClick={() => void pickExample(example)}
-                  className="flex flex-1 flex-col gap-1.5 text-left"
-                >
-                  <span className="font-semibold">{example.title}</span>
-                  <span className="text-muted-foreground text-sm">
-                    {example.summary}
-                  </span>
-                  <span className="flex flex-wrap gap-1">
-                    {example.tags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="font-normal"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </span>
-                </button>
-                <audio
-                  src={example.url}
-                  controls
-                  preload="none"
-                  className="h-8 w-full"
-                  aria-label={`Listen to ${example.title}`}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
-
-        <div className="grid grid-cols-1 items-stretch gap-6 md:gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 md:gap-8 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
             <Card>
               <CardHeader>
@@ -488,6 +433,54 @@ export default function TranscriberPage() {
                     aria-label="Watch the recording"
                   />
                 )}
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-sm">
+                    Or try a ready-made recording; it comes with the options
+                    that suit it.
+                  </p>
+                  <div
+                    role="radiogroup"
+                    aria-label="Ready-made recordings"
+                    className="grid gap-2 sm:grid-cols-2"
+                  >
+                    {EXAMPLES.map((example) => {
+                      const picked = exampleId === example.id;
+                      return (
+                        <button
+                          key={example.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={picked}
+                          disabled={busy}
+                          onClick={() => void pickExample(example)}
+                          title={example.summary}
+                          className={cn(
+                            "flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-60",
+                            picked
+                              ? "border-primary bg-primary/5"
+                              : "bg-card hover:border-primary/40",
+                          )}
+                        >
+                          <AudioLines
+                            className={cn(
+                              "mt-0.5 h-4 w-4 shrink-0",
+                              picked ? "text-primary" : "text-muted-foreground",
+                            )}
+                            aria-hidden
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">
+                              {example.title}
+                            </span>
+                            <span className="text-muted-foreground block text-xs">
+                              {example.tags.join(" · ")}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
