@@ -7,7 +7,6 @@ import { EmptyStateCard } from "@/components/demo/result-card";
 import { SectionGuide, type GuideStep } from "@/components/demo/section-guide";
 import { StepIndicator } from "@/components/demo/step-indicator";
 import { FeedbackButton } from "@/components/feedback";
-import { Badge } from "@/components/ui/badge";
 import { RunButton } from "@/components/demo/run-button";
 import {
   Card,
@@ -90,6 +89,17 @@ const GUIDE_NOTES = [
 
 const ACCEPT = ".mp3,.wav,.m4a,.mp4,.webm,.ogg,.flac,.mov";
 const IS_VIDEO = /\.(mp4|webm|mov)$/i;
+
+/** The lecture clip opens with its finished subtitles; the others are transcribed. */
+const LECTURE: SubtitleExample = {
+  id: "lecture",
+  title: "A lecture clip, with subtitles",
+  summary:
+    "A finished video with its subtitles: play, search and correct them, with nothing to wait for.",
+  tags: ["Finnish", "video", "ready-made"],
+  language: "fi",
+};
+const READY_MADE: SubtitleExample[] = [LECTURE, ...EXAMPLES];
 
 export default function VideoTranscriptionPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -327,88 +337,17 @@ export default function VideoTranscriptionPage() {
       <DemoPageHeader
         icon={Mic}
         iconClassName="text-primary h-8 w-8"
-        title="Video Transcription & Subtitles"
+        title="Video transcription & subtitles"
         description="Turn a recording into a transcript and subtitles: play them on the video, correct them, and save them as SRT or VTT"
         className="mb-6"
       />
 
       <div className="space-y-6">
         <SectionGuide
-          heading="How to use Video Transcription & Subtitles"
+          heading="How to use Video transcription & subtitles"
           steps={GUIDE_STEPS}
           notes={GUIDE_NOTES}
         />
-
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">
-            Start from a ready-made recording
-          </h2>
-          <div
-            role="radiogroup"
-            aria-label="Ready-made recordings"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            <button
-              type="button"
-              role="radio"
-              aria-checked={exampleId === "lecture"}
-              disabled={busy}
-              onClick={() => void openLecture()}
-              className={cn(
-                "flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all",
-                exampleId === "lecture"
-                  ? "border-primary bg-primary/5"
-                  : "bg-card hover:border-primary/40",
-              )}
-            >
-              <span className="font-semibold">
-                A lecture clip, with subtitles
-              </span>
-              <span className="text-muted-foreground text-sm">
-                A finished video with its subtitles: open it to play, search and
-                correct them, with nothing to wait for.
-              </span>
-              <span className="flex flex-wrap gap-1">
-                {["Finnish", "video", "ready-made"].map((tag) => (
-                  <Badge key={tag} variant="outline" className="font-normal">
-                    {tag}
-                  </Badge>
-                ))}
-              </span>
-              {lectureError && (
-                <span className="text-destructive text-xs">{lectureError}</span>
-              )}
-            </button>
-            {EXAMPLES.map((example) => (
-              <button
-                key={example.id}
-                type="button"
-                role="radio"
-                aria-checked={exampleId === example.id}
-                disabled={busy}
-                onClick={() => void pickExample(example)}
-                className={cn(
-                  "flex flex-col gap-1.5 rounded-xl border-2 p-3 text-left transition-all",
-                  exampleId === example.id
-                    ? "border-primary bg-primary/5"
-                    : "bg-card hover:border-primary/40",
-                )}
-              >
-                <span className="font-semibold">{example.title}</span>
-                <span className="text-muted-foreground text-sm">
-                  {example.summary}
-                </span>
-                <span className="flex flex-wrap gap-1">
-                  {example.tags.map((tag) => (
-                    <Badge key={tag} variant="outline" className="font-normal">
-                      {tag}
-                    </Badge>
-                  ))}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
 
         <div className="grid grid-cols-1 items-start gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
@@ -440,7 +379,7 @@ export default function VideoTranscriptionPage() {
               {isLoadingExample && (
                 <p className="text-muted-foreground flex items-center gap-2 text-sm">
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  Loading…
+                  Loading the recording…
                 </p>
               )}
               {fileUrl &&
@@ -461,20 +400,91 @@ export default function VideoTranscriptionPage() {
                   />
                 ))}
               {lecture && exampleId === "lecture" && (
-                <p className="text-muted-foreground flex flex-wrap items-center gap-2 text-sm">
-                  <Video className="text-primary size-4" />
-                  {lecture.title}
-                  <a
-                    href={lecture.source_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline"
-                  >
-                    Open on YouTube
-                    <ExternalLink className="size-3.5" />
-                  </a>
-                </p>
+                <div className="bg-muted/50 space-y-1 rounded-lg px-3 py-2 text-sm">
+                  <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <Video
+                      className="text-primary size-4 shrink-0"
+                      aria-hidden
+                    />
+                    <span className="font-medium">{lecture.title}</span>
+                    <a
+                      href={lecture.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary inline-flex items-center gap-1 underline-offset-2 hover:underline"
+                    >
+                      Open on YouTube
+                      <ExternalLink className="size-3.5" aria-hidden />
+                    </a>
+                  </p>
+                  <p className="text-muted-foreground">
+                    Already transcribed:{" "}
+                    <a
+                      href="#subtitle-studio"
+                      className="text-primary underline-offset-2 hover:underline"
+                    >
+                      its subtitles are below
+                    </a>
+                    , ready to play, search and correct.
+                  </p>
+                </div>
               )}
+              <div className="space-y-2">
+                <p className="text-muted-foreground text-sm">
+                  Or try a ready-made recording; it comes with the options that
+                  suit it.
+                </p>
+                <div
+                  role="radiogroup"
+                  aria-label="Ready-made recordings"
+                  className="grid gap-2 sm:grid-cols-2"
+                >
+                  {READY_MADE.map((entry) => {
+                    const picked = exampleId === entry.id;
+                    const Icon = entry.id === "lecture" ? Video : AudioLines;
+                    return (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={picked}
+                        disabled={busy}
+                        onClick={() =>
+                          void (entry.id === "lecture"
+                            ? openLecture()
+                            : pickExample(entry))
+                        }
+                        title={entry.summary}
+                        className={cn(
+                          "flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-60",
+                          picked
+                            ? "border-primary bg-primary/5"
+                            : "bg-card hover:border-primary/40",
+                        )}
+                      >
+                        <Icon
+                          className={cn(
+                            "mt-0.5 h-4 w-4 shrink-0",
+                            picked ? "text-primary" : "text-muted-foreground",
+                          )}
+                          aria-hidden
+                        />
+                        <span className="min-w-0">
+                          <span className="block text-sm font-medium">
+                            {entry.title}
+                          </span>
+                          <span className="text-muted-foreground block text-xs">
+                            {entry.tags.join(" · ")}
+                          </span>
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {lectureError && (
+                  <p className="text-destructive text-xs">{lectureError}</p>
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -565,9 +575,11 @@ export default function VideoTranscriptionPage() {
               >
                 Transcribe
               </RunButton>
-              {!file && (
+              {!file && !isLoadingExample && (
                 <p className="text-muted-foreground text-center text-xs">
-                  Add a recording first.
+                  {exampleId === "lecture"
+                    ? "The lecture clip needs no transcribing. Upload a recording or pick another one to transcribe it."
+                    : "Add a recording first."}
                 </p>
               )}
             </CardContent>
@@ -598,7 +610,7 @@ export default function VideoTranscriptionPage() {
           )}
 
           {result && !isLoading && (
-            <div ref={studio} className="scroll-mt-20">
+            <div ref={studio} id="subtitle-studio" className="scroll-mt-20">
               <SubtitleStudio
                 key={result.job_id}
                 segments={result.segments}
