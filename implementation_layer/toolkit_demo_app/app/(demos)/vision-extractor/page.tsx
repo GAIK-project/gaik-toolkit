@@ -556,7 +556,7 @@ export default function VisionExtractorPage() {
           </ul>
         </section>
 
-        <div className="grid items-start gap-6 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:grid-rows-[auto_1fr]">
           <Card className="lg:col-start-1 lg:row-start-1">
             <CardHeader>
               <StepTitle n={1}>Add the documents</StepTitle>

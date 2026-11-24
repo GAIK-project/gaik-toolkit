@@ -350,7 +350,7 @@ export default function TranscriberPage() {
           </div>
         </section>
 
-        <div className="grid items-stretch gap-6 md:gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-6 md:gap-8 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
             <Card>
               <CardHeader>
@@ -586,21 +586,6 @@ export default function TranscriberPage() {
                   </div>
                 )}
               </div>
-
-              <Option
-                title="Compress audio"
-                htmlFor="compress"
-                description="Kept for compatibility. It has no effect at the moment: the file is sent as it is."
-                disabled
-                control={
-                  <Switch
-                    id="compress"
-                    checked={options.compress}
-                    onCheckedChange={(value) => set({ compress: value })}
-                    disabled={busy}
-                  />
-                }
-              />
 
               <RunButton
                 running={isLoading}

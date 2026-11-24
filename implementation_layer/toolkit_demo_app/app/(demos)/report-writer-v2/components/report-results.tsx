@@ -57,7 +57,7 @@ export function ReportResults({
         key={hasEvidence ? "evidence" : "files"}
         defaultValue={hasEvidence ? "evidence" : "files"}
       >
-        <TabsList>
+        <TabsList className="max-w-full flex-wrap justify-start group-data-[orientation=horizontal]/tabs:h-auto">
           <TabsTrigger value="evidence">Evidence by section</TabsTrigger>
           <TabsTrigger value="files">Workspace files</TabsTrigger>
           {Object.keys(rw.usage).length > 0 && (

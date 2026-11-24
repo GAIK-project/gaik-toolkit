@@ -593,7 +593,7 @@ export function TranscriptView({
                 </span>
               </div>
 
-              <div className="grid gap-3 lg:grid-cols-2">
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {(["original", "corrected"] as const).map((side) => (
                   <div key={side} className="min-w-0 space-y-1">
                     <div className="flex items-center gap-2 text-sm font-semibold">

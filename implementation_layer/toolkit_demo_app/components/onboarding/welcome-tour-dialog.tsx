@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Compass, Sparkles } from "lucide-react";
+import { Compass } from "lucide-react";
 
 interface WelcomeTourDialogProps {
   open: boolean;
@@ -32,16 +32,12 @@ export function WelcomeTourDialog({
     >
       <DialogContent className="sm:max-w-md" showCloseButton={false}>
         <DialogHeader>
-          <div className="bg-primary/10 mb-1 flex size-11 items-center justify-center rounded-full">
-            <Sparkles className="text-primary size-5" />
-          </div>
           <DialogTitle className="font-serif text-xl">
             Welcome to the GAIK Toolkit
           </DialogTitle>
           <DialogDescription className="text-sm leading-relaxed">
-            Everything here is a live, runnable demo — real use cases and the AI
-            building blocks behind them. Want a quick 60-second tour of the
-            highlights?
+            Every demo here runs for real. A one-minute tour shows where to
+            start.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="mt-2">

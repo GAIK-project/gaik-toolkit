@@ -522,254 +522,247 @@ export default function KnowledgeCuratorPage() {
           </div>
         </section>
 
-        <div className="grid items-stretch gap-6 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
-                <div className="min-w-[12rem] flex-1">
-                  <CardTitle>1. The sources</CardTitle>
-                  <CardDescription>
-                    Send them from the{" "}
-                    <Link href="/source-normalizer" className="underline">
-                      Source Normalizer
-                    </Link>
-                    , or upload the .zip it downloads.
-                  </CardDescription>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={clearAll}
-                  disabled={busy || (!normalized && !started)}
-                >
-                  Clear
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {loadingExample && (
-                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading the sources…
-                  </p>
-                )}
-                {normalized && (
-                  <>
-                    <p className="text-muted-foreground text-xs">
-                      From {origin || "an upload"}: {files.length} source
-                      {files.length === 1 ? "" : "s"}
-                    </p>
-                    <ul className="space-y-1.5">
-                      {files.map((f) => (
-                        <li
-                          key={f.id}
-                          className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                        >
-                          <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
-                          <span className="flex-1 truncate">{f.file}</span>
-                          <span className="text-muted-foreground shrink-0 text-xs">
-                            {f.source_type} ·{" "}
-                            {(
-                              normalized[`normalized/${f.id}.md`]?.length ?? 0
-                            ).toLocaleString("en-US")}{" "}
-                            chars
-                          </span>
-                          {f.source_class && (
-                            <Badge variant="outline" className="text-[10px]">
-                              {f.source_class}
-                            </Badge>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-                <label
-                  className={cn(
-                    "text-muted-foreground hover:border-primary/50 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-4 text-sm transition-colors",
-                    busy && "pointer-events-none opacity-50",
-                  )}
-                >
-                  <Upload className="h-4 w-4" />
-                  {normalized
-                    ? "Replace with a .zip"
-                    : "Upload the .zip from the Source Normalizer"}
-                  <input
-                    type="file"
-                    accept=".zip,application/zip"
-                    className="sr-only"
-                    disabled={busy}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      e.target.value = "";
-                      if (file) void loadZip(file);
-                    }}
-                  />
-                </label>
-                <UploadReminder />
-              </CardContent>
-            </Card>
-
-            <Card className="flex flex-1 flex-col">
-              <CardHeader>
-                <CardTitle>3. Instructions</CardTitle>
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
+          <Card>
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+              <div className="min-w-[12rem] flex-1">
+                <CardTitle>1. The sources</CardTitle>
                 <CardDescription>
-                  Scope and style, and the language of the summaries. Whether a
-                  conflict between sources is resolved is set by the switch
-                  below, not by the text.
+                  Send them from the{" "}
+                  <Link href="/source-normalizer" className="underline">
+                    Source Normalizer
+                  </Link>
+                  , or upload the .zip it downloads.
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="flex flex-1 flex-col gap-3">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="primary-first"
-                    checked={precedence.length > 0}
-                    onCheckedChange={(on) =>
-                      setPrecedence(on ? PRIMARY_FIRST : [])
-                    }
-                    disabled={busy}
-                  />
-                  <Label htmlFor="primary-first" className="text-sm">
-                    Primary sources outrank secondary ones in a conflict
-                  </Label>
-                </div>
-                <Textarea
-                  value={instructions}
-                  onChange={(e) => setInstructions(e.target.value)}
-                  disabled={busy}
-                  placeholder="e.g. Site notes are primary sources. Customer documents are secondary. Write the summaries in English."
-                  className="h-full min-h-[110px] text-sm"
-                />
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex flex-col gap-6">
-            <Card className="flex-1">
-              <CardHeader>
-                <CardTitle>2. Topics</CardTitle>
-                <CardDescription>
-                  The topics to collect facts for. Under Advanced, list the
-                  items a topic must cover; the ones no source covers are
-                  reported as missing.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SectionEditor
-                  sections={sections}
-                  onChange={setSections}
-                  disabled={busy}
-                  withRequiredItems
-                  hideDependsOn
-                  noun="Topic"
-                />
-                {problem && started && (
-                  <p className="text-destructive mt-2 text-xs">{problem}</p>
-                )}
-                {!started && (
-                  <p className="mt-2 text-xs font-medium text-amber-700">
-                    No topic defined yet. Add a title and what to look for, or
-                    load an example.
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearAll}
+                disabled={busy || (!normalized && !started)}
+              >
+                Clear
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loadingExample && (
+                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading the sources…
+                </p>
+              )}
+              {normalized && (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    From {origin || "an upload"}: {files.length} source
+                    {files.length === 1 ? "" : "s"}
                   </p>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="options" className="border-none">
-                  <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">
-                    <div>
-                      4. Options
-                      <p className="text-muted-foreground mt-1 text-sm font-normal">
-                        Model, reasoning effort and parallel topics
-                      </p>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-3 px-6 pb-5">
-                    <div className="space-y-1">
-                      <Label htmlFor="kc-model" className="text-sm">
-                        Model
-                      </Label>
-                      <ModelNameInput
-                        kind="chat"
-                        id="kc-model"
-                        value={options.model ?? ""}
-                        disabled={busy}
-                        onChange={(e) =>
-                          setOptions({ ...options, model: e.target.value })
-                        }
-                        placeholder="The server's model"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-sm">Reasoning effort</Label>
-                      <Select
-                        value={options.reasoning_effort ?? "default"}
-                        disabled={busy}
-                        onValueChange={(v) =>
-                          setOptions({
-                            ...options,
-                            reasoning_effort:
-                              v === "default" ? null : (v as Effort),
-                          })
-                        }
+                  <ul className="space-y-1.5">
+                    {files.map((f) => (
+                      <li
+                        key={f.id}
+                        className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
                       >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Model default</SelectItem>
-                          {EFFORTS.map((e) => (
-                            <SelectItem key={e} value={e}>
-                              {e}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-muted-foreground text-xs">
-                        Higher effort copies quotes more carefully, at more cost
-                        and time.
-                      </p>
-                    </div>
-                    <div className="space-y-1">
-                      <Label htmlFor="kc-workers" className="text-sm">
-                        Topics in parallel
-                      </Label>
-                      <Input
-                        id="kc-workers"
-                        type="number"
-                        min={1}
-                        max={8}
-                        value={options.max_workers}
-                        disabled={busy}
-                        onChange={(e) =>
-                          setOptions({
-                            ...options,
-                            max_workers: Math.min(
-                              8,
-                              Math.max(1, Number(e.target.value) || 1),
-                            ),
-                          })
-                        }
-                      />
-                    </div>
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-              <CardContent className="flex gap-2 pt-0">
-                <RunButton
-                  running={running}
-                  onRun={curate}
-                  onStop={stopRun}
-                  icon={Sparkles}
-                  className="flex-1"
-                  disabled={busy || !normalized || problem !== null}
-                >
-                  Curate
-                </RunButton>
-              </CardContent>
-            </Card>
-          </div>
+                        <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                        <span className="flex-1 truncate">{f.file}</span>
+                        <span className="text-muted-foreground shrink-0 text-xs">
+                          {f.source_type} ·{" "}
+                          {(
+                            normalized[`normalized/${f.id}.md`]?.length ?? 0
+                          ).toLocaleString("en-US")}{" "}
+                          chars
+                        </span>
+                        {f.source_class && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {f.source_class}
+                          </Badge>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <label
+                className={cn(
+                  "text-muted-foreground hover:border-primary/50 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-4 text-sm transition-colors",
+                  busy && "pointer-events-none opacity-50",
+                )}
+              >
+                <Upload className="h-4 w-4" />
+                {normalized
+                  ? "Replace with a .zip"
+                  : "Upload the .zip from the Source Normalizer"}
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void loadZip(file);
+                  }}
+                />
+              </label>
+              <UploadReminder />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>2. Topics</CardTitle>
+              <CardDescription>
+                The topics to collect facts for. Under Advanced, list the items
+                a topic must cover; the ones no source covers are reported as
+                missing.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SectionEditor
+                sections={sections}
+                onChange={setSections}
+                disabled={busy}
+                withRequiredItems
+                hideDependsOn
+                noun="Topic"
+              />
+              {problem && started && (
+                <p className="text-destructive mt-2 text-xs">{problem}</p>
+              )}
+              {!started && (
+                <p className="text-muted-foreground mt-2 text-xs">
+                  No topic defined yet. Add a title and what to look for, or
+                  load an example.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+          <Card className="flex flex-col">
+            <CardHeader>
+              <CardTitle>3. Instructions</CardTitle>
+              <CardDescription>
+                Scope and style, and the language of the summaries. Whether a
+                conflict between sources is resolved is set by the switch below,
+                not by the text.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-1 flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="primary-first"
+                  checked={precedence.length > 0}
+                  onCheckedChange={(on) =>
+                    setPrecedence(on ? PRIMARY_FIRST : [])
+                  }
+                  disabled={busy}
+                />
+                <Label htmlFor="primary-first" className="text-sm">
+                  Primary sources outrank secondary ones in a conflict
+                </Label>
+              </div>
+              <Textarea
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+                disabled={busy}
+                placeholder="e.g. Site notes are primary sources. Customer documents are secondary. Write the summaries in English."
+                className="h-full min-h-[110px] text-sm"
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="options" className="border-none">
+                <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">
+                  <div>
+                    4. Options
+                    <p className="text-muted-foreground mt-1 text-sm font-normal">
+                      Model, reasoning effort and parallel topics
+                    </p>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3 px-6 pb-5">
+                  <div className="space-y-1">
+                    <Label htmlFor="kc-model" className="text-sm">
+                      Model
+                    </Label>
+                    <ModelNameInput
+                      kind="chat"
+                      id="kc-model"
+                      value={options.model ?? ""}
+                      disabled={busy}
+                      onChange={(e) =>
+                        setOptions({ ...options, model: e.target.value })
+                      }
+                      placeholder="The server's model"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-sm">Reasoning effort</Label>
+                    <Select
+                      value={options.reasoning_effort ?? "default"}
+                      disabled={busy}
+                      onValueChange={(v) =>
+                        setOptions({
+                          ...options,
+                          reasoning_effort:
+                            v === "default" ? null : (v as Effort),
+                        })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="default">Model default</SelectItem>
+                        {EFFORTS.map((e) => (
+                          <SelectItem key={e} value={e}>
+                            {e}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-muted-foreground text-xs">
+                      Higher effort copies quotes more carefully, at more cost
+                      and time.
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="kc-workers" className="text-sm">
+                      Topics in parallel
+                    </Label>
+                    <Input
+                      id="kc-workers"
+                      type="number"
+                      min={1}
+                      max={8}
+                      value={options.max_workers}
+                      disabled={busy}
+                      onChange={(e) =>
+                        setOptions({
+                          ...options,
+                          max_workers: Math.min(
+                            8,
+                            Math.max(1, Number(e.target.value) || 1),
+                          ),
+                        })
+                      }
+                    />
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+            <CardContent className="flex gap-2 pt-0">
+              <RunButton
+                running={running}
+                onRun={curate}
+                onStop={stopRun}
+                icon={Sparkles}
+                className="flex-1"
+                disabled={busy || !normalized || problem !== null}
+              >
+                Curate
+              </RunButton>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-4" aria-live="polite">

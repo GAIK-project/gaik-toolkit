@@ -35,6 +35,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { SectionEditor } from "../report-writer/components/section-editor";
 import { downloadBlob } from "./components/artifact-browser";
 import { ReportResults } from "./components/report-results";
@@ -80,11 +81,26 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
     setSettings,
   } = rw;
 
+  // The report and the evidence need the page's whole width, so they sit under
+  // both columns. A run that finished scrolls to them; a stopped or failed one
+  // leaves the page where its error shows, in the stage column.
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const seenRuns = useRef(rw.finishedRuns);
+  useEffect(() => {
+    if (rw.finishedRuns === seenRuns.current) return;
+    seenRuns.current = rw.finishedRuns;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    resultsRef.current?.scrollIntoView({
+      behavior: reduce.matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [rw.finishedRuns]);
+
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Files can total up to 100 MB. Download the workspace ZIP and your
-        report spec before reloading or closing this tab.
+        Files can total up to 100 MB. Download the workspace ZIP and your report
+        spec before reloading or closing this tab.
       </p>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -281,7 +297,8 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
           </Card>
         </div>
 
-        {/* Running it and what comes out */}
+        {/* Running it. From lg the stage buttons stay in view beside the form
+            while it scrolls, and end just above the results. */}
         <div className="space-y-4">
           <HowItWorksCard description="What you define, what each stage does, and how to edit in between">
             <p>
@@ -455,23 +472,28 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
             </Accordion>
           </Card>
 
-          <StageStepper
-            artifacts={rw.artifacts}
-            stale={rw.stale}
-            running={rw.running}
-            ready={rw.ready}
-            progress={rw.progress}
-            error={rw.error}
-            onRun={rw.run}
-            onStop={rw.stop}
-            stacked
-            runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
-          />
-          <ReportResults
-            rw={rw}
-            emptyText="Add your sources and press Run all three stages. The report and the evidence behind it appear here."
-          />
+          <div className="lg:sticky lg:top-24">
+            <StageStepper
+              artifacts={rw.artifacts}
+              stale={rw.stale}
+              running={rw.running}
+              ready={rw.ready}
+              progress={rw.progress}
+              error={rw.error}
+              onRun={rw.run}
+              onStop={rw.stop}
+              stacked
+              runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
+            />
+          </div>
         </div>
+      </div>
+
+      <div ref={resultsRef} className="scroll-mt-24">
+        <ReportResults
+          rw={rw}
+          emptyText="Add your sources and press Run all three stages. The report and the evidence behind it appear here."
+        />
       </div>
     </div>
   );

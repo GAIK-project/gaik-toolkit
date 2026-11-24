@@ -186,7 +186,7 @@ export default function PostgresAgentPage() {
         description="Ask a database in plain language. The agent writes and runs read-only SQL."
       />
 
-      <div className="grid gap-6 md:gap-8 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 md:gap-8 lg:grid-cols-2">
         {/* Input Section */}
         <div className="space-y-6">
           <Card>

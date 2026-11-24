@@ -737,6 +737,7 @@ export function ModelPicker({ loggedIn }: { loggedIn: boolean }) {
           <Button
             variant="outline"
             size="sm"
+            data-tour="models"
             className={cn(
               "relative max-w-56 gap-1.5",
               settings &&

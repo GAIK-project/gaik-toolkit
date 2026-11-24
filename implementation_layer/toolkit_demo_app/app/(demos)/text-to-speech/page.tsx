@@ -379,7 +379,7 @@ export default function TextToSpeechPage() {
           </div>
         </section>
 
-        <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
               <div>

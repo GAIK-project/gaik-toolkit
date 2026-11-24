@@ -82,11 +82,23 @@ const NO_MODELS = Object.fromEntries(
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
+/** A failed load as a sentence for the page: the API's own message, not its URL or JSON. */
 async function getOk(url: string): Promise<Response> {
   const res = await fetch(url);
-  if (!res.ok)
-    throw new Error(`GET ${url} failed (${res.status}): ${await res.text()}`);
-  return res;
+  if (res.ok) return res;
+  const text = await res.text();
+  let detail: unknown = null;
+  try {
+    const body = JSON.parse(text);
+    detail = body.error ?? body.detail;
+  } catch {
+    // Not JSON: fall back to the status below.
+  }
+  throw new Error(
+    typeof detail === "string" && detail
+      ? detail
+      : `The server answered ${res.status}. Try again in a moment.`,
+  );
 }
 
 async function httpError(res: Response): Promise<Error> {
@@ -136,6 +148,8 @@ export function useReportWriter() {
 
   // Runs
   const [running, setRunning] = useState<Stage | null>(null);
+  // Runs that ended with every stage done: not a stop, a failure or a rate limit.
+  const [finishedRuns, setFinishedRuns] = useState(0);
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -459,6 +473,7 @@ export function useReportWriter() {
     try {
       for (const stage of stages)
         ws = await runStage(stage, ws, controller.signal);
+      setFinishedRuns((count) => count + 1);
       if (stages.includes("synthesize") || stages.includes("rebuild"))
         toast.success("Report ready");
     } catch (e) {
@@ -534,6 +549,7 @@ export function useReportWriter() {
     ready,
     // runs
     running,
+    finishedRuns,
     busy,
     progress,
     error,

@@ -503,7 +503,7 @@ export default function ClassifierPage() {
           </div>
         </section>
 
-        <div className="grid items-start gap-6 md:gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-start gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader>
               <CardTitle>1. The documents</CardTitle>
@@ -570,8 +570,9 @@ export default function ClassifierPage() {
                 </p>
               )}
 
+              {/* At most MAX_FILES rows: the whole list shows, none is cut off. */}
               {entries.length > 0 && (
-                <ul className="max-h-72 space-y-1.5 overflow-auto">
+                <ul className="space-y-1.5">
                   {entries.map((entry) => (
                     <li
                       key={entry.key}

@@ -295,9 +295,7 @@ function ConflictCard({
                   );
                 })}
               </div>
-              {problem && (
-                <p className="text-xs text-amber-700">{problem}</p>
-              )}
+              {problem && <p className="text-xs text-amber-700">{problem}</p>}
             </div>
           )}
           <Textarea

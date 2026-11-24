@@ -590,433 +590,425 @@ export default function KnowledgeSynthesisPage() {
           </div>
         </section>
 
-        <div className="grid items-start gap-6 lg:grid-cols-2">
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
-                <div className="min-w-[12rem] flex-1">
-                  <CardTitle>1. Curated knowledge</CardTitle>
-                  <CardDescription>
-                    The facts the report is written from. Send them from the{" "}
-                    <Link href="/knowledge-curator" className="underline">
-                      Knowledge Curator
-                    </Link>
-                    , or upload its .zip.
-                  </CardDescription>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  onClick={clearAll}
-                  disabled={busy || (knowledgePaths.length === 0 && !title)}
-                >
-                  Clear
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {loadingExample && (
-                  <p className="text-muted-foreground flex items-center gap-2 text-sm">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Loading the knowledge…
+        <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:grid-rows-[auto_auto_1fr]">
+          <Card className="lg:col-start-1 lg:row-start-1">
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+              <div className="min-w-[12rem] flex-1">
+                <CardTitle>1. Curated knowledge</CardTitle>
+                <CardDescription>
+                  The facts the report is written from. Send them from the{" "}
+                  <Link href="/knowledge-curator" className="underline">
+                    Knowledge Curator
+                  </Link>
+                  , or upload its .zip.
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={clearAll}
+                disabled={busy || (knowledgePaths.length === 0 && !title)}
+              >
+                Clear
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {loadingExample && (
+                <p className="text-muted-foreground flex items-center gap-2 text-sm">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Loading the knowledge…
+                </p>
+              )}
+              {knowledgePaths.length > 0 ? (
+                <>
+                  <p className="text-muted-foreground text-xs">
+                    From {origin || "an upload"}: knowledge for{" "}
+                    {knowledgePaths.length} topic
+                    {knowledgePaths.length === 1 ? "" : "s"}
                   </p>
+                  <ul className="space-y-1.5">
+                    {knowledgePaths.map((path) => {
+                      const read = readKnowledge(knowledge[path]);
+                      return (
+                        <li
+                          key={path}
+                          className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
+                        >
+                          <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                          <span className="flex-1 truncate font-mono text-xs">
+                            {knowledgeId(path)}
+                          </span>
+                          <span className="text-muted-foreground shrink-0 text-xs">
+                            {read.ok
+                              ? `${read.value.units.length} facts · ${read.value.missing.length} missing · ${read.value.conflicts.length} conflicts`
+                              : "invalid JSON"}
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </>
+              ) : (
+                <p className="text-muted-foreground text-xs">
+                  No knowledge yet. Pick a ready-made set above, or add
+                  knowledge from the Knowledge Curator.
+                </p>
+              )}
+              <label
+                className={cn(
+                  "text-muted-foreground hover:border-primary/50 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-4 text-sm transition-colors",
+                  busy && "pointer-events-none opacity-50",
                 )}
-                {knowledgePaths.length > 0 ? (
-                  <>
-                    <p className="text-muted-foreground text-xs">
-                      From {origin || "an upload"}: knowledge for{" "}
-                      {knowledgePaths.length} topic
-                      {knowledgePaths.length === 1 ? "" : "s"}
-                    </p>
-                    <ul className="space-y-1.5">
-                      {knowledgePaths.map((path) => {
-                        const read = readKnowledge(knowledge[path]);
-                        return (
-                          <li
-                            key={path}
-                            className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm"
-                          >
-                            <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
-                            <span className="flex-1 truncate font-mono text-xs">
-                              {knowledgeId(path)}
-                            </span>
-                            <span className="text-muted-foreground shrink-0 text-xs">
-                              {read.ok
-                                ? `${read.value.units.length} facts · ${read.value.missing.length} missing · ${read.value.conflicts.length} conflicts`
-                                : "invalid JSON"}
-                            </span>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </>
-                ) : (
-                  <p className="text-xs font-medium text-amber-700">
-                    No knowledge yet. Pick a ready-made set above, or add
-                    knowledge from the Knowledge Curator.
-                  </p>
+              >
+                <Upload className="h-4 w-4" />
+                {knowledgePaths.length
+                  ? "Replace with a .zip"
+                  : "Upload the .zip from the Knowledge Curator"}
+                <input
+                  type="file"
+                  accept=".zip,application/zip"
+                  className="sr-only"
+                  disabled={busy}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    e.target.value = "";
+                    if (file) void loadZip(file);
+                  }}
+                />
+              </label>
+              <UploadReminder />
+            </CardContent>
+          </Card>
+          <Card className="lg:col-start-1 lg:row-start-2">
+            <CardHeader>
+              <CardTitle>2. The report</CardTitle>
+              <CardDescription>
+                Its title and language, the rules for every section, and an
+                optional sample report to copy the shape of.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
+                <div className="space-y-1">
+                  <Label htmlFor="ks-title" className="text-sm">
+                    Report title
+                  </Label>
+                  <Input
+                    id="ks-title"
+                    value={title}
+                    disabled={busy}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. Site report, 12 Example Road"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="ks-language" className="text-sm">
+                    Language
+                  </Label>
+                  <Input
+                    id="ks-language"
+                    value={language}
+                    disabled={busy}
+                    onChange={(e) => setLanguage(e.target.value)}
+                    placeholder="English"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="ks-instructions" className="text-sm">
+                  Report instructions
+                </Label>
+                <Textarea
+                  id="ks-instructions"
+                  value={instructions}
+                  disabled={busy}
+                  onChange={(e) => setInstructions(e.target.value)}
+                  placeholder="Rules for every section: which source to trust, tone, how to cite."
+                  className="min-h-[96px] text-sm"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-sm">
+                  Sample report{" "}
+                  <span className="text-muted-foreground font-normal">
+                    (optional; the report copies its structure, length and tone,
+                    never its facts)
+                  </span>
+                </Label>
+                {sample && (
+                  <div className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
+                    <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                    <span className="flex-1 truncate">{sample.name}</span>
+                    <span className="text-muted-foreground shrink-0 text-xs">
+                      {formatFileSize(sample.file.size)}
+                    </span>
+                    <button
+                      type="button"
+                      title="Remove"
+                      aria-label="Remove the sample report"
+                      disabled={busy}
+                      onClick={() => setSample(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 )}
                 <label
                   className={cn(
-                    "text-muted-foreground hover:border-primary/50 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed px-3 py-4 text-sm transition-colors",
+                    "text-muted-foreground hover:border-muted-foreground/50 flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm transition-colors",
                     busy && "pointer-events-none opacity-50",
                   )}
                 >
                   <Upload className="h-4 w-4" />
-                  {knowledgePaths.length
-                    ? "Replace with a .zip"
-                    : "Upload the .zip from the Knowledge Curator"}
+                  {sample
+                    ? "Replace the sample report"
+                    : "Upload a sample report (.md, .txt, .docx, .pdf)"}
                   <input
                     type="file"
-                    accept=".zip,application/zip"
+                    accept={SAMPLE_ACCEPT}
                     className="sr-only"
                     disabled={busy}
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       e.target.value = "";
-                      if (file) void loadZip(file);
+                      if (file) pickSample(file);
                     }}
                   />
                 </label>
                 <UploadReminder />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>2. The report</CardTitle>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="lg:col-start-2 lg:row-span-3 lg:row-start-1">
+            <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
+              <div className="min-w-[12rem] flex-1">
+                <CardTitle>3. Sections</CardTitle>
                 <CardDescription>
-                  Its title and language, the rules for every section, and an
-                  optional sample report to copy the shape of.
+                  A section without dependencies is written from the knowledge
+                  with the same id. A section that depends on others is{" "}
+                  <strong>derived</strong>: it is written from their finished
+                  text and needs no knowledge of its own.
                 </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-[1fr_10rem]">
-                  <div className="space-y-1">
-                    <Label htmlFor="ks-title" className="text-sm">
-                      Report title
-                    </Label>
-                    <Input
-                      id="ks-title"
-                      value={title}
-                      disabled={busy}
-                      onChange={(e) => setTitle(e.target.value)}
-                      placeholder="e.g. Site report, 12 Example Road"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor="ks-language" className="text-sm">
-                      Language
-                    </Label>
-                    <Input
-                      id="ks-language"
-                      value={language}
-                      disabled={busy}
-                      onChange={(e) => setLanguage(e.target.value)}
-                      placeholder="English"
-                    />
-                  </div>
-                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={startFromKnowledge}
+                disabled={busy || knowledgePaths.length === 0}
+                title="Create one section for each knowledge file"
+              >
+                Start from the knowledge
+              </Button>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <SectionEditor
+                sections={rows}
+                onChange={setRows}
+                disabled={busy}
+                withRequiredItems
+              />
 
-                <div className="space-y-1">
-                  <Label htmlFor="ks-instructions" className="text-sm">
-                    Report instructions
-                  </Label>
-                  <Textarea
-                    id="ks-instructions"
-                    value={instructions}
-                    disabled={busy}
-                    onChange={(e) => setInstructions(e.target.value)}
-                    placeholder="Rules for every section: which source to trust, tone, how to cite."
-                    className="min-h-[96px] text-sm"
-                  />
-                </div>
+              {inputs.length === 0 && (
+                <p className="text-muted-foreground text-xs">
+                  No sections defined yet. Define your sections above, pick a
+                  ready-made set, or start from the knowledge.
+                </p>
+              )}
 
-                <div className="space-y-1">
-                  <Label className="text-sm">
-                    Sample report{" "}
-                    <span className="text-muted-foreground font-normal">
-                      (optional; the report copies its structure, length and
-                      tone, never its facts)
-                    </span>
-                  </Label>
-                  {sample && (
-                    <div className="flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm">
-                      <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
-                      <span className="flex-1 truncate">{sample.name}</span>
-                      <span className="text-muted-foreground shrink-0 text-xs">
-                        {formatFileSize(sample.file.size)}
+              {problems.length > 0 && (
+                <ul className="text-destructive space-y-1 text-xs">
+                  {problems.map((p) => (
+                    <li key={p}>{p}</li>
+                  ))}
+                </ul>
+              )}
+
+              {order && (
+                <div className="bg-muted/30 space-y-1.5 rounded-md border p-3">
+                  <p className="flex items-center gap-1.5 text-xs font-medium">
+                    <Layers className="h-3.5 w-3.5" />
+                    Writing order
+                  </p>
+                  {order.map((level, i) => (
+                    <div
+                      key={i}
+                      className="flex flex-wrap items-center gap-1.5 text-xs"
+                    >
+                      <span className="text-muted-foreground w-14 shrink-0">
+                        Step {i + 1}
                       </span>
-                      <button
-                        type="button"
-                        title="Remove"
-                        aria-label="Remove the sample report"
-                        disabled={busy}
-                        onClick={() => setSample(null)}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  )}
-                  <label
-                    className={cn(
-                      "text-muted-foreground hover:border-muted-foreground/50 flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm transition-colors",
-                      busy && "pointer-events-none opacity-50",
-                    )}
-                  >
-                    <Upload className="h-4 w-4" />
-                    {sample
-                      ? "Replace the sample report"
-                      : "Upload a sample report (.md, .txt, .docx, .pdf)"}
-                    <input
-                      type="file"
-                      accept={SAMPLE_ACCEPT}
-                      className="sr-only"
-                      disabled={busy}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        e.target.value = "";
-                        if (file) pickSample(file);
-                      }}
-                    />
-                  </label>
-                  <UploadReminder />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <Accordion type="single" collapsible className="w-full">
-                <AccordionItem value="options" className="border-none">
-                  <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">
-                    <div>
-                      4. Options
-                      <p className="text-muted-foreground mt-1 text-sm font-normal">
-                        Citations, review, models and output
-                      </p>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="space-y-3 px-6 pb-5">
-                    <SwitchRow
-                      label="Citations"
-                      description="Cite the source file and place of each fact. Off writes plain statements, even if the report instructions ask for citations. Run twice to compare."
-                      checked={options.citations}
-                      onCheckedChange={(v) =>
-                        setOptions({ ...options, citations: v })
-                      }
-                      disabled={busy}
-                    />
-                    <SwitchRow
-                      label="Strict review"
-                      description="Stop the run when a reviewer correction cannot be applied"
-                      checked={options.strict_review}
-                      onCheckedChange={(v) =>
-                        setOptions({ ...options, strict_review: v })
-                      }
-                      disabled={busy}
-                    />
-                    <SwitchRow
-                      label="Generate DOCX"
-                      description="Also build report.docx next to the Markdown"
-                      checked={options.docx}
-                      onCheckedChange={(v) =>
-                        setOptions({ ...options, docx: v })
-                      }
-                      disabled={busy}
-                    />
-                    <Row label="Review attempts">
-                      <Input
-                        type="number"
-                        min={1}
-                        max={5}
-                        value={options.review_attempts}
-                        disabled={busy}
-                        onChange={(e) =>
-                          setOptions({
-                            ...options,
-                            review_attempts: Math.min(
-                              5,
-                              Math.max(1, Number(e.target.value) || 1),
-                            ),
-                          })
-                        }
-                        className="h-8 text-sm"
-                      />
-                    </Row>
-                    {(["writer", "reviewer"] as const).map((step) => (
-                      <div key={step} className="space-y-3">
-                        <p className="text-muted-foreground text-xs font-medium capitalize">
-                          {step}
-                        </p>
-                        <Row label="Model">
-                          <ModelNameInput
-                            kind="chat"
-                            placeholder="The server's model"
-                            value={options[`${step}_model`] ?? ""}
-                            disabled={busy}
-                            onChange={(e) =>
-                              setOptions({
-                                ...options,
-                                [`${step}_model`]: e.target.value,
-                              })
-                            }
-                            className="h-8 font-mono text-sm"
-                          />
-                        </Row>
-                        <Row label="Reasoning effort">
-                          <Select
-                            value={options[`${step}_effort`] ?? "default"}
-                            disabled={busy}
-                            onValueChange={(v) =>
-                              setOptions({
-                                ...options,
-                                [`${step}_effort`]:
-                                  v === "default" ? null : (v as Effort),
-                              })
-                            }
+                      {level.map((id) => {
+                        const deps =
+                          inputs.find((s) => s.id === id)?.depends_on ?? [];
+                        return (
+                          // A badge does not wrap or shrink by default. A derived
+                          // section names every section it is written from, and
+                          // on a phone that line is wider than the card: let it
+                          // wrap, the dependencies under the title.
+                          <Badge
+                            key={id}
+                            variant="outline"
+                            className="max-w-full shrink flex-wrap justify-start gap-1 rounded-xl text-left font-normal wrap-anywhere whitespace-normal"
                           >
-                            <SelectTrigger className="h-8 text-sm">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="default">
-                                model default
-                              </SelectItem>
-                              {EFFORTS.map((e) => (
-                                <SelectItem key={e} value={e}>
-                                  {e}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </Row>
-                      </div>
-                    ))}
-                  </AccordionContent>
-                </AccordionItem>
-              </Accordion>
-              <CardContent className="space-y-2 pt-0">
-                <div className="flex gap-2">
-                  <RunButton
-                    running={running}
-                    onRun={synthesize}
-                    onStop={stopRun}
-                    icon={Sparkles}
-                    className="flex-1"
-                    disabled={busy || !ready}
-                  >
-                    Synthesize
-                  </RunButton>
+                            {titleOf(id)}
+                            {deps.length > 0 && (
+                              <span className="text-muted-foreground">
+                                ← {deps.map(titleOf).join(", ")}
+                              </span>
+                            )}
+                          </Badge>
+                        );
+                      })}
+                      <span className="text-muted-foreground">
+                        {i === 0
+                          ? "from the knowledge, in parallel"
+                          : "from the text of the sections before"}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-                {!ready && !running && (
-                  <p className="text-muted-foreground text-xs">
-                    {knowledgePaths.length === 0
-                      ? "Add knowledge first: pick a ready-made set, or use the Knowledge Curator."
-                      : inputs.length === 0
-                        ? "Define the sections of the report first."
-                        : !title.trim()
-                          ? "Give the report a title."
-                          : problems.length > 0
-                            ? "Fix the problems listed under the sections."
-                            : ""}
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="flex flex-col gap-6">
-            <Card>
-              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">
-                <div className="min-w-[12rem] flex-1">
-                  <CardTitle>3. Sections</CardTitle>
-                  <CardDescription>
-                    A section without dependencies is written from the knowledge
-                    with the same id. A section that depends on others is{" "}
-                    <strong>derived</strong>: it is written from their finished
-                    text and needs no knowledge of its own.
-                  </CardDescription>
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={startFromKnowledge}
-                  disabled={busy || knowledgePaths.length === 0}
-                  title="Create one section for each knowledge file"
-                >
-                  Start from the knowledge
-                </Button>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <SectionEditor
-                  sections={rows}
-                  onChange={setRows}
-                  disabled={busy}
-                  withRequiredItems
-                />
-
-                {inputs.length === 0 && (
-                  <p className="text-xs font-medium text-amber-700">
-                    No sections defined yet. Define your sections above, pick a
-                    ready-made set, or start from the knowledge.
-                  </p>
-                )}
-
-                {problems.length > 0 && (
-                  <ul className="text-destructive space-y-1 text-xs">
-                    {problems.map((p) => (
-                      <li key={p}>{p}</li>
-                    ))}
-                  </ul>
-                )}
-
-                {order && (
-                  <div className="bg-muted/30 space-y-1.5 rounded-md border p-3">
-                    <p className="flex items-center gap-1.5 text-xs font-medium">
-                      <Layers className="h-3.5 w-3.5" />
-                      Writing order
+              )}
+            </CardContent>
+          </Card>
+          <Card className="lg:col-start-1 lg:row-start-3">
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="options" className="border-none">
+                <AccordionTrigger className="text-muted-foreground hover:text-foreground px-6 py-4 text-left text-sm font-medium hover:no-underline">
+                  <div>
+                    4. Options
+                    <p className="text-muted-foreground mt-1 text-sm font-normal">
+                      Citations, review, models and output
                     </p>
-                    {order.map((level, i) => (
-                      <div
-                        key={i}
-                        className="flex flex-wrap items-center gap-1.5 text-xs"
-                      >
-                        <span className="text-muted-foreground w-14 shrink-0">
-                          Step {i + 1}
-                        </span>
-                        {level.map((id) => {
-                          const deps =
-                            inputs.find((s) => s.id === id)?.depends_on ?? [];
-                          return (
-                            // A badge does not wrap or shrink by default. A derived
-                            // section names every section it is written from, and
-                            // on a phone that line is wider than the card: let it
-                            // wrap, the dependencies under the title.
-                            <Badge
-                              key={id}
-                              variant="outline"
-                              className="max-w-full shrink flex-wrap justify-start gap-1 rounded-xl text-left font-normal wrap-anywhere whitespace-normal"
-                            >
-                              {titleOf(id)}
-                              {deps.length > 0 && (
-                                <span className="text-muted-foreground">
-                                  ← {deps.map(titleOf).join(", ")}
-                                </span>
-                              )}
-                            </Badge>
-                          );
-                        })}
-                        <span className="text-muted-foreground">
-                          {i === 0
-                            ? "from the knowledge, in parallel"
-                            : "from the text of the sections before"}
-                        </span>
-                      </div>
-                    ))}
                   </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+                </AccordionTrigger>
+                <AccordionContent className="space-y-3 px-6 pb-5">
+                  <SwitchRow
+                    label="Citations"
+                    description="Cite the source file and place of each fact. Off writes plain statements, even if the report instructions ask for citations. Run twice to compare."
+                    checked={options.citations}
+                    onCheckedChange={(v) =>
+                      setOptions({ ...options, citations: v })
+                    }
+                    disabled={busy}
+                  />
+                  <SwitchRow
+                    label="Strict review"
+                    description="Stop the run when a reviewer correction cannot be applied"
+                    checked={options.strict_review}
+                    onCheckedChange={(v) =>
+                      setOptions({ ...options, strict_review: v })
+                    }
+                    disabled={busy}
+                  />
+                  <SwitchRow
+                    label="Generate DOCX"
+                    description="Also build report.docx next to the Markdown"
+                    checked={options.docx}
+                    onCheckedChange={(v) => setOptions({ ...options, docx: v })}
+                    disabled={busy}
+                  />
+                  <Row label="Review attempts">
+                    <Input
+                      type="number"
+                      min={1}
+                      max={5}
+                      value={options.review_attempts}
+                      disabled={busy}
+                      onChange={(e) =>
+                        setOptions({
+                          ...options,
+                          review_attempts: Math.min(
+                            5,
+                            Math.max(1, Number(e.target.value) || 1),
+                          ),
+                        })
+                      }
+                      className="h-8 text-sm"
+                    />
+                  </Row>
+                  {(["writer", "reviewer"] as const).map((step) => (
+                    <div key={step} className="space-y-3">
+                      <p className="text-muted-foreground text-xs font-medium capitalize">
+                        {step}
+                      </p>
+                      <Row label="Model">
+                        <ModelNameInput
+                          kind="chat"
+                          placeholder="The server's model"
+                          value={options[`${step}_model`] ?? ""}
+                          disabled={busy}
+                          onChange={(e) =>
+                            setOptions({
+                              ...options,
+                              [`${step}_model`]: e.target.value,
+                            })
+                          }
+                          className="h-8 font-mono text-sm"
+                        />
+                      </Row>
+                      <Row label="Reasoning effort">
+                        <Select
+                          value={options[`${step}_effort`] ?? "default"}
+                          disabled={busy}
+                          onValueChange={(v) =>
+                            setOptions({
+                              ...options,
+                              [`${step}_effort`]:
+                                v === "default" ? null : (v as Effort),
+                            })
+                          }
+                        >
+                          <SelectTrigger className="h-8 text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="default">
+                              model default
+                            </SelectItem>
+                            {EFFORTS.map((e) => (
+                              <SelectItem key={e} value={e}>
+                                {e}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </Row>
+                    </div>
+                  ))}
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+            <CardContent className="space-y-2 pt-0">
+              <div className="flex gap-2">
+                <RunButton
+                  running={running}
+                  onRun={synthesize}
+                  onStop={stopRun}
+                  icon={Sparkles}
+                  className="flex-1"
+                  disabled={busy || !ready}
+                >
+                  Synthesize
+                </RunButton>
+              </div>
+              {!ready && !running && (
+                <p className="text-muted-foreground text-xs">
+                  {knowledgePaths.length === 0
+                    ? "Add knowledge first: pick a ready-made set, or use the Knowledge Curator."
+                    : inputs.length === 0
+                      ? "Define the sections of the report first."
+                      : !title.trim()
+                        ? "Give the report a title."
+                        : problems.length > 0
+                          ? "Fix the problems listed under the sections."
+                          : ""}
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-4" aria-live="polite">

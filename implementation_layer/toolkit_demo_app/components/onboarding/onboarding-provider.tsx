@@ -1,5 +1,6 @@
 "use client";
 
+import type { DriveStep } from "driver.js";
 import "driver.js/dist/driver.css";
 import { usePathname } from "next/navigation";
 import {
@@ -44,6 +45,28 @@ function hasSeenTour(): boolean {
   } catch {
     return true; // storage blocked → don't nag
   }
+}
+
+/**
+ * The stops whose anchor is on screen now: the model menu only for a signed-in
+ * user, and nothing hidden at this width. The first stop has no Back button.
+ */
+function visibleSteps(): DriveStep[] {
+  const steps = TOUR_STEPS.filter((step) => {
+    const element =
+      typeof step.element === "string"
+        ? document.querySelector(step.element)
+        : null;
+    return element !== null && element.getClientRects().length > 0;
+  });
+  return steps.map((step, index) =>
+    index === 0
+      ? {
+          ...step,
+          popover: { ...step.popover, showButtons: ["next", "close"] },
+        }
+      : step,
+  );
 }
 
 function markTourSeen(): void {
@@ -104,13 +127,28 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { driver } = await import("driver.js");
+    // A tour started from another page (?tour=1) runs right after the home page
+    // loads: wait up to three seconds for its anchors and for the model menu,
+    // which is a spinner until the model list arrives.
+    for (
+      let wait = 0;
+      wait < 30 &&
+      (visibleSteps().length === 0 ||
+        document.querySelector('[aria-label="Loading the models"]'));
+      wait++
+    ) {
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    const steps = visibleSteps();
+    if (steps.length === 0) return;
     driver({
       showProgress: true,
+      smoothScroll: true,
       popoverClass: "gaik-tour",
       nextBtnText: "Next",
       prevBtnText: "Back",
       doneBtnText: "Done",
-      steps: TOUR_STEPS,
+      steps,
     }).drive();
   }, []);
 
