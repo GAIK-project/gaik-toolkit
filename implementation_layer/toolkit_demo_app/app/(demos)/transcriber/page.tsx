@@ -24,21 +24,31 @@ import { useAittaSpeech } from "@/components/model-settings";
 import { cn } from "@/lib/utils";
 import {
   AudioLines,
+  Check,
   Languages,
   Loader2,
+  Globe,
   Mic,
   Sparkles,
   Users,
   Wand2,
 } from "lucide-react";
+import Image from "next/image";
 import posthog from "posthog-js";
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { TranscriptView, type TranscribeResult } from "./transcript-view";
+import { DialectComparison, MakerLogo } from "./dialect-comparison";
+import { CompareColumns, EngineLogo, type Run } from "./compare-columns";
 import {
   DEFAULT_OPTIONS,
+  ENGINES,
   EXAMPLES,
   LANGUAGES,
+  engineById,
+  engineRequest,
+  languageMatters,
+  type EngineId,
   type TranscriberExample,
   type TranscriberOptions,
 } from "./transcriber-data";
@@ -52,7 +62,7 @@ const GUIDE_STEPS: GuideStep[] = [
   {
     icon: Languages,
     title: "Choose how to transcribe",
-    text: "Language, the Finnish HH server or the cloud model, speaker detection, hints and error fixing.",
+    text: "One model or several side by side, the language, speaker detection, hints and error fixing.",
   },
   {
     icon: Sparkles,
@@ -66,7 +76,9 @@ const GUIDE_STEPS: GuideStep[] = [
   },
 ];
 const GUIDE_NOTES = [
-  "Only the HH server (the Finnish transcriber) times the text and detects speakers. The cloud model returns the text alone.",
+  "Only the HH server times the text and detects speakers. OpenAI returns the text alone.",
+  "On the HH server, Finnish Whisper is used only when the recording is read as Finnish; Whisper large is its general model.",
+  "Recordings can be up to 30 minutes; the GAIK team has no time limit.",
   "Nothing is saved: the recording and its transcript stay in this session.",
 ];
 
@@ -107,13 +119,14 @@ export default function TranscriberPage() {
   const [options, setOptions] = useState<TranscriberOptions>(DEFAULT_OPTIONS);
   const [exampleId, setExampleId] = useState<string | null>(null);
   const [isLoadingExample, setIsLoadingExample] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [result, setResult] = useState<TranscribeResult | null>(null);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [resultFile, setResultFile] = useState<File | null>(null);
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [resultUrl, setResultUrl] = useState<string | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  const isLoading = runs.some((run) => run.status === "running");
   const busy = isLoading || isLoadingExample;
   const set = (patch: Partial<TranscriberOptions>) =>
     setOptions((previous) => ({ ...previous, ...patch }));
@@ -122,8 +135,26 @@ export default function TranscriberPage() {
   // With an Aitta model picked, Aitta's Whisper transcribes: the HH server and
   // what only it does (a set language, timed text, speakers) are out.
   const aittaSpeech = useAittaSpeech();
-  const speakersNeedServer =
-    options.diarization && !options.preferLocalFirst && !aittaSpeech;
+  const usesServer =
+    !aittaSpeech && options.engines.some((id) => engineById(id).server);
+  const speakersNeedServer = options.diarization && !usesServer && !aittaSpeech;
+  const languageUsed = !!aittaSpeech || languageMatters(options.engines);
+  const openRun =
+    runs.find((run) => run.key === openKey && run.status === "done") ??
+    runs.find((run) => run.status === "done");
+
+  function toggleEngine(id: EngineId): void {
+    setOptions((previous) => {
+      const on = previous.engines.includes(id);
+      if (on && previous.engines.length === 1) return previous;
+      const engines = on
+        ? previous.engines.filter((entry) => entry !== id)
+        : ENGINES.map((engine) => engine.id).filter(
+            (entry) => entry === id || previous.engines.includes(entry),
+          );
+      return { ...previous, engines };
+    });
+  }
 
   useEffect(() => {
     return () => abortControllerRef.current?.abort();
@@ -151,7 +182,8 @@ export default function TranscriberPage() {
   }, [resultFile]);
 
   function clearResult(): void {
-    setResult(null);
+    setRuns([]);
+    setOpenKey(null);
     setResultFile(null);
   }
 
@@ -177,6 +209,77 @@ export default function TranscriberPage() {
     }
   }
 
+  /** One model's request; resolves to its result, or throws with the reason. */
+  async function transcribeWith(
+    recording: File,
+    engine: EngineId | null,
+    signal: AbortSignal,
+  ): Promise<TranscribeResult> {
+    const request =
+      engine === null
+        ? { language: options.language, preferLocalFirst: false }
+        : engineRequest(engine, options.language);
+    const formData = new FormData();
+    formData.append("file", recording);
+    formData.append("custom_context", options.context);
+    formData.append("fix_transcription_errors", String(options.fixErrors));
+    if (options.fixInstructions.trim() !== "")
+      formData.append(
+        "enhanced_transcript_instructions",
+        options.fixInstructions.trim(),
+      );
+    formData.append("compress_audio", String(options.compress));
+    formData.append("language", request.language);
+    formData.append("diarization", String(options.diarization));
+    formData.append("prefer_local_first", String(request.preferLocalFirst));
+    if (options.diarization) {
+      if (options.speakerCount.trim() !== "")
+        formData.append("speaker_count", options.speakerCount.trim());
+      if (options.minSpeakers.trim() !== "")
+        formData.append("min_speakers", options.minSpeakers.trim());
+      if (options.maxSpeakers.trim() !== "")
+        formData.append("max_speakers", options.maxSpeakers.trim());
+    }
+    if (options.context.trim() !== "")
+      formData.append("initial_prompt", options.context.trim());
+
+    const response = await apiFetch("/api/transcribe", {
+      method: "POST",
+      body: formData,
+      signal,
+    });
+    if (!response.ok) {
+      let errorMessage = "Failed to transcribe";
+      try {
+        const error = await response.json();
+        errorMessage = error.detail || errorMessage;
+      } catch {
+        // JSON parsing failed, use default message
+      }
+      throw new Error(errorMessage);
+    }
+    const data = (await response.json()) as TranscribeResult;
+    posthog.capture("audio_transcribed", {
+      file_type: recording.type,
+      file_size: recording.size,
+      fix_transcription_errors: options.fixErrors,
+      has_enhanced_transcript_instructions:
+        options.fixInstructions.trim().length > 0,
+      compress_audio: options.compress,
+      has_custom_context: options.context.length > 0,
+      language: request.language,
+      diarization: options.diarization,
+      prefer_local_first: request.preferLocalFirst,
+      engine: engine ?? "aitta",
+      engines: options.engines.length,
+      used_fallback: data.used_fallback,
+      fallback_reason: data.fallback_reason,
+      transcription_model: data.transcription_model,
+      example: exampleId,
+    });
+    return data;
+  }
+
   async function handleSubmit(): Promise<void> {
     if (busy) return;
     if (!file) {
@@ -188,95 +291,80 @@ export default function TranscriberPage() {
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    setIsLoading(true);
-    clearResult();
+    // A picked Aitta model transcribes alone; otherwise every picked model runs
+    // at the same time, and its column fills in when its answer lands.
+    const startedAt = Date.now();
+    const planned: Run[] = aittaSpeech
+      ? [
+          {
+            key: "aitta",
+            engine: null,
+            label: aittaSpeech,
+            where: "CSC Aitta",
+            status: "running",
+            startedAt,
+          },
+        ]
+      : options.engines.map((id) => {
+          const engine = engineById(id);
+          return {
+            key: id,
+            engine: id,
+            label: engine.name,
+            where: engine.where,
+            status: "running",
+            startedAt,
+          };
+        });
+    setRuns(planned);
+    setOpenKey(null);
+    setResultFile(file);
 
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("custom_context", options.context);
-      formData.append("fix_transcription_errors", String(options.fixErrors));
-      if (options.fixInstructions.trim() !== "")
-        formData.append(
-          "enhanced_transcript_instructions",
-          options.fixInstructions.trim(),
-        );
-      formData.append("compress_audio", String(options.compress));
-      formData.append("language", options.language);
-      formData.append("diarization", String(options.diarization));
-      formData.append("prefer_local_first", String(options.preferLocalFirst));
-      if (options.diarization) {
-        if (options.speakerCount.trim() !== "")
-          formData.append("speaker_count", options.speakerCount.trim());
-        if (options.minSpeakers.trim() !== "")
-          formData.append("min_speakers", options.minSpeakers.trim());
-        if (options.maxSpeakers.trim() !== "")
-          formData.append("max_speakers", options.maxSpeakers.trim());
-      }
-      if (options.context.trim() !== "")
-        formData.append("initial_prompt", options.context.trim());
-
-      const response = await apiFetch("/api/transcribe", {
-        method: "POST",
-        body: formData,
-        signal: controller.signal,
-      });
-
-      if (!response.ok) {
-        let errorMessage = "Failed to transcribe";
-        try {
-          const error = await response.json();
-          errorMessage = error.detail || errorMessage;
-        } catch {
-          // JSON parsing failed, use default message
-        }
-        throw new Error(errorMessage);
-      }
-
-      const data = (await response.json()) as TranscribeResult;
-      setResult(data);
-      setResultFile(file);
-
-      posthog.capture("audio_transcribed", {
-        file_type: file.type,
-        file_size: file.size,
-        fix_transcription_errors: options.fixErrors,
-        has_enhanced_transcript_instructions:
-          options.fixInstructions.trim().length > 0,
-        compress_audio: options.compress,
-        has_custom_context: options.context.length > 0,
-        language: options.language,
-        diarization: options.diarization,
-        prefer_local_first: options.preferLocalFirst,
-        used_fallback: data.used_fallback,
-        fallback_reason: data.fallback_reason,
-        transcription_model: data.transcription_model,
-        example: exampleId,
-      });
-
-      toast.success(
-        data.used_fallback
-          ? "Transcription complete (cloud fallback)"
-          : "Transcription complete!",
+    const update = (key: string, patch: Partial<Run>) => {
+      if (abortControllerRef.current !== controller) return;
+      setRuns((previous) =>
+        previous.map((run) => (run.key === key ? { ...run, ...patch } : run)),
       );
-    } catch (error) {
-      if (
-        controller.signal.aborted ||
-        (error instanceof Error && error.name === "AbortError")
-      )
-        return;
-      if (error instanceof RateLimitError) return;
-      toast.error(error instanceof Error ? error.message : "An error occurred");
-    } finally {
-      // A run that a newer one replaced leaves the newer one's state alone.
-      if (abortControllerRef.current === controller) setIsLoading(false);
-    }
+    };
+
+    await Promise.all(
+      planned.map(async (run) => {
+        try {
+          const result = await transcribeWith(
+            file,
+            run.engine,
+            controller.signal,
+          );
+          update(run.key, {
+            status: "done",
+            result,
+            ms: Date.now() - startedAt,
+          });
+        } catch (error) {
+          if (
+            controller.signal.aborted ||
+            (error instanceof Error && error.name === "AbortError")
+          )
+            return;
+          const message =
+            error instanceof RateLimitError
+              ? "The run limit is reached for now."
+              : error instanceof Error
+                ? error.message
+                : "An error occurred";
+          update(run.key, { status: "error", error: message });
+          if (planned.length === 1 && !(error instanceof RateLimitError))
+            toast.error(message);
+        }
+      }),
+    );
   }
 
-  /** Cancels the run in the browser; the page is ready again with its input. */
+  /** Cancels the runs in the browser; the page is ready again with its input. */
   function stopRun(): void {
     abortControllerRef.current?.abort();
-    setIsLoading(false);
+    abortControllerRef.current = null;
+    setRuns((previous) => previous.filter((run) => run.status === "done"));
   }
 
   return (
@@ -356,7 +444,8 @@ export default function TranscriberPage() {
               <CardHeader>
                 <CardTitle>1. The recording</CardTitle>
                 <CardDescription>
-                  An audio or video file: MP3, WAV, M4A, MP4, WEBM, OGG or FLAC.
+                  An audio or video file of up to 30 minutes. The GAIK team has
+                  no time limit.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -481,65 +570,155 @@ export default function TranscriberPage() {
             </CardHeader>
             <CardContent className="flex flex-1 flex-col gap-5">
               <div className="space-y-2">
-                <Label>Language</Label>
+                <Label id="engine-label">Models</Label>
+                <div
+                  role="group"
+                  aria-labelledby="engine-label"
+                  className="grid gap-2"
+                >
+                  {ENGINES.map((engine) => {
+                    const checked =
+                      !aittaSpeech && options.engines.includes(engine.id);
+                    const last = checked && options.engines.length === 1;
+                    return (
+                      <button
+                        key={engine.id}
+                        type="button"
+                        role="checkbox"
+                        aria-checked={checked}
+                        disabled={busy || !!aittaSpeech}
+                        onClick={() => toggleEngine(engine.id)}
+                        title={last ? "Keep at least one model" : undefined}
+                        className={cn(
+                          "flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-[color,background-color,border-color,transform] active:scale-[0.99] disabled:opacity-60",
+                          checked
+                            ? "border-primary bg-primary/10"
+                            : "hover:border-primary/40",
+                        )}
+                      >
+                        <EngineLogo engine={engine.id} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">
+                            {engine.name}{" "}
+                            <span className="text-muted-foreground font-normal">
+                              · {engine.where}
+                            </span>
+                          </span>
+                          <span className="text-muted-foreground block text-xs">
+                            {engine.note}
+                          </span>
+                        </span>
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                            checked
+                              ? "border-primary bg-primary text-primary-foreground"
+                              : "border-input",
+                          )}
+                        >
+                          {checked && (
+                            <Check className="animate-in zoom-in-50 size-3 duration-150" />
+                          )}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <a
+                  href="#dialect-comparison"
+                  className="hover:border-primary/40 flex items-center gap-3 rounded-lg border border-dashed px-3 py-2.5 transition-colors"
+                >
+                  <MakerLogo maker="gaik" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">
+                      GAIK dialect model
+                    </span>
+                    <span className="text-muted-foreground block text-xs">
+                      A third of the errors on dialect speech.{" "}
+                      <span className="text-primary">See the comparison</span>
+                    </span>
+                  </span>
+                  <Badge variant="outline" className="shrink-0 font-normal">
+                    Coming soon
+                  </Badge>
+                </a>
+                <p className="text-muted-foreground text-xs">
+                  {aittaSpeech
+                    ? `Not used while a CSC Aitta model is picked: ${aittaSpeech} transcribes, and it returns the text without timestamps or speakers.`
+                    : options.engines.length > 1
+                      ? "The models run at the same time and their texts come side by side. Each model counts as one run."
+                      : usesServer
+                        ? "If the HH server cannot be reached, OpenAI is used instead."
+                        : "Timed text and speaker detection need the HH server."}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <Label id="language-label">Language</Label>
                 <div
                   role="radiogroup"
-                  aria-label="Language"
+                  aria-labelledby="language-label"
                   className="grid grid-cols-3 gap-2"
                 >
-                  {LANGUAGES.map((entry) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      role="radio"
-                      aria-checked={options.language === entry.id}
-                      disabled={busy || !!aittaSpeech}
-                      onClick={() => set({ language: entry.id })}
-                      className={cn(
-                        "rounded-lg border px-3 py-2 text-sm transition-colors",
-                        options.language === entry.id
-                          ? "border-primary bg-primary/10 text-primary font-medium"
-                          : "hover:border-primary/40",
-                      )}
-                    >
-                      {entry.label}
-                    </button>
-                  ))}
+                  {LANGUAGES.map((entry) => {
+                    const checked =
+                      languageUsed && options.language === entry.id;
+                    return (
+                      <button
+                        key={entry.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={checked}
+                        disabled={busy || !!aittaSpeech || !languageUsed}
+                        onClick={() => set({ language: entry.id })}
+                        className={cn(
+                          "flex min-w-0 items-center justify-center gap-2 rounded-lg border px-2 py-2 text-sm transition-[color,background-color,border-color,transform] active:scale-[0.97] disabled:opacity-60",
+                          checked
+                            ? "border-primary bg-primary/10 text-primary font-medium"
+                            : "hover:border-primary/40",
+                        )}
+                      >
+                        {entry.id === "auto" ? (
+                          <Globe className="size-4 shrink-0" aria-hidden />
+                        ) : (
+                          <Image
+                            src={`/icons/flag-${entry.id === "fi" ? "fi" : "gb"}.svg`}
+                            alt=""
+                            width={16}
+                            height={16}
+                            className="size-4 shrink-0"
+                          />
+                        )}
+                        {entry.id === "auto" ? (
+                          <>
+                            <span className="sm:hidden">Auto</span>
+                            <span className="hidden truncate sm:inline">
+                              {entry.label}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="truncate">{entry.label}</span>
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
                 <p className="text-muted-foreground text-xs">
                   {aittaSpeech
                     ? `Not used: ${aittaSpeech} recognises the language from the speech.`
-                    : language.hint}
+                    : !languageUsed
+                      ? "Not asked: Finnish Whisper always reads the speech as Finnish."
+                      : language.hint}
                 </p>
               </div>
-
-              <Option
-                title="Finnish transcriber (HH server)"
-                htmlFor="prefer-local-first"
-                description={
-                  aittaSpeech
-                    ? `Off while a CSC Aitta model is picked: ${aittaSpeech} transcribes, and it returns the text without timestamps or speakers.`
-                    : "Try the Whisper server of Haaga-Helia first. It is the more accurate for Finnish, and it times the text and can tell speakers apart. If it cannot be reached, the cloud model is used instead."
-                }
-                disabled={!!aittaSpeech}
-                control={
-                  <Switch
-                    id="prefer-local-first"
-                    checked={options.preferLocalFirst && !aittaSpeech}
-                    onCheckedChange={(value) =>
-                      set({ preferLocalFirst: value })
-                    }
-                    disabled={busy || !!aittaSpeech}
-                  />
-                }
-              />
 
               <div className="space-y-3">
                 <Option
                   title="Speaker detection"
                   htmlFor="diarization"
                   description="Tells who speaks when, and shows each speaker's share of the talk. Works with the HH server only."
-                  disabled={!options.preferLocalFirst || !!aittaSpeech}
+                  disabled={!usesServer}
                   control={
                     <Switch
                       id="diarization"
@@ -551,8 +730,8 @@ export default function TranscriberPage() {
                 />
                 {speakersNeedServer && (
                   <p className="text-xs text-amber-700">
-                    Speaker detection needs the HH server. Turn it on above, or
-                    the cloud model will return the text without speakers.
+                    Speaker detection needs the HH server. Pick one of its
+                    models above, or OpenAI returns the text without speakers.
                   </p>
                 )}
                 {options.diarization && !aittaSpeech && (
@@ -603,30 +782,49 @@ export default function TranscriberPage() {
         </div>
 
         <div className="space-y-4" aria-live="polite">
-          {isLoading && (
+          {runs.length === 1 && isLoading && (
             <LoadingCard
               message="Transcribing audio…"
               subMessage="This may take a while for longer files"
             />
           )}
 
-          {result && !isLoading && (
+          {runs.length > 1 && (
+            <CompareColumns
+              runs={runs}
+              openKey={openRun?.key ?? null}
+              onOpen={setOpenKey}
+            />
+          )}
+
+          {runs.length === 1 && runs[0].status === "error" && (
+            <EmptyStateCard
+              icon={Wand2}
+              title="The transcription failed"
+              description={runs[0].error ?? "Try again."}
+              feedbackSlot={<FeedbackButton demoType="transcriber" />}
+            />
+          )}
+
+          {openRun?.result && (
             <TranscriptView
-              key={result.job_id}
-              result={result}
+              key={openRun.result.job_id}
+              result={openRun.result}
               audioUrl={resultUrl}
             />
           )}
 
-          {!result && !isLoading && (
+          {runs.length === 0 && (
             <EmptyStateCard
               icon={Wand2}
               title="No transcription yet"
-              description="Add a recording and click Transcribe. The text appears here with a player that follows it."
+              description="Add a recording and click Transcribe. The text appears here with a player that follows it; with more than one model, their texts come side by side."
               feedbackSlot={<FeedbackButton demoType="transcriber" />}
             />
           )}
         </div>
+
+        <DialectComparison />
       </div>
     </PageTransition>
   );

@@ -5,6 +5,10 @@ import {
   activeSegment,
   applyChanges,
   changedParts,
+  differingWords,
+  engineById,
+  engineRequest,
+  languageMatters,
   formatTime,
   hasSpeakers,
   segmentsToText,
@@ -104,5 +108,51 @@ describe("reviewing the changes", () => {
   });
   test("accepting some mixes the two", () => {
     expect(applyChanges(parts, new Set([1]))).toBe("Hello world and uh");
+  });
+});
+
+describe("models", () => {
+  test("Finnish Whisper always asks the HH server for Finnish", () => {
+    expect(engineRequest("hh-fi", "en")).toEqual({
+      language: "fi",
+      preferLocalFirst: true,
+    });
+  });
+  test("Whisper large never sends Finnish, which would switch models", () => {
+    expect(engineRequest("hh-large", "fi").language).toBe("auto");
+    expect(engineRequest("hh-large", "en").language).toBe("en");
+  });
+  test("OpenAI takes the language as set and skips the HH server", () => {
+    expect(engineRequest("openai", "fi")).toEqual({
+      language: "fi",
+      preferLocalFirst: false,
+    });
+  });
+  test("the language matters unless Finnish Whisper runs alone", () => {
+    expect(languageMatters(["hh-fi"])).toBe(false);
+    expect(languageMatters(["hh-fi", "openai"])).toBe(true);
+  });
+  test("every example names known models", () => {
+    for (const example of EXAMPLES)
+      for (const id of example.options.engines ?? [])
+        expect(engineById(id).id).toBe(id);
+  });
+});
+
+describe("differingWords", () => {
+  test("marks the words that are not shared, ignoring case and punctuation", () => {
+    expect(
+      differingWords(
+        "Kometankuja 6, keskiviikko.",
+        "kometankuja kuusi keskiviikko",
+      ),
+    ).toEqual([false, true, false]);
+  });
+  test("an added word is marked", () => {
+    expect(differingWords("a b", "a x b")).toEqual([false, true, false]);
+  });
+  test("texts too long to compare give null", () => {
+    const long = "sana ".repeat(2001);
+    expect(differingWords(long, long)).toBeNull();
   });
 });

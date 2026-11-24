@@ -75,3 +75,36 @@ def test_the_cloud_model_returns_text_and_usage_only(client) -> None:
     assert body["segments"] is None
     assert body["srt_content"] is None
     assert body["usage"] == {"total_tokens": 20}
+
+
+def test_a_recording_over_the_limit_is_refused_before_transcribing(client, monkeypatch) -> None:
+    monkeypatch.setattr(route, "_audio_seconds", lambda path: 31 * 60)
+    monkeypatch.setattr(route, "request_is_staff", lambda: False)
+
+    response = _post(client, True)
+
+    assert response.status_code == 413
+    assert "up to 30 minutes" in response.json()["detail"]
+    assert "31 minutes" in response.json()["detail"]
+
+
+def test_the_gaik_team_has_no_length_limit(client, monkeypatch) -> None:
+    def never(path):
+        raise AssertionError("the length is not read for the team")
+
+    monkeypatch.setattr(route, "_audio_seconds", never)
+    monkeypatch.setattr(route, "request_is_staff", lambda: True)
+
+    assert _post(client, True).status_code == 200
+
+
+def test_a_recording_whose_length_cannot_be_read_still_runs(client, monkeypatch) -> None:
+    monkeypatch.setattr(route, "_audio_seconds", lambda path: None)
+    monkeypatch.setattr(route, "request_is_staff", lambda: False)
+
+    assert _post(client, True).status_code == 200
+
+
+def test_exactly_thirty_minutes_is_allowed() -> None:
+    assert route.too_long_detail(30 * 60) is None
+    assert route.too_long_detail(30 * 60 + 1) is not None

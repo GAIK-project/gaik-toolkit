@@ -7,24 +7,91 @@ export const LANGUAGES: { id: Language; label: string; hint: string }[] = [
   {
     id: "auto",
     label: "Auto-detect",
-    hint: "The language is recognised from the speech. A good choice when it varies or is not known.",
+    hint: "Recognised from the speech. A good choice when it varies or is not known.",
   },
   {
     id: "fi",
     label: "Finnish",
-    hint: "Uses the Finnish speech model of the HH server, which is more accurate for Finnish than the general one.",
+    hint: "OpenAI reads the speech as Finnish. Whisper large still recognises the language itself, since Finnish on the HH server means Finnish Whisper.",
   },
   {
     id: "en",
     label: "English",
-    hint: "Reads the speech as English, with the general large model of the HH server.",
+    hint: "Read as English.",
   },
 ];
 
+// ---------------------------------------------------------------------------
+// The models a recording can be transcribed with
+// ---------------------------------------------------------------------------
+
+export type EngineId = "hh-fi" | "hh-large" | "openai";
+
+export interface Engine {
+  id: EngineId;
+  name: string;
+  /** Where it runs. */
+  where: string;
+  note: string;
+  /** The HH server times the text and can tell speakers apart. */
+  server: boolean;
+}
+
+export const ENGINES: Engine[] = [
+  {
+    id: "hh-fi",
+    name: "Finnish Whisper",
+    where: "HH server",
+    note: "Fine-tuned for Finnish; reads every recording as Finnish",
+    server: true,
+  },
+  {
+    id: "hh-large",
+    name: "Whisper large",
+    where: "HH server",
+    note: "The general model, for any language",
+    server: true,
+  },
+  {
+    id: "openai",
+    name: "OpenAI",
+    where: "Azure",
+    note: "Cloud model; the text without timestamps",
+    server: false,
+  },
+];
+
+export function engineById(id: EngineId): Engine {
+  return ENGINES.find((engine) => engine.id === id) ?? ENGINES[0];
+}
+
+/**
+ * The language and route of one model's run. The HH server switches to its
+ * Finnish model when the language is Finnish, so Finnish Whisper always sends
+ * "fi", and Whisper large never does: it recognises Finnish itself.
+ */
+export function engineRequest(
+  engine: EngineId,
+  language: Language,
+): { language: Language; preferLocalFirst: boolean } {
+  if (engine === "hh-fi") return { language: "fi", preferLocalFirst: true };
+  if (engine === "hh-large")
+    return {
+      language: language === "en" ? "en" : "auto",
+      preferLocalFirst: true,
+    };
+  return { language, preferLocalFirst: false };
+}
+
+/** Whether the language setting reaches any of these models. */
+export function languageMatters(engines: EngineId[]): boolean {
+  return engines.some((engine) => engine !== "hh-fi");
+}
+
 export interface TranscriberOptions {
   language: Language;
-  /** Try the HH Whisper server first; the cloud model is the fallback. */
-  preferLocalFirst: boolean;
+  /** The models to run, at the same time, in this order. */
+  engines: EngineId[];
   diarization: boolean;
   speakerCount: string;
   minSpeakers: string;
@@ -37,7 +104,7 @@ export interface TranscriberOptions {
 
 export const DEFAULT_OPTIONS: TranscriberOptions = {
   language: "auto",
-  preferLocalFirst: true,
+  engines: ["hh-fi"],
   diarization: false,
   speakerCount: "",
   minSpeakers: "",
@@ -65,11 +132,11 @@ export const EXAMPLES: TranscriberExample[] = [
     id: "note",
     title: "A short voice note",
     summary:
-      "A 14-second Finnish note about a defect on a site. The quickest way to see the result.",
+      "A 14-second Finnish note about a defect on a site, read by three models at once.",
     url: "/Sample11.m4a",
     fileName: "Sample11.m4a",
-    tags: ["Finnish", "14 s", "timed text"],
-    options: { language: "fi" },
+    tags: ["Finnish", "14 s", "3 models side by side"],
+    options: { engines: ["hh-fi", "hh-large", "openai"] },
   },
   {
     id: "meeting",
@@ -80,7 +147,7 @@ export const EXAMPLES: TranscriberExample[] = [
     fileName: "site-meeting-fi.mp3",
     tags: ["Finnish", "46 s", "2 speakers"],
     options: {
-      language: "fi",
+      engines: ["hh-fi"],
       diarization: true,
       minSpeakers: "2",
       maxSpeakers: "2",
@@ -95,7 +162,7 @@ export const EXAMPLES: TranscriberExample[] = [
     fileName: "sample2.m4a",
     tags: ["Finnish", "47 s", "fixed errors"],
     options: {
-      language: "fi",
+      engines: ["hh-fi"],
       fixErrors: true,
       context:
         "A construction site diary. The site is at Kometankuja 6. Terms: alihankkija, konekuljettaja, ulkoverhous.",
@@ -105,11 +172,11 @@ export const EXAMPLES: TranscriberExample[] = [
     id: "consultation",
     title: "A consultation in English",
     summary:
-      "A 93-second medical consultation summary. Turn the HH server off to read it with the cloud model instead.",
+      "A 93-second medical consultation summary, read by the HH server's general model and by OpenAI.",
     url: "/sample.mp3",
     fileName: "sample.mp3",
-    tags: ["English", "93 s"],
-    options: { language: "en" },
+    tags: ["English", "93 s", "2 models"],
+    options: { language: "en", engines: ["hh-large", "openai"] },
   },
 ];
 
@@ -253,4 +320,44 @@ export function applyChanges(parts: DiffPart[], accepted: Set<number>): string {
 export function downloadName(filename: string, suffix: string): string {
   const stem = filename.replace(/\.[^.]+$/, "") || "transcript";
   return `${stem}${suffix}`;
+}
+
+/** A word as the comparison sees it: lower-cased, without punctuation. */
+function comparable(word: string): string {
+  return word.toLowerCase().replace(/[^\p{L}\p{N}]/gu, "");
+}
+
+/** Longest texts whose word differences are marked (base words x other words). */
+export const MAX_DIFF_CELLS = 4_000_000;
+
+/**
+ * For each word of `other`, whether it is missing from the shared run of words
+ * with `base` (a longest common subsequence, case and punctuation ignored).
+ * Null when the texts are too long to compare in the browser.
+ */
+export function differingWords(base: string, other: string): boolean[] | null {
+  const a = base.split(/\s+/).filter(Boolean).map(comparable);
+  const words = other.split(/\s+/).filter(Boolean);
+  const b = words.map(comparable);
+  if (a.length * b.length > MAX_DIFF_CELLS) return null;
+  const width = b.length + 1;
+  const lengths = new Uint16Array((a.length + 1) * width);
+  for (let i = a.length - 1; i >= 0; i--)
+    for (let j = b.length - 1; j >= 0; j--)
+      lengths[i * width + j] =
+        a[i] === b[j]
+          ? lengths[(i + 1) * width + j + 1] + 1
+          : Math.max(lengths[(i + 1) * width + j], lengths[i * width + j + 1]);
+  const differs = b.map((word) => word !== "");
+  let i = 0;
+  let j = 0;
+  while (i < a.length && j < b.length) {
+    if (a[i] === b[j]) {
+      differs[j] = false;
+      i++;
+      j++;
+    } else if (lengths[(i + 1) * width + j] >= lengths[i * width + j + 1]) i++;
+    else j++;
+  }
+  return differs;
 }
