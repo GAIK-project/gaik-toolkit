@@ -71,13 +71,40 @@ export function PrivacyContent() {
 
       <Section icon={Scale} title="Controller and legal basis">
         <p>
-          Controller:{" "}
-          <ToBeFilled what="the controller of this demo and its contact details" />
+          Controller: Haaga-Helia University of Applied Sciences Ltd (business
+          ID 2029188-8), Ratapihantie 13, 00520 Helsinki, Finland, which leads
+          the GAIK project. Contact for the demo: the project team below or{" "}
+          <a
+            href="https://gaik.ai/contact-info/"
+            className="text-teal-600 hover:underline dark:text-teal-400"
+          >
+            gaik.ai/contact-info
+          </a>
+          . Data protection officer:{" "}
+          <a
+            href="mailto:dpo@haaga-helia.fi"
+            className="text-teal-600 hover:underline dark:text-teal-400"
+          >
+            dpo@haaga-helia.fi
+          </a>
+          , who also handles requests to use the rights listed below.
         </p>
-        <p className="mt-2">
-          Legal basis:{" "}
-          <ToBeFilled what="the legal basis for each kind of processing below" />
-        </p>
+        <p className="mt-2">Legal basis:</p>
+        <ul className="mt-1 list-inside list-disc space-y-1">
+          <li>
+            your account, access record, uploads and demo inputs: your consent,
+            given when you request access and run a demo; you can withdraw it by
+            asking us to delete your account
+          </li>
+          <li>
+            logs and usage limits: our legitimate interest in keeping the demo
+            secure and preventing misuse
+          </li>
+          <li>
+            analytics: our legitimate interest in improving the demos; Do Not
+            Track opts you out
+          </li>
+        </ul>
       </Section>
 
       <Section icon={Eye} title="Account details and feedback">
@@ -119,11 +146,11 @@ export function PrivacyContent() {
         <p>
           The files you upload and the text, questions, web addresses and
           recordings you enter go to the demo&apos;s server on CSC&apos;s Rahti
-          service, which checks each file for malware, and from there to the
-          services below. The server reads each file in memory or in a temporary
-          file, and most demos drop it when the request ends. Some keep what you
-          enter or what they produce for a while, so you can go on working with
-          it. The longest the server keeps them:
+          service, which checks that each file&apos;s type and content match,
+          and from there to the services below. The server reads each file in
+          memory or in a temporary file, and most demos drop it when the request
+          ends. Some keep what you enter or what they produce for a while, so
+          you can go on working with it. The longest the server keeps them:
         </p>
         <ul className="mt-1 list-inside list-disc space-y-1">
           <li>
@@ -164,10 +191,30 @@ export function PrivacyContent() {
           server to that server. If you enter your own model key, they go to the
           provider of that key, on its terms.
         </p>
-        <p className="mt-2">
-          How long these services keep them:{" "}
-          <ToBeFilled what="each service's retention period for prompts and files" />
-        </p>
+        <p className="mt-2">How long these services keep them:</p>
+        <ul className="mt-1 list-inside list-disc space-y-1">
+          <li>
+            Azure OpenAI (GPT models): the model keeps nothing between requests.
+            Microsoft&apos;s abuse monitoring may store a prompt and its output
+            for human review, in the same geography, and they are not used to
+            train models.
+          </li>
+          <li>
+            Claude models in Microsoft Foundry: Anthropic processes prompts and
+            outputs as an independent processor, under its commercial terms and
+            data processing addendum.
+          </li>
+          <li>
+            Gemini on Vertex AI: Google may cache inputs and outputs for up to
+            24 hours and log prompts for abuse monitoring for up to 90 days, and
+            does not use them to train models without permission.
+          </li>
+          <li>CSC Aitta: prompts and responses are not stored permanently.</li>
+          <li>
+            HH Parser and Haaga-Helia&apos;s Whisper server:{" "}
+            <ToBeFilled what="how long these Haaga-Helia services keep files" />
+          </li>
+        </ul>
       </Section>
 
       <Section icon={ScrollText} title="Logs and usage limits">
@@ -188,11 +235,15 @@ export function PrivacyContent() {
           the wizard. These counts do not expire.
         </p>
         <p className="mt-2">
-          Where Upstash Redis is hosted:{" "}
-          <ToBeFilled what="the Upstash Redis region" />
+          Upstash Redis is hosted on AWS in London, United Kingdom, a country
+          the EU recognises as protecting personal data adequately.
         </p>
         <p className="mt-2">
-          How long logs are kept: <ToBeFilled what="the log retention period" />
+          How long logs are kept: the server&apos;s own log is kept until the
+          server is next restarted or updated. The project&apos;s monitoring
+          service keeps error lines, with a few lines around each, for 30 days,
+          and records of each request&apos;s path, outcome and duration for 90
+          days.
         </p>
       </Section>
 
@@ -210,8 +261,8 @@ export function PrivacyContent() {
           opt out by enabling Do Not Track in your browser settings.
         </p>
         <p className="mt-2">
-          How long analytics data is kept:{" "}
-          <ToBeFilled what="the analytics retention period" />
+          How long analytics data is kept: one year, PostHog&apos;s retention
+          period for our plan.
         </p>
       </Section>
 
