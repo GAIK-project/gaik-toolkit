@@ -1,7 +1,7 @@
 "use client";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Play, Upload } from "lucide-react";
+import { Play, Upload, type LucideIcon } from "lucide-react";
 import { useRef, useState, type ComponentType } from "react";
 
 export type Choice = "example" | "create";
@@ -18,16 +18,46 @@ export interface UseCaseChooserProps {
   CreateSection: ComponentType;
 }
 
+function Option({
+  value,
+  icon: Icon,
+  label,
+  description,
+}: {
+  value: Choice;
+  icon: LucideIcon;
+  label: string;
+  description: string;
+}) {
+  return (
+    <TabsTrigger
+      value={value}
+      className="group/option h-auto flex-col items-start gap-0.5 px-4 py-2.5 text-left whitespace-normal"
+    >
+      <span className="flex items-center gap-2 text-sm font-semibold sm:text-base">
+        <Icon
+          aria-hidden
+          className="group-data-[state=active]/option:text-primary"
+        />
+        {label}
+      </span>
+      <span className="text-muted-foreground hidden text-xs font-normal sm:block">
+        {description}
+      </span>
+    </TabsTrigger>
+  );
+}
+
 /**
- * The two ways into a demo as one switch: the built-in example, or the user's own
- * data. Both labels stay in view, so neither section hides the other, and one line
- * under the switch says what the open one does.
+ * The two ways into a demo as one switch across the page: the built-in example, or
+ * the user's own files. Each option says what it does, so both meanings are in view
+ * before anything is pressed, and neither section hides the other.
  */
 export function UseCaseChooser({
   initialChoice = "example",
-  exampleLabel = "Built-in example",
+  exampleLabel = "Try the example",
   exampleDescription,
-  createLabel = "Your own data",
+  createLabel = "Use your own files",
   createDescription,
   ExampleSection,
   CreateSection,
@@ -49,21 +79,26 @@ export function UseCaseChooser({
       onValueChange={(value) => setOpen(value as Choice)}
       className="scroll-mt-24 gap-4 pt-2"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+      <div className="space-y-2">
         <TabsList
           aria-label="What would you like to do?"
-          className="grid h-10 w-full grid-cols-2 sm:inline-flex sm:w-fit"
+          className="grid h-auto w-full grid-cols-2 p-1 group-data-[orientation=horizontal]/tabs:h-auto"
         >
-          <TabsTrigger value="example" className="gap-2 px-4">
-            <Play aria-hidden />
-            {exampleLabel}
-          </TabsTrigger>
-          <TabsTrigger value="create" className="gap-2 px-4">
-            <Upload aria-hidden />
-            {createLabel}
-          </TabsTrigger>
+          <Option
+            value="example"
+            icon={Play}
+            label={exampleLabel}
+            description={exampleDescription}
+          />
+          <Option
+            value="create"
+            icon={Upload}
+            label={createLabel}
+            description={createDescription}
+          />
         </TabsList>
-        <p className="text-muted-foreground text-sm">
+        {/* On a phone the options carry only their labels; the open one is told here. */}
+        <p className="text-muted-foreground text-sm sm:hidden">
           {open === "example" ? exampleDescription : createDescription}
         </p>
       </div>
