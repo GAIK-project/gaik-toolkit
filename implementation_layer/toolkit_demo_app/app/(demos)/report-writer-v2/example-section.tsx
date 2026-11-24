@@ -31,9 +31,6 @@ export function ReportWriterExampleSection({
     <div className="space-y-6">
       <ExampleOverview rw={rw} />
 
-      <p className="text-muted-foreground text-sm">
-        Running the example uses AI models and takes about two minutes.
-      </p>
       <StageStepper
         artifacts={rw.artifacts}
         stale={rw.stale}
@@ -44,6 +41,7 @@ export function ReportWriterExampleSection({
         onRun={rw.run}
         onStop={rw.stop}
         runAllHint="The example is loading."
+        description="Uses AI models and takes about two minutes."
       />
 
       <ReportResults rw={rw} />

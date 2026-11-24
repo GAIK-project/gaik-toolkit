@@ -1,6 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -194,6 +193,16 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
     },
   ];
   const current = docs.find((doc) => doc.name === selected) ?? docs[0];
+  // Stage 1 writes each source as normalized/NN_<stem>.md, the sample as sample_report.md.
+  const stem = current?.name.replace(/\.[^.]+$/, "");
+  const readPath =
+    current?.group === "sample"
+      ? "sample_report.md"
+      : Object.keys(rw.artifacts).find(
+          (path) =>
+            path.startsWith("normalized/") && path.endsWith(`_${stem}.md`),
+        );
+  const readText = readPath ? rw.artifacts[readPath] : undefined;
 
   if (!example || docs.length === 0)
     return (
@@ -234,7 +243,7 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
                   <div
                     role="radiogroup"
                     aria-label={group.title}
-                    className="space-y-1.5"
+                    className="space-y-0.5"
                   >
                     {items.map((doc) => {
                       const Icon = kindOf(doc.name).icon;
@@ -246,23 +255,26 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
                           role="radio"
                           aria-checked={active}
                           onClick={() => setSelected(doc.name)}
+                          title={doc.name}
                           className={cn(
-                            "flex w-full items-center gap-3 rounded-lg border-2 px-3 py-2 text-left transition-colors",
+                            "flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left text-sm transition-colors",
                             active
-                              ? "border-primary bg-primary/5"
-                              : "bg-card hover:border-primary/40",
+                              ? "bg-primary/10 text-foreground font-medium"
+                              : "hover:bg-muted",
                           )}
                         >
-                          <span className="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-md">
-                            <Icon className="size-4" />
+                          <Icon
+                            className={cn(
+                              "size-4 shrink-0",
+                              active ? "text-primary" : "text-muted-foreground",
+                            )}
+                            aria-hidden
+                          />
+                          <span className="min-w-0 flex-1 truncate">
+                            {labelOf(doc.name)}
                           </span>
-                          <span className="min-w-0">
-                            <span className="block truncate text-sm font-medium">
-                              {labelOf(doc.name)}
-                            </span>
-                            <span className="text-muted-foreground block truncate text-xs">
-                              {doc.name}
-                            </span>
+                          <span className="text-muted-foreground shrink-0 text-xs font-normal uppercase">
+                            {ext(doc.name)}
                           </span>
                         </button>
                       );
@@ -273,7 +285,8 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
             })}
           </div>
 
-          <div className="min-w-0 space-y-3 border-t pt-4 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-4">
+          {/* Sticky beside the longer list, so the picked source stays in view. */}
+          <div className="min-w-0 space-y-3 border-t pt-4 lg:sticky lg:top-24 lg:self-start lg:border-t-0 lg:border-l lg:pt-0 lg:pl-4">
             <div>
               <h4 className="font-semibold">{labelOf(current.name)}</h4>
               <p className="text-muted-foreground text-sm">
@@ -283,6 +296,19 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
               </p>
             </div>
             <Preview key={current.name} doc={current} />
+            <div className="space-y-1.5 border-t pt-3">
+              <h5 className="text-sm font-medium">What stage 1 read</h5>
+              {readText ? (
+                <pre className="bg-muted/50 h-72 overflow-auto rounded-md p-3 font-sans text-xs leading-relaxed whitespace-pre-wrap">
+                  {readText}
+                </pre>
+              ) : (
+                <p className="bg-muted/30 text-muted-foreground flex h-72 items-center justify-center rounded-md border border-dashed p-6 text-center text-sm">
+                  The text stage 1 reads from this file appears here after the
+                  Normalize stage.
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
@@ -295,13 +321,14 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
               An item that no source covers is marked as missing.
             </p>
           </div>
-          <ol className="grid gap-2 md:grid-cols-2">
+          {/* Two columns read top to bottom, so the sections keep their order. */}
+          <ol className="gap-x-6 md:columns-2">
             {rw.sections.map((section, index) => {
               const derived = section.depends_on.length > 0;
               return (
                 <li
                   key={effectiveId(section)}
-                  className="bg-card flex gap-3 rounded-lg border p-3"
+                  className="mb-3 flex break-inside-avoid gap-3"
                 >
                   <span className="bg-primary/10 text-primary flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold">
                     {index + 1}
@@ -312,9 +339,9 @@ export function ExampleOverview({ rw }: { rw: ReportWriter }) {
                         {section.title}
                       </span>
                       {derived && (
-                        <Badge variant="outline" className="font-normal">
-                          written from the other sections
-                        </Badge>
+                        <span className="text-muted-foreground text-xs">
+                          from the other sections
+                        </span>
                       )}
                     </span>
                     <span className="text-muted-foreground line-clamp-2 block text-xs">

@@ -1,17 +1,17 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { ChevronDown, Play, Wand2 } from "lucide-react";
-import { useId, useRef, useState, type ComponentType } from "react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Play, Upload } from "lucide-react";
+import { useRef, useState, type ComponentType } from "react";
 
 export type Choice = "example" | "create";
 
 export interface UseCaseChooserProps {
-  /** Which section is open at first. Neither, by default. */
-  initialChoice?: Choice | null;
-  exampleTitle?: string;
+  /** Which way is open at first: the built-in example, so the demo opens ready to try. */
+  initialChoice?: Choice;
+  exampleLabel?: string;
   exampleDescription: string;
-  createTitle: string;
+  createLabel?: string;
   createDescription: string;
   /** Shown when the example is open. `onCreate` switches to the other section. */
   ExampleSection: ComponentType<{ onCreate: () => void }>;
@@ -19,106 +19,60 @@ export interface UseCaseChooserProps {
 }
 
 /**
- * The two ways into a demo, as two cards that are always visible. Choosing one opens
- * its section below; choosing it again closes it. Neither is open at first, so nobody
- * has to scroll past one section to find the other.
+ * The two ways into a demo as one switch: the built-in example, or the user's own
+ * data. Both labels stay in view, so neither section hides the other, and one line
+ * under the switch says what the open one does.
  */
 export function UseCaseChooser({
-  initialChoice = null,
-  exampleTitle = "Try a built-in example",
+  initialChoice = "example",
+  exampleLabel = "Built-in example",
   exampleDescription,
-  createTitle,
+  createLabel = "Your own data",
   createDescription,
   ExampleSection,
   CreateSection,
 }: UseCaseChooserProps) {
-  const [open, setOpen] = useState<Choice | null>(initialChoice);
-  const contentId = useId();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState<Choice>(initialChoice);
+  const rootRef = useRef<HTMLDivElement>(null);
 
-  const choose = (choice: Choice) => {
-    const next = open === choice ? null : choice;
-    setOpen(next);
-    if (next) {
-      requestAnimationFrame(() =>
-        contentRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-        }),
-      );
-    }
+  const openCreate = () => {
+    setOpen("create");
+    requestAnimationFrame(() =>
+      rootRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
   };
 
   return (
-    <div className="space-y-6">
-      <div
-        role="group"
-        aria-label="What would you like to do?"
-        className="grid items-stretch gap-4 lg:grid-cols-2"
-      >
-        <button
-          type="button"
-          aria-controls={contentId}
-          aria-expanded={open === "example"}
-          onClick={() => choose("example")}
-          className={cn(
-            "bg-card flex items-start gap-3 rounded-2xl border-2 p-4 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md motion-reduce:hover:translate-y-0 sm:gap-4 sm:p-6",
-            open === "example" ? "border-primary" : "border-border",
-          )}
+    <Tabs
+      ref={rootRef}
+      value={open}
+      onValueChange={(value) => setOpen(value as Choice)}
+      className="scroll-mt-24 gap-4 pt-2"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+        <TabsList
+          aria-label="What would you like to do?"
+          className="grid h-10 w-full grid-cols-2 sm:inline-flex sm:w-fit"
         >
-          <span className="bg-primary/10 text-primary flex size-11 shrink-0 items-center justify-center rounded-xl">
-            <Play className="size-5" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block text-lg font-semibold">{exampleTitle}</span>
-            <span className="text-muted-foreground block text-sm">
-              {exampleDescription}
-            </span>
-          </span>
-          <ChevronDown
-            className={cn(
-              "text-muted-foreground mt-1 size-5 shrink-0 transition-transform",
-              open === "example" && "rotate-180",
-            )}
-          />
-        </button>
-
-        <button
-          type="button"
-          aria-controls={contentId}
-          aria-expanded={open === "create"}
-          onClick={() => choose("create")}
-          className={cn(
-            "border-primary/50 from-primary/15 via-card to-card ring-primary/20 flex items-start gap-3 rounded-2xl border-2 bg-gradient-to-br p-5 text-left shadow-lg ring-4 transition-all hover:-translate-y-0.5 hover:shadow-xl motion-reduce:hover:translate-y-0 sm:gap-5 sm:p-8",
-            open === "create" && "border-primary",
-          )}
-        >
-          <span className="bg-primary text-primary-foreground flex size-11 shrink-0 items-center justify-center rounded-xl shadow-sm sm:size-14">
-            <Wand2 className="size-6 sm:size-7" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block font-serif text-xl font-semibold md:text-2xl">
-              {createTitle}
-            </span>
-            <span className="text-muted-foreground block text-sm">
-              {createDescription}
-            </span>
-          </span>
-          <ChevronDown
-            className={cn(
-              "text-primary mt-2 size-6 shrink-0 transition-transform",
-              open === "create" && "rotate-180",
-            )}
-          />
-        </button>
+          <TabsTrigger value="example" className="gap-2 px-4">
+            <Play aria-hidden />
+            {exampleLabel}
+          </TabsTrigger>
+          <TabsTrigger value="create" className="gap-2 px-4">
+            <Upload aria-hidden />
+            {createLabel}
+          </TabsTrigger>
+        </TabsList>
+        <p className="text-muted-foreground text-sm">
+          {open === "example" ? exampleDescription : createDescription}
+        </p>
       </div>
-
-      <div id={contentId} ref={contentRef} className="scroll-mt-24">
-        {open === "example" && (
-          <ExampleSection onCreate={() => choose("create")} />
-        )}
-        {open === "create" && <CreateSection />}
-      </div>
-    </div>
+      <TabsContent value="example">
+        <ExampleSection onCreate={openCreate} />
+      </TabsContent>
+      <TabsContent value="create">
+        <CreateSection />
+      </TabsContent>
+    </Tabs>
   );
 }

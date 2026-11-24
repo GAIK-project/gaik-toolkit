@@ -8,9 +8,8 @@ import { ExampleShowcase } from "./example-showcase";
 export function UseCaseChooser() {
   return (
     <Chooser
-      exampleDescription="Choose a single-file extraction or a multi-file order with pricing."
-      createTitle="Test with your own data or examples (extraction only)"
-      createDescription="Choose the fields to extract from a purchase order, with optional bills of materials."
+      exampleDescription="A single-file extraction, or a multi-file order priced from a price list."
+      createDescription="Extraction only: pick the fields to read from your purchase order, with optional bills of materials."
       ExampleSection={ExampleShowcase}
       CreateSection={CustomUseCase}
     />

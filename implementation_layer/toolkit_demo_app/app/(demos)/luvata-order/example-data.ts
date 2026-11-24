@@ -174,15 +174,15 @@ export const EXAMPLE_CASES: {
 }[] = [
   {
     value: "single",
-    title: "Single-file purchase order (extraction only)",
-    description: "One PO PDF, read into header fields and line items.",
+    title: "Extraction",
+    description:
+      "One purchase order PDF, read into header fields and line items.",
   },
   {
     value: "multi",
-    title:
-      "Purchase order + BOMs + price list (Extraction and order draft generation)",
+    title: "Order with pricing",
     description:
-      "A PO, its bills of materials and a price list, turned into a priced order.",
+      "A purchase order, its bills of materials and a price list, turned into a priced order draft.",
   },
 ];
 

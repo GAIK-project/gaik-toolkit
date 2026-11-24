@@ -145,7 +145,7 @@ export function ExtractionExampleSection({
               )}
             </div>
             <div className="space-y-2">
-              <h3 className="text-sm font-semibold">Extracted by AI</h3>
+              <h3 className="text-sm font-semibold">Fields AI reads</h3>
               <div className="flex flex-wrap gap-1.5">
                 {config.exampleFieldLabels.map((label) => (
                   <span

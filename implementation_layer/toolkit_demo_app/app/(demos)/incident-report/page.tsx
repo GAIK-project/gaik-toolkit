@@ -35,7 +35,6 @@ export default function IncidentReportPage() {
 
       <UseCaseChooser
         exampleDescription="Try a shift log with two incidents, a Finnish report or a recording."
-        createTitle="Test on your own data or examples"
         createDescription="Pick the fields and language for your reports, then download them as a PDF."
         ExampleSection={ExampleSection}
         CreateSection={CreateSection}

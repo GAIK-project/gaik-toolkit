@@ -33,7 +33,6 @@ export default function DiaryPage() {
 
       <UseCaseChooser
         exampleDescription="Try English and Finnish examples, including a diary that covers several days."
-        createTitle="Test on your own data or examples"
         createDescription="Pick the fields and language for your daily entries, then download them as a PDF."
         ExampleSection={ExampleSection}
         CreateSection={CreateSection}
