@@ -6,7 +6,6 @@ import { UseCaseChooser } from "@/components/demo/use-case-chooser";
 import { WizardBanner } from "@/components/demo/wizard-banner";
 import { FeedbackButton } from "@/components/feedback";
 import { FilePen } from "lucide-react";
-import { useSearchParams } from "next/navigation";
 import { Suspense, useContext } from "react";
 import { ReportWriterCreateSection } from "./create-section";
 import { ReportWriterExampleSection } from "./example-section";
@@ -24,8 +23,6 @@ function CreateSection() {
 
 function ReportWriterPage() {
   const rw = useReportWriter();
-  // The Construction Report Writing use case links here with ?example=<id>.
-  const opensExample = useSearchParams().has("example");
 
   return (
     <ReportWriterContext.Provider value={rw}>
@@ -44,9 +41,7 @@ function ReportWriterPage() {
           </DemoPageHeader>
 
           <UseCaseChooser
-            initialChoice={opensExample ? "example" : null}
-            exampleDescription="Write a construction report from site recordings and customer documents, with evidence for each section."
-            createTitle="Test on your own data or examples"
+            exampleDescription="Run a ready-made case and check the evidence behind each section."
             createDescription="Set your own report sections and rules, and edit the stage outputs before continuing."
             ExampleSection={ExampleSection}
             CreateSection={CreateSection}

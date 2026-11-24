@@ -68,6 +68,7 @@ export function StageStepper({
   onRun,
   onStop,
   runAllHint,
+  description,
   stacked = false,
 }: {
   artifacts: Record<string, string>;
@@ -80,6 +81,8 @@ export function StageStepper({
   onStop: () => void;
   /** Says what is missing, when Run all is not possible yet. */
   runAllHint?: string;
+  /** One line under the title, such as how long a run takes. */
+  description?: string;
   /** One stage under the other, for a narrow column. */
   stacked?: boolean;
 }) {
@@ -99,7 +102,12 @@ export function StageStepper({
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0 pb-3">
-        <CardTitle className="text-base">Write the report</CardTitle>
+        <div className="space-y-1">
+          <CardTitle className="text-base">Write the report</CardTitle>
+          {description && (
+            <p className="text-muted-foreground text-sm">{description}</p>
+          )}
+        </div>
         <div className="flex gap-2">
           <RunButton
             running={busy}

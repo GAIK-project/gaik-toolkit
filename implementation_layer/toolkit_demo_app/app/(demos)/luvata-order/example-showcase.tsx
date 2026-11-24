@@ -55,11 +55,6 @@ const PIPELINES = {
     { icon: Calculator, label: "Price", detail: "Material plus fees" },
     { icon: FileText, label: "Order draft", detail: "Totals and PDF" },
   ],
-  single: [
-    { icon: FileText, label: "Document", detail: "One purchase order PDF" },
-    { icon: Sparkles, label: "Extract", detail: "AI reads the fields" },
-    { icon: Table2, label: "Structured data", detail: "Header and line items" },
-  ],
 };
 
 async function detail(response: Response, fallback: string) {
@@ -232,7 +227,7 @@ const MULTI_GUIDE_STEPS: GuideStep[] = [
   {
     icon: Layers,
     title: "Pick an example",
-    text: "Single-file purchase order, or purchase order + BOMs + price list. The two cards below switch between them.",
+    text: "Extraction from one purchase order, or an order priced from its BOMs and a price list. The switch at the top of the example changes it.",
   },
   {
     icon: FileSearch,
@@ -257,7 +252,7 @@ const SINGLE_GUIDE_STEPS: GuideStep[] = [
   {
     icon: Layers,
     title: "Pick an example",
-    text: "Single-file purchase order, or purchase order + BOMs + price list.",
+    text: "Extraction from one purchase order, or an order priced from its BOMs and a price list.",
   },
   {
     icon: FileSearch,
@@ -497,73 +492,70 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
       <Card>
         <CardContent className="space-y-6 pt-6">
           {/* Which example to look at */}
-          <div
-            role="radiogroup"
-            aria-label="Example"
-            className="grid gap-3 sm:grid-cols-2"
-          >
-            {EXAMPLE_CASES.map(({ value, title, description }) => (
-              <label
-                key={value}
-                className={cn(
-                  "has-checked:border-primary has-checked:bg-primary/5 flex cursor-pointer items-start gap-3 rounded-xl border p-3.5 transition-colors",
-                  caseKey !== value && "hover:bg-muted/50",
-                  processing && "cursor-not-allowed opacity-60",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="example-case"
-                  value={value}
-                  checked={caseKey === value}
-                  disabled={processing}
-                  onChange={() => changeCase(value)}
-                  className="sr-only"
-                />
-                <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
-                  {value === "single" ? (
-                    <FileText className="size-4" />
-                  ) : (
-                    <Files className="size-4" />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
+            <div
+              role="radiogroup"
+              aria-label="Example"
+              className="bg-muted grid w-full grid-cols-2 rounded-lg p-[3px] sm:inline-grid sm:w-fit"
+            >
+              {EXAMPLE_CASES.map(({ value, title }) => (
+                <label
+                  key={value}
+                  className={cn(
+                    "has-checked:bg-background has-checked:text-foreground text-muted-foreground has-focus-visible:ring-ring flex cursor-pointer items-center justify-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors has-checked:shadow-sm has-focus-visible:ring-2",
+                    processing && "cursor-not-allowed opacity-60",
                   )}
-                </span>
-                <span>
-                  <span className="block font-semibold">{title}</span>
-                  <span className="text-muted-foreground block text-sm">
-                    {description}
-                  </span>
-                </span>
-              </label>
-            ))}
+                >
+                  <input
+                    type="radio"
+                    name="example-case"
+                    value={value}
+                    checked={caseKey === value}
+                    disabled={processing}
+                    onChange={() => changeCase(value)}
+                    className="sr-only"
+                  />
+                  {value === "single" ? (
+                    <FileText className="size-4" aria-hidden />
+                  ) : (
+                    <Files className="size-4" aria-hidden />
+                  )}
+                  {title}
+                </label>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-sm">
+              {
+                EXAMPLE_CASES.find((entry) => entry.value === caseKey)
+                  ?.description
+              }
+            </p>
           </div>
 
-          {/* The path from documents to the result */}
-          <ol
-            className={cn(
-              "grid gap-2",
-              single ? "sm:grid-cols-3" : "sm:grid-cols-5",
-            )}
-          >
-            {PIPELINES[caseKey].map(({ icon: Icon, label, detail }, index) => (
-              <li
-                key={label}
-                className="bg-muted/40 relative flex items-center gap-3 rounded-xl border p-3"
-              >
-                <span className="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-lg">
-                  <Icon className="size-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-sm font-semibold">{label}</span>
-                  <span className="text-muted-foreground block text-xs">
-                    {detail}
+          {/* The path from documents to a priced order: matching and pricing need saying. */}
+          {!single && (
+            <ol className="grid gap-2 sm:grid-cols-5">
+              {PIPELINES.multi.map(({ icon: Icon, label, detail }, index) => (
+                <li
+                  key={label}
+                  className="bg-muted/40 relative flex items-center gap-3 rounded-xl border p-3"
+                >
+                  <span className="bg-primary/10 text-primary flex size-8 shrink-0 items-center justify-center rounded-lg">
+                    <Icon className="size-4" />
                   </span>
-                </span>
-                {index < PIPELINES[caseKey].length - 1 && (
-                  <ArrowRight className="text-muted-foreground/50 absolute top-1/2 -right-2.5 z-10 hidden size-4 -translate-y-1/2 sm:block" />
-                )}
-              </li>
-            ))}
-          </ol>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{label}</span>
+                    <span className="text-muted-foreground block text-xs">
+                      {detail}
+                    </span>
+                  </span>
+                  {index < PIPELINES.multi.length - 1 && (
+                    <ArrowRight className="text-muted-foreground/50 absolute top-1/2 -right-2.5 z-10 hidden size-4 -translate-y-1/2 sm:block" />
+                  )}
+                </li>
+              ))}
+            </ol>
+          )}
 
           {/* The documents, and what is read from each */}
           <div
@@ -632,7 +624,7 @@ export function ExampleShowcase({ onCreate }: { onCreate?: () => void }) {
                 <div className="space-y-3">
                   <p className="text-sm font-semibold">
                     {active.method === "ai"
-                      ? "Extracted by AI"
+                      ? "Fields AI reads"
                       : "Read from the sheet"}
                   </p>
                   {(
