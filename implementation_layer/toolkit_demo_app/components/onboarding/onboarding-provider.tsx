@@ -127,13 +127,20 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       return;
     }
     const { driver } = await import("driver.js");
-    // A tour started from another page (?tour=1) can run before the home page's
-    // anchors are on screen: wait for the first one briefly, and if none shows,
-    // drive every stop rather than none.
-    for (let wait = 0; wait < 20 && visibleSteps().length === 0; wait++) {
+    // A tour started from another page (?tour=1) runs right after the home page
+    // loads: wait up to three seconds for its anchors and for the model menu,
+    // which is a spinner until the model list arrives.
+    for (
+      let wait = 0;
+      wait < 30 &&
+      (visibleSteps().length === 0 ||
+        document.querySelector('[aria-label="Loading the models"]'));
+      wait++
+    ) {
       await new Promise((resolve) => window.setTimeout(resolve, 100));
     }
     const steps = visibleSteps();
+    if (steps.length === 0) return;
     driver({
       showProgress: true,
       smoothScroll: true,
@@ -141,7 +148,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
       nextBtnText: "Next",
       prevBtnText: "Back",
       doneBtnText: "Done",
-      steps: steps.length > 0 ? steps : TOUR_STEPS,
+      steps,
     }).drive();
   }, []);
 

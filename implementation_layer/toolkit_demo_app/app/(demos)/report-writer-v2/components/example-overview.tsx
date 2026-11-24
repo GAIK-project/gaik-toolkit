@@ -143,11 +143,7 @@ function Preview({ doc }: { doc: Doc }) {
           </Button>
         )}
         <Button asChild size="sm" variant="outline">
-          <a
-            href={url}
-            download={doc.name}
-            aria-label={`Download ${doc.name}`}
-          >
+          <a href={url} download={doc.name} aria-label={`Download ${doc.name}`}>
             <Download className="size-4" />
             Download file
           </a>

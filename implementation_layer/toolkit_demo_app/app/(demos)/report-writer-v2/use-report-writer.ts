@@ -148,6 +148,8 @@ export function useReportWriter() {
 
   // Runs
   const [running, setRunning] = useState<Stage | null>(null);
+  // Runs that ended with every stage done: not a stop, a failure or a rate limit.
+  const [finishedRuns, setFinishedRuns] = useState(0);
   const [progress, setProgress] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -471,6 +473,7 @@ export function useReportWriter() {
     try {
       for (const stage of stages)
         ws = await runStage(stage, ws, controller.signal);
+      setFinishedRuns((count) => count + 1);
       if (stages.includes("synthesize") || stages.includes("rebuild"))
         toast.success("Report ready");
     } catch (e) {
@@ -546,6 +549,7 @@ export function useReportWriter() {
     ready,
     // runs
     running,
+    finishedRuns,
     busy,
     progress,
     error,

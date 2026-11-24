@@ -81,22 +81,20 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
     setSettings,
   } = rw;
 
-  // The report and the evidence need the page's whole width: once a stage has
-  // written something, the results sit under both columns instead of in the right
-  // one, and a finished run scrolls to them.
-  const hasResults = rw.paths.length > 0;
+  // The report and the evidence need the page's whole width, so they sit under
+  // both columns. A run that finished scrolls to them; a stopped or failed one
+  // leaves the page where its error shows, in the stage column.
   const resultsRef = useRef<HTMLDivElement>(null);
-  const wasRunning = useRef(false);
+  const seenRuns = useRef(rw.finishedRuns);
   useEffect(() => {
-    if (wasRunning.current && !rw.running && hasResults) {
-      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
-      resultsRef.current?.scrollIntoView({
-        behavior: reduce.matches ? "auto" : "smooth",
-        block: "start",
-      });
-    }
-    wasRunning.current = rw.running !== null;
-  }, [rw.running, hasResults]);
+    if (rw.finishedRuns === seenRuns.current) return;
+    seenRuns.current = rw.finishedRuns;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+    resultsRef.current?.scrollIntoView({
+      behavior: reduce.matches ? "auto" : "smooth",
+      block: "start",
+    });
+  }, [rw.finishedRuns]);
 
   return (
     <div className="space-y-6">
@@ -299,7 +297,8 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
           </Card>
         </div>
 
-        {/* Running it and what comes out */}
+        {/* Running it. From lg the stage buttons stay in view beside the form
+            while it scrolls, and end just above the results. */}
         <div className="space-y-4">
           <HowItWorksCard description="What you define, what each stage does, and how to edit in between">
             <p>
@@ -473,32 +472,29 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
             </Accordion>
           </Card>
 
-          <StageStepper
-            artifacts={rw.artifacts}
-            stale={rw.stale}
-            running={rw.running}
-            ready={rw.ready}
-            progress={rw.progress}
-            error={rw.error}
-            onRun={rw.run}
-            onStop={rw.stop}
-            stacked
-            runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
-          />
-          {!hasResults && (
-            <ReportResults
-              rw={rw}
-              emptyText="Add your sources and press Run all three stages. The report and the evidence behind it appear below."
+          <div className="lg:sticky lg:top-24">
+            <StageStepper
+              artifacts={rw.artifacts}
+              stale={rw.stale}
+              running={rw.running}
+              ready={rw.ready}
+              progress={rw.progress}
+              error={rw.error}
+              onRun={rw.run}
+              onStop={rw.stop}
+              stacked
+              runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
             />
-          )}
+          </div>
         </div>
       </div>
 
-      {hasResults && (
-        <div ref={resultsRef} className="scroll-mt-24">
-          <ReportResults rw={rw} />
-        </div>
-      )}
+      <div ref={resultsRef} className="scroll-mt-24">
+        <ReportResults
+          rw={rw}
+          emptyText="Add your sources and press Run all three stages. The report and the evidence behind it appear here."
+        />
+      </div>
     </div>
   );
 }
