@@ -21,9 +21,17 @@ from fastapi.concurrency import run_in_threadpool
 from pydantic import BaseModel
 
 try:
-    from utils.model_settings import get_request_api_config, provider_error_detail
+    from utils.model_settings import (
+        get_request_api_config,
+        provider_error_detail,
+        request_is_staff,
+    )
 except ImportError:
-    from api.utils.model_settings import get_request_api_config, provider_error_detail
+    from api.utils.model_settings import (
+        get_request_api_config,
+        provider_error_detail,
+        request_is_staff,
+    )
 
 try:
     from utils.upload_check import upload_problem
@@ -32,13 +40,13 @@ except ImportError:
 
 try:
     from utils.errors import component_error
-    from utils.model_allow_list import check_model
+    from utils.model_allow_list import check_model, offered_to
 
     from routers.vision_extractor import _offered_models
 except ImportError:
     from api.routers.vision_extractor import _offered_models
     from api.utils.errors import component_error
-    from api.utils.model_allow_list import check_model
+    from api.utils.model_allow_list import check_model, offered_to
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -119,7 +127,19 @@ def _make_judge(provider: JudgeProvider, model: str | None):
     request_config = get_request_api_config()
     if request_config is not None:
         return LLMJudge(config=request_config, model=request_config["model"])
-    check_model(model, _offered_models(_CATALOGUE_PROVIDER[provider]))
+    offered = _offered_models(_CATALOGUE_PROVIDER[provider])
+    if not model and not request_is_staff():
+        # The provider's own default (Sonnet on Foundry, a Gemini preview) may be a
+        # team model: outside the team a judge with no model runs an open one.
+        allowed = offered_to(offered)
+        if not allowed:
+            raise HTTPException(
+                status_code=403,
+                detail="This provider's models are for the GAIK project team. "
+                "Pick another model in the model menu.",
+            )
+        model = allowed[0]
+    check_model(model, offered)
     if provider == "anthropic" and not _provider_configured("anthropic") and _foundry_configured():
         # Claude through the deployment's Azure AI Foundry resource, as the Vision
         # Extractor and the model menu run it; the panel's Claude judge comes here.

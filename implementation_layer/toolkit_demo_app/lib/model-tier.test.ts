@@ -56,3 +56,11 @@ describe("deploymentFor", () => {
     expect(deploymentFor("gpt-6-sol", false)).toBe("gpt-6-sol");
   });
 });
+
+describe("deploymentFor with a deployment the catalogue does not know", () => {
+  test("keeps a custom name, which may be the only deployment", () => {
+    expect(deploymentFor("my-chat-deployment", false)).toBe(
+      "my-chat-deployment",
+    );
+  });
+});

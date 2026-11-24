@@ -233,3 +233,41 @@ def test_csc_aitta_models_are_open(server_env, monkeypatch):
     assert not allow.is_team_only("openai/gpt-oss-120b")
     monkeypatch.setenv("DEMO_OPEN_MODELS", "gpt-6-luna")
     assert not allow.is_team_only("google/gemma-4-31b-it")
+
+
+def test_a_judge_with_no_model_runs_an_open_one_outside_the_team(server_env, monkeypatch):
+    """gaik's Foundry default is Claude Sonnet: a judge with no model named must not
+    run it outside the team."""
+    import gaik.software_components.validators as validators
+
+    built = []
+
+    class FakeJudge:
+        def __init__(self, *args, config=None, model=None, **kwargs):
+            built.append(model)
+
+    monkeypatch.setattr(validators, "LLMJudge", FakeJudge)
+    llm_judge._make_judge("anthropic", None)
+    assert built == ["claude-haiku-5-5"]
+    monkeypatch.setenv("GOOGLE_API_KEY", "g")
+    with pytest.raises(HTTPException) as refused:
+        llm_judge._make_judge("google", None)  # no open Gemini model
+    assert refused.value.status_code == 403
+
+
+def test_rag_collections_are_built_on_an_open_model_for_the_team_too(server_env, monkeypatch):
+    """The example collections are shared, so the team's default (GPT-6 Sol) must not
+    build one that everyone then queries."""
+    from api.utils.config import get_rag_api_config
+
+    monkeypatch.setenv("DEMO_LLM_MODEL", "gpt-6-sol")
+    token = settings._staff.set(True)
+    try:
+        assert get_rag_api_config()["model"] == "gpt-6-luna"
+    finally:
+        settings._staff.reset(token)
+
+
+def test_claude_is_not_offered_without_claude_credentials(server_env, monkeypatch):
+    monkeypatch.delenv("ANTHROPIC_FOUNDRY_API_KEY")
+    assert vision_extractor._offered_models("claude") == ()

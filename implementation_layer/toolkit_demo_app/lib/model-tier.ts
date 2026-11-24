@@ -22,11 +22,14 @@ export function openModels(): string[] {
 
 /**
  * The Azure deployment a demo that runs its model in Next.js uses for this user:
- * the configured one for the team or when it is open, else the first open GPT model.
+ * the configured one for the team, when it is open, or when it is not a GPT-6
+ * model (a name the catalogue does not know may be the only deployment there is);
+ * else the first open GPT model.
  */
 export function deploymentFor(configured: string, staff: boolean): string {
   const open = openModels();
-  if (staff || open.includes(configured)) return configured;
+  if (staff || open.includes(configured) || !configured.startsWith("gpt-6"))
+    return configured;
   return open.find((name) => name.startsWith("gpt-")) ?? configured;
 }
 
