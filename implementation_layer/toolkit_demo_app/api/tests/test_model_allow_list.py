@@ -255,6 +255,28 @@ def test_a_judge_with_no_model_runs_an_open_one_outside_the_team(server_env, mon
     assert refused.value.status_code == 403
 
 
+def test_a_judge_with_no_model_runs_the_server_model(server_env, monkeypatch):
+    """The model menu says the server default runs the judge: GPT-6 Sol for the team,
+    the open GPT-6 Luna outside it, not gaik's AZURE_DEPLOYMENT."""
+    import gaik.software_components.validators as validators
+
+    built = []
+
+    class FakeJudge:
+        def __init__(self, *args, config=None, model=None, **kwargs):
+            built.append(model)
+
+    monkeypatch.setattr(validators, "LLMJudge", FakeJudge)
+    monkeypatch.setenv("DEMO_LLM_MODEL", "gpt-6-sol")
+    llm_judge._make_judge("azure", None)
+    token = settings._staff.set(True)
+    try:
+        llm_judge._make_judge("azure", None)
+    finally:
+        settings._staff.reset(token)
+    assert built == ["gpt-6-luna", "gpt-6-sol"]
+
+
 def test_rag_collections_are_built_on_an_open_model_for_the_team_too(server_env, monkeypatch):
     """The example collections are shared, so the team's default (GPT-6 Sol) must not
     build one that everyone then queries."""

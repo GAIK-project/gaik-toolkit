@@ -39,12 +39,14 @@ except ImportError:
     from api.utils.upload_check import upload_problem
 
 try:
+    from utils.config import server_api_config
     from utils.errors import component_error
     from utils.model_allow_list import check_model, offered_to
 
     from routers.vision_extractor import _offered_models
 except ImportError:
     from api.routers.vision_extractor import _offered_models
+    from api.utils.config import server_api_config
     from api.utils.errors import component_error
     from api.utils.model_allow_list import check_model, offered_to
 
@@ -112,6 +114,15 @@ _CATALOGUE_PROVIDER: dict[str, str] = {
 }
 
 
+def _server_default(provider: JudgeProvider) -> dict | None:
+    """The deployment's server model when the judge asks for its provider, else None."""
+    try:
+        config = server_api_config()
+    except HTTPException:
+        return None
+    return config if config.get("provider") == provider and config.get("model") else None
+
+
 def _make_judge(provider: JudgeProvider, model: str | None):
     """Construct an LLMJudge with friendly errors for missing deps / creds.
 
@@ -127,6 +138,13 @@ def _make_judge(provider: JudgeProvider, model: str | None):
     request_config = get_request_api_config()
     if request_config is not None:
         return LLMJudge(config=request_config, model=request_config["model"])
+    if not model:
+        # No model named, on the server's own provider: the server's model, as the
+        # other demos and the model menu have it (DEMO_LLM_MODEL for the team, an
+        # open model outside it), not gaik's default deployment for the provider.
+        server = _server_default(provider)
+        if server is not None:
+            return LLMJudge(config=server, model=server["model"])
     offered = _offered_models(_CATALOGUE_PROVIDER[provider])
     if not model and not request_is_staff():
         # The provider's own default (Sonnet on Foundry, a Gemini preview) may be a

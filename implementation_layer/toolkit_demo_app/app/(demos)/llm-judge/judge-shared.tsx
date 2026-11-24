@@ -143,11 +143,17 @@ export function UsageBar({ usage }: { usage: Usage | null | undefined }) {
     items.push({ label: "Cost", value: `$${usage.cost_usd.toFixed(4)}` });
   if (items.length === 0) return null;
   return (
-    <div className="bg-muted/40 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-4">
+    // The model name gets the widest column and breaks at its hyphens, not mid-word.
+    <div className="bg-muted/40 grid grid-cols-2 gap-2 rounded-md border p-3 text-xs sm:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))]">
       {items.map((stat) => (
-        <div key={stat.label}>
+        <div
+          key={stat.label}
+          className={
+            stat.label === "Model" ? "col-span-2 sm:col-span-1" : undefined
+          }
+        >
           <p className="text-muted-foreground">{stat.label}</p>
-          <p className="font-mono break-all">{stat.value}</p>
+          <p className="font-mono break-words">{stat.value}</p>
         </div>
       ))}
     </div>
