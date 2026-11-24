@@ -26,7 +26,9 @@ import { PageTransition } from "@/components/demo/page-transition";
 import { WizardFileBrowser } from "@/components/demo/wizard-file-browser";
 import { WizardHelpDialog } from "@/components/demo/wizard-help-dialog";
 import { WizardStartScreen } from "@/components/demo/wizard-start-screen";
+import { useRunAccess } from "@/components/run-access";
 import { UploadReminder } from "@/components/upload-reminder";
+import { runBlockedLabel } from "@/lib/run-refusal";
 import { deriveWizardStage, WizardProgress } from "@/components/demo/wizard-progress";
 import { Button } from "@/components/ui/button";
 import {
@@ -188,6 +190,12 @@ export default function SolutionWizardPage() {
   // Surfaced on the start screen with a retry, so a failed bootstrap does not
   // leave the user staring at a skeleton that never resolves.
   const [startError, setStartError] = useState<string | null>(null);
+  // A visitor who cannot run demos sees the start screen without a session:
+  // the access notice above already says why, so no start request and no error.
+  const { blocked: runBlocked, loggedIn, reason } = useRunAccess();
+  const blockedLabel = runBlocked
+    ? runBlockedLabel(reason ?? (loggedIn ? "approval" : "sign-in"))
+    : null;
 
   const sessionRef = useRef<string | null>(null);
   const streamRef = useRef("");
@@ -332,10 +340,10 @@ export default function SolutionWizardPage() {
 
   // Start a session on mount (guard against React strict-mode double-invoke).
   useEffect(() => {
-    if (startedRef.current) return;
+    if (startedRef.current || runBlocked) return;
     startedRef.current = true;
     void startSession();
-  }, [startSession]);
+  }, [startSession, runBlocked]);
 
   // End the session when leaving the page.
   useEffect(() => {
@@ -473,11 +481,12 @@ export default function SolutionWizardPage() {
           <PromptInputTextarea
             className="min-h-11"
             placeholder={
-              !sessionId
+              blockedLabel ??
+              (!sessionId
                 ? "Connecting to the wizard…"
                 : hasConversation
                   ? "Reply to the wizard…"
-                  : "Describe your use case…"
+                  : "Describe your use case…")
             }
             disabled={!sessionId || busy}
           />
@@ -567,7 +576,7 @@ export default function SolutionWizardPage() {
             startedRef.current = false;
             void startSession().then(() => { startedRef.current = true; });
           }}
-          disabled={busy}
+          disabled={busy || runBlocked}
         >
           <RotateCcw className="mr-1 h-4 w-4" />
           Restart
@@ -589,7 +598,7 @@ export default function SolutionWizardPage() {
           {!hasConversation ? (
             <div className="flex min-h-0 flex-1 rounded-xl border bg-white">
               <WizardStartScreen
-                connecting={!sessionId || busy}
+                connecting={!runBlocked && (!sessionId || busy)}
                 disabled={!sessionId || busy}
                 error={startError}
                 onRetry={() => {

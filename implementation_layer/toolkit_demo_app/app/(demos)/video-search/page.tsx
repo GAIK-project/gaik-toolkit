@@ -373,7 +373,7 @@ export default function VideoSearchPage() {
                     id="video-search-query"
                     name="query"
                     ref={searchInputRef}
-                    placeholder="Search your videos with normal words"
+                    placeholder="Search videos"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     onKeyDown={handleKeyDown}
@@ -621,11 +621,12 @@ export default function VideoSearchPage() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="grid gap-2">
+                      {/* minmax(0, 1fr): a long title wraps instead of widening the page on a phone. */}
+                      <div className="grid grid-cols-[minmax(0,1fr)] gap-2">
                         {videos.map((video) => (
                           <button
                             key={video.video_id}
-                            className="hover:bg-muted/50 flex items-center justify-between rounded-lg px-3 py-2.5 text-left transition-colors"
+                            className="hover:bg-muted/50 flex min-w-0 items-center justify-between rounded-lg px-3 py-2.5 text-left transition-colors"
                             onClick={() => {
                               setVideoFilter(video.video_id);
                               setQuery("");
@@ -636,7 +637,7 @@ export default function VideoSearchPage() {
                               <div className="bg-muted flex h-8 w-8 shrink-0 items-center justify-center rounded-md">
                                 <Video className="text-muted-foreground h-4 w-4" />
                               </div>
-                              <span className="truncate text-sm font-medium">
+                              <span className="line-clamp-2 text-sm font-medium">
                                 {video.video_title}
                               </span>
                             </div>
