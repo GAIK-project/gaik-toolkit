@@ -335,7 +335,7 @@ export default function ParserPage() {
               again with another parser adds a second output to compare.
             </CardDescription>
           </CardHeader>
-          <CardContent className="grid items-start gap-6 lg:grid-cols-2">
+          <CardContent className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2">
             <FileUpload
               accept={ACCEPTED_FILES}
               maxSize={20}
@@ -453,7 +453,7 @@ export default function ParserPage() {
                   </SelectContent>
                 </Select>
               </div>
-              <div className="grid items-start gap-4 lg:grid-cols-2">
+              <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
                 <ParsedPane key={`a-${active.id}`} run={active} idPrefix="a-" />
                 <ParsedPane key={`b-${other.id}`} run={other} idPrefix="b-" />
               </div>
@@ -461,7 +461,7 @@ export default function ParserPage() {
           )}
 
           {active && !isLoading && !comparing && file && (
-            <div className="grid items-start gap-4 lg:grid-cols-2">
+            <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
               <OriginalPreview file={file} />
               <ParsedPane key={active.id} run={active} idPrefix="a-" />
             </div>

@@ -35,6 +35,7 @@ import {
   Zap,
 } from "lucide-react";
 import Link from "next/link";
+import { useEffect, useRef } from "react";
 import { SectionEditor } from "../report-writer/components/section-editor";
 import { downloadBlob } from "./components/artifact-browser";
 import { ReportResults } from "./components/report-results";
@@ -80,11 +81,28 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
     setSettings,
   } = rw;
 
+  // The report and the evidence need the page's whole width: once a stage has
+  // written something, the results sit under both columns instead of in the right
+  // one, and a finished run scrolls to them.
+  const hasResults = rw.paths.length > 0;
+  const resultsRef = useRef<HTMLDivElement>(null);
+  const wasRunning = useRef(false);
+  useEffect(() => {
+    if (wasRunning.current && !rw.running && hasResults) {
+      const reduce = window.matchMedia("(prefers-reduced-motion: reduce)");
+      resultsRef.current?.scrollIntoView({
+        behavior: reduce.matches ? "auto" : "smooth",
+        block: "start",
+      });
+    }
+    wasRunning.current = rw.running !== null;
+  }, [rw.running, hasResults]);
+
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground text-sm">
-        Files can total up to 100 MB. Download the workspace ZIP and your
-        report spec before reloading or closing this tab.
+        Files can total up to 100 MB. Download the workspace ZIP and your report
+        spec before reloading or closing this tab.
       </p>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -467,12 +485,20 @@ export function ReportWriterCreateSection({ rw }: { rw: ReportWriter }) {
             stacked
             runAllHint="Add at least one source file, and a file for every source listed, to run the stages."
           />
-          <ReportResults
-            rw={rw}
-            emptyText="Add your sources and press Run all three stages. The report and the evidence behind it appear here."
-          />
+          {!hasResults && (
+            <ReportResults
+              rw={rw}
+              emptyText="Add your sources and press Run all three stages. The report and the evidence behind it appear below."
+            />
+          )}
         </div>
       </div>
+
+      {hasResults && (
+        <div ref={resultsRef} className="scroll-mt-24">
+          <ReportResults rw={rw} />
+        </div>
+      )}
     </div>
   );
 }

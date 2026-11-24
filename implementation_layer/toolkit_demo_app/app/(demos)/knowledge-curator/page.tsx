@@ -522,7 +522,7 @@ export default function KnowledgeCuratorPage() {
           </div>
         </section>
 
-        <div className="grid items-stretch gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
             <Card>
               <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2 space-y-0">

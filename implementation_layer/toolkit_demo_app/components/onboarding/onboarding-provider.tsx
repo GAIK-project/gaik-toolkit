@@ -1,5 +1,6 @@
 "use client";
 
+import type { DriveStep } from "driver.js";
 import "driver.js/dist/driver.css";
 import { usePathname } from "next/navigation";
 import {
@@ -44,6 +45,28 @@ function hasSeenTour(): boolean {
   } catch {
     return true; // storage blocked → don't nag
   }
+}
+
+/**
+ * The stops whose anchor is on screen now: the model menu only for a signed-in
+ * user, and nothing hidden at this width. The first stop has no Back button.
+ */
+function visibleSteps(): DriveStep[] {
+  const steps = TOUR_STEPS.filter((step) => {
+    const element =
+      typeof step.element === "string"
+        ? document.querySelector(step.element)
+        : null;
+    return element !== null && element.getClientRects().length > 0;
+  });
+  return steps.map((step, index) =>
+    index === 0
+      ? {
+          ...step,
+          popover: { ...step.popover, showButtons: ["next", "close"] },
+        }
+      : step,
+  );
 }
 
 function markTourSeen(): void {
@@ -106,11 +129,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
     const { driver } = await import("driver.js");
     driver({
       showProgress: true,
+      smoothScroll: true,
       popoverClass: "gaik-tour",
       nextBtnText: "Next",
       prevBtnText: "Back",
       doneBtnText: "Done",
-      steps: TOUR_STEPS,
+      steps: visibleSteps(),
     }).drive();
   }, []);
 

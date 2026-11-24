@@ -549,7 +549,7 @@ export default function SourceNormalizerPage() {
           </div>
         </section>
 
-        <div className="grid items-stretch gap-6 md:gap-8 lg:grid-cols-2">
+        <div className="grid grid-cols-1 items-stretch gap-6 md:gap-8 lg:grid-cols-2">
           <Card>
             <CardHeader className="flex flex-row items-start justify-between gap-2 space-y-0">
               <div>

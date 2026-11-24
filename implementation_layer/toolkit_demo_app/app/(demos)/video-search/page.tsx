@@ -410,19 +410,19 @@ export default function VideoSearchPage() {
               <div className="mt-4 space-y-3">
                 <Tabs value={searchType} onValueChange={setSearchType}>
                   <div className="flex flex-wrap items-end gap-4">
-                    <div className="space-y-1.5">
+                    <div className="w-full space-y-1.5 sm:w-auto">
                       <Label className="text-muted-foreground text-xs font-normal">
                         Search style
                       </Label>
-                      <TabsList className="bg-muted border-border flex h-auto w-fit rounded-xl border p-1">
+                      <TabsList className="bg-muted border-border flex h-auto w-full rounded-xl border p-1 sm:w-fit">
                         {Object.entries(SEARCH_TYPE_INFO).map(
                           ([key, { icon: Icon, label }]) => (
                             <TabsTrigger
                               key={key}
                               value={key}
-                              className="data-[state=active]:bg-background data-[state=active]:border-border h-auto gap-1.5 rounded-lg border border-transparent px-3 py-2 whitespace-nowrap data-[state=active]:shadow-sm"
+                              className="data-[state=active]:bg-background data-[state=active]:border-border h-auto flex-1 gap-1.5 rounded-lg border border-transparent px-2 py-2 whitespace-nowrap data-[state=active]:shadow-sm sm:flex-none sm:px-3"
                             >
-                              <Icon className="h-3.5 w-3.5 shrink-0" />
+                              <Icon className="hidden h-3.5 w-3.5 shrink-0 sm:block" />
                               <span className="text-sm font-medium">
                                 {label}
                               </span>
