@@ -73,8 +73,15 @@ const SEVERITY_BAR: Record<Severity, string> = {
 
 export function PanelTab() {
   const catalogue = useVisionModels();
-  // The judges are the first models the server offers: its own model first. No model is named here.
-  const judges = catalogue.choices.openai.slice(0, PANEL_SIZE);
+  // The judges are the first models the server offers: its own model first, then
+  // Claude, so a user with one open GPT model still gets a panel. No model is named here.
+  const judges = [
+    ...catalogue.choices.openai.map((model) => ({ provider: "openai", model })),
+    ...catalogue.choices.claude.map((model) => ({
+      provider: "anthropic",
+      model,
+    })),
+  ].slice(0, PANEL_SIZE);
 
   const [exampleId, setExampleId] = useState<string | null>(null);
   const [expected, setExpected] = useState("");
@@ -112,7 +119,7 @@ export function PanelTab() {
           extracted_text: extracted,
           expected_text: expected,
           field_name: fieldName || undefined,
-          judges: judges.map((model) => ({ provider: "openai", model })),
+          judges,
         }),
         signal,
       });
@@ -196,7 +203,7 @@ export function PanelTab() {
               {judges.length === 0 ? (
                 <span className="text-muted-foreground">loading…</span>
               ) : (
-                judges.map((model) => (
+                judges.map(({ model }) => (
                   <Badge key={model} variant="secondary" className="font-mono">
                     {model}
                   </Badge>

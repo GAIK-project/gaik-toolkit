@@ -112,11 +112,18 @@ and commit the result; a unit test fails while the generated files are stale.
 The **model menu** in the nav shows which model runs the current demo. Signed-in users
 can switch among the server's own models without a key. `GET /api/model-settings/server`
 lists them, and the API checks the `x-gaik-server-model` header against that list.
-By default these are GPT-6 Sol (the server default, set with `DEMO_LLM_MODEL`), GPT-6 Luna,
-Claude Haiku 5.5, Claude Sonnet 5.5 and Gemini 3.8 Flash for everyone, and GPT-6.2 Sol, GPT-6.1 Sol,
-GPT-6 Astra, Claude Opus 5.5, Gemini 4 Argon and Gemini 4 Carbon for the GAIK team only: the admin, the `DEMO_USER_NAME`
-account, `haaga-helia.fi` addresses and anyone in `MODEL_STAFF_EMAILS`. The proxy
-decides this from the session and tells the API in `x-gaik-model-tier`; a browser cannot
+Everyone signed in may run the open models: GPT-6 Luna, Claude Haiku 5.5 and the CSC Aitta
+models (Gemma 4 31B, gpt-oss 120B), which CSC hosts at no cost. Every other model (GPT-6 Sol,
+GPT-6.1 and 6.2 Sol, GPT-6 Astra, Claude Sonnet 5.5 and Opus 5.5, the Gemini models) is
+for the GAIK team only: the admin, the `DEMO_USER_NAME` account, `haaga-helia.fi`
+addresses and anyone in `MODEL_STAFF_EMAILS`. `DEMO_OPEN_MODELS` (comma-separated, default
+`gpt-6-luna,claude-haiku-5-5`) replaces the GPT, Claude and Gemini models in the open list;
+set it on both deployments, since the Next.js demos read it too. The server default
+(`DEMO_LLM_MODEL`, GPT-6 Sol on Rahti) runs for the team; outside the team a request with
+no choice runs on the first open model on the same provider (GPT-6 Luna), and so do the
+Helpdesk Chatbot and AI Act screening, which run their model in Next.js
+(`HELPDESK_CHAT_DEPLOYMENT`, `AI_ACT_SCREENING_DEPLOYMENT`). The proxy
+decides the tier from the session and tells the API in `x-gaik-model-tier`; a browser cannot
 set it. A provider without credentials on the server is left out, and
 `DEMO_SERVER_MODELS=provider:model[:staff],…` replaces the list. With Claude or Gemini
 picked, the audio demos still transcribe on the server (local Whisper, else
@@ -132,12 +139,13 @@ while it runs on its own model choice.
 
 A route that takes a model name in the request runs only the models it offers, and a
 team-only model only for the team, decided from the session as above. Which models are
-team-only follows the list above (a `DEMO_SERVER_MODELS` entry decides for the model it
-names), whatever credentials the server has. The LLM Judge and the Vision Extractor
+team-only follows the open list above (a `DEMO_SERVER_MODELS` entry decides for the model it
+names), whatever credentials the server has; speech-to-text models are not limited. The LLM Judge and the Vision Extractor
 offer the Vision Extractor's model list; the Report Writer, Report Writer v2, Source
 Normalizer, Knowledge Curator and Knowledge Synthesis offer the server's model, the
 listed models on the same provider and `DEMO_EXTRA_CHAT_MODELS` (default
-`gpt-6-luna,gpt-5.5-deployment`, the Report Writer page's defaults), and for
+`gpt-6-luna,gpt-5.5-deployment`, the Report Writer page's writer default and a review
+deployment for the team), and for
 transcription `DEMO_TRANSCRIPTION_MODELS` (default
 `gpt-4o-transcribe,gpt-4o-mini-transcribe,whisper-1,whisper`).
 Another name is refused with a 422, which lists the names that work, before any model call.

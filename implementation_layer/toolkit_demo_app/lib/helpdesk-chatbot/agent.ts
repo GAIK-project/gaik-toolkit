@@ -10,6 +10,7 @@ import {
   wrapLanguageModel,
 } from "ai";
 import { z } from "zod";
+import { deploymentFor } from "@/lib/model-tier";
 import type { Knowledge } from "./knowledge";
 import { searchArticles, searchServices, toServiceCard } from "./search";
 
@@ -30,16 +31,17 @@ export function helpdeskConfigured(): boolean {
 
 const deployment = process.env.HELPDESK_CHAT_DEPLOYMENT ?? "gpt-6-sol";
 
-function chatModel() {
+function chatModel(staff: boolean) {
   const azure = createAzure({
     apiKey: process.env.AZURE_API_KEY,
     baseURL: azureBaseUrl(),
     apiVersion: process.env.HELPDESK_AZURE_API_VERSION ?? "2025-04-01-preview",
     useDeploymentBasedUrls: true,
   });
-  // GPT-6 Sol answers fastest with reasoning off, and supports it with tools.
+  // GPT-6 answers fastest with reasoning off, and supports it with tools.
   return wrapLanguageModel({
-    model: azure.chat(deployment),
+    // Outside the GAIK team an open model (lib/model-tier.ts).
+    model: azure.chat(deploymentFor(deployment, staff)),
     middleware: defaultSettingsMiddleware({
       settings: { providerOptions: { openai: { reasoningEffort: "none" } } },
     }),
@@ -151,9 +153,9 @@ ${
 Catalogue at a glance (for routing only, not for quoting): ${knowledge.services.length} entries in categories ${knowledge.categories.join(", ")}; ${knowledge.articles.length} FAQ articles.`;
 }
 
-export function createHelpdeskAgent(knowledge: Knowledge) {
+export function createHelpdeskAgent(knowledge: Knowledge, staff = false) {
   return new ToolLoopAgent({
-    model: chatModel(),
+    model: chatModel(staff),
     instructions: instructions(knowledge),
     tools: buildTools(knowledge),
     toolApproval: { requestHumanHandoff: "user-approval" },

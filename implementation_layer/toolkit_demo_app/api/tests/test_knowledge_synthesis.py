@@ -167,6 +167,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(route, "_gaik", lambda: FakeGaik)
     monkeypatch.setattr(route, "get_api_config", lambda: CONFIG)
     monkeypatch.setattr(route, "chat_models", lambda: ["wr", "rev"])
+    monkeypatch.setenv("DEMO_OPEN_MODELS", "wr,rev")  # not team-only models
     monkeypatch.setattr(route, "_docx", lambda report: b"PK docx bytes")
     app = FastAPI()
     app.include_router(route.router, prefix="/knowledge-synthesis")

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { isModelStaff } from "./model-tier";
+import { deploymentFor, isModelStaff } from "./model-tier";
 
 describe("isModelStaff", () => {
   afterEach(() => {
@@ -34,5 +34,33 @@ describe("isModelStaff", () => {
 
   test("an unsigned admin cookie does not count", () => {
     expect(isModelStaff(null, "authenticated")).toBe(false);
+  });
+});
+
+describe("deploymentFor", () => {
+  afterEach(() => {
+    delete process.env.DEMO_OPEN_MODELS;
+  });
+
+  test("outside the team a team deployment gives way to GPT-6 Luna", () => {
+    expect(deploymentFor("gpt-6-sol", false)).toBe("gpt-6-luna");
+    expect(deploymentFor("gpt-6-sol", true)).toBe("gpt-6-sol");
+    expect(deploymentFor("gpt-6-luna", false)).toBe("gpt-6-luna");
+  });
+
+  test("DEMO_OPEN_MODELS sets the open models", () => {
+    process.env.DEMO_OPEN_MODELS = "gpt-6-sol, claude-haiku-5-5";
+    expect(deploymentFor("gpt-6-sol", false)).toBe("gpt-6-sol");
+    process.env.DEMO_OPEN_MODELS = "claude-haiku-5-5";
+    // No open GPT model: the configured deployment runs.
+    expect(deploymentFor("gpt-6-sol", false)).toBe("gpt-6-sol");
+  });
+});
+
+describe("deploymentFor with a deployment the catalogue does not know", () => {
+  test("keeps a custom name, which may be the only deployment", () => {
+    expect(deploymentFor("my-chat-deployment", false)).toBe(
+      "my-chat-deployment",
+    );
   });
 });

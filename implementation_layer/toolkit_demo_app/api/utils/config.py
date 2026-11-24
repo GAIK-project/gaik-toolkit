@@ -11,8 +11,11 @@ from .model_settings import (
     aitta_embedding_model,
     aitta_speech_model,
     get_request_api_config,
+    is_listed_team_model,
     model_name,
+    open_model_for,
     reads_images,
+    request_is_staff,
     request_model_settings,
     request_reasoning_effort,
     request_server_model,
@@ -131,17 +134,18 @@ def get_rag_api_config() -> dict:
     A picked server model applies when its provider also serves embeddings
     (Azure, OpenAI, Aitta). Any other pick leaves RAG on the server default, and
     so does a team-only model: a collection outlives the request that built it,
-    and its questions arrive without the team check.
+    and its questions arrive without the team check. The default here is the one
+    outside the team, also for a team user, since the example collections are shared.
     """
     chosen = request_server_model()
-    if chosen is not None and chosen.staff:
-        return server_api_config()
+    if request_model_settings() is None and (chosen is None or chosen.staff):
+        return server_api_config(team=False)
     config = get_api_config()
     if on_aitta(config):
         return {**config, "embedding_model": aitta_embedding_model()}
     if config.get("provider") in {"azure", "openai"}:
         return config
-    return server_api_config()
+    return server_api_config(team=False)
 
 
 def require_vision(config: dict) -> dict:
@@ -164,8 +168,15 @@ def require_vision(config: dict) -> dict:
     return config
 
 
-def server_api_config():
-    """The deployment's own provider and model, ignoring any per-request choice."""
+def server_api_config(*, team: bool | None = None):
+    """The deployment's own provider and model, ignoring any per-request choice.
+
+    Outside the GAIK team a request runs on an open model: when the deployment's
+    model (``DEMO_LLM_MODEL``) is one the catalogue keeps for the team, the first
+    open model on the same provider takes its place (``model_settings.open_model_for``).
+    A deployment name the catalogue does not know stays, as it may be the only one.
+    ``team`` overrides the request's tier.
+    """
     from gaik.software_components.llm import get_llm_config
 
     provider = os.getenv("DEMO_LLM_PROVIDER") or os.getenv("LLM_PROVIDER")
@@ -184,7 +195,14 @@ def server_api_config():
     if os.getenv("DEMO_LLM_MODEL"):
         overrides["model"] = os.environ["DEMO_LLM_MODEL"]
     try:
-        return get_llm_config(provider, **overrides)
+        config = get_llm_config(provider, **overrides)
+        model = config.get("model")
+        team = request_is_staff() if team is None else team
+        if not team and is_listed_team_model(str(model or "")):
+            fallback = open_model_for(provider)
+            if fallback:
+                config = get_llm_config(provider, **{**overrides, "model": fallback})
+        return config
     except ValueError:
         raise HTTPException(503, "The server model provider is not configured correctly.") from None
 

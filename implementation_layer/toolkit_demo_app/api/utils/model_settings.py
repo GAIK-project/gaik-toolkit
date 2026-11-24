@@ -71,7 +71,8 @@ class ServerModel:
     provider: str
     model: str
     label: str
-    # Costlier models: only the GAIK team (admin, demo account, haaga-helia.fi).
+    # Not an open model (open_models): only the GAIK team (admin, demo account,
+    # haaga-helia.fi).
     staff: bool = False
     # False when the provider has no speech-to-text: the audio demos then
     # transcribe with the server's own transcriber and extract with this model.
@@ -85,8 +86,9 @@ class ServerModel:
 
 
 _server_model: ContextVar[ServerModel | None] = ContextVar("demo_server_model", default=None)
-# Whether the request carries the team tier, set by ModelSettingsMiddleware for the
-# routes that check a named model (utils/model_allow_list.py).
+# Whether the request carries the team tier, set by ModelSettingsMiddleware on every
+# request. It decides the model a request without a choice runs on
+# (config.server_api_config) and the models a route may name (utils/model_allow_list.py).
 _staff: ContextVar[bool] = ContextVar("demo_model_staff", default=False)
 
 # The reasoning effort picked in the model menu. Absent means Auto: each model
@@ -107,28 +109,38 @@ _LABELS = {
     "openai/gpt-oss-120b": "gpt-oss 120B",
 }
 
-# (family, model, staff only). Families map to the provider that has credentials.
+# The chat models everyone signed in may run on the server's credentials. Every other
+# model is for the GAIK team (admin, demo account, haaga-helia.fi): the demo shows
+# what the toolkit does on the small models a user would test with. DEMO_OPEN_MODELS
+# replaces the list (comma-separated names); a DEMO_SERVER_MODELS entry decides for
+# the model it names.
+_OPEN_MODELS = "gpt-6-luna,claude-haiku-5-5"
+# Families whose built-in models are open whatever DEMO_OPEN_MODELS says: CSC hosts
+# the Aitta models for Finnish universities at no cost.
+_OPEN_FAMILIES = ("aitta",)
+
+# (family, model). Families map to the provider that has credentials.
 _DEFAULT_MODELS = (
-    ("gpt", "gpt-6-luna", False),
-    ("gpt", "gpt-6-sol", False),
-    ("gpt", "gpt-6.1-sol", True),
-    ("gpt", "gpt-6.2-sol", True),
-    ("gpt", "gpt-6-astra", True),
-    ("claude", "claude-haiku-5-5", False),
-    ("claude", "claude-sonnet-5-5", False),
-    ("claude", "claude-opus-5-5", True),
-    ("gemini", "gemini-3.8-flash", False),
-    ("gemini", "gemini-4-argon", True),
+    ("gpt", "gpt-6-luna"),
+    ("gpt", "gpt-6-sol"),
+    ("gpt", "gpt-6.1-sol"),
+    ("gpt", "gpt-6.2-sol"),
+    ("gpt", "gpt-6-astra"),
+    ("claude", "claude-haiku-5-5"),
+    ("claude", "claude-sonnet-5-5"),
+    ("claude", "claude-opus-5-5"),
+    ("gemini", "gemini-3.8-flash"),
+    ("gemini", "gemini-4-argon"),
     # Read every test receipt right on 2026-11-19, but takes 25 s to 3 min a page.
     # Gemini 4 Neon and Hydrogen answer too, but left line prices empty
     # (docs/MODEL_REQUIREMENTS.md); DEMO_SERVER_MODELS can list them.
-    ("gemini", "gemini-4-carbon", True),
+    ("gemini", "gemini-4-carbon"),
     # CSC Aitta: open models hosted in Finland. Of the models tested through
     # gaik on 2026-11-16 these two are worth offering: Gemma reads images, and
     # gpt-oss answers three times faster (docs/MODEL_REQUIREMENTS.md). Others
     # can be listed with DEMO_SERVER_MODELS.
-    ("aitta", "google/gemma-4-31b-it", False),
-    ("aitta", "openai/gpt-oss-120b", False),
+    ("aitta", "google/gemma-4-31b-it"),
+    ("aitta", "openai/gpt-oss-120b"),
 )
 _FAMILIES = {
     "gpt": ("azure", "openai"),
@@ -217,36 +229,93 @@ def _server_default() -> tuple[str, str] | None:
     return (str(provider), str(model)) if provider and model else None
 
 
+def _configured_entries() -> list[tuple[str, str, bool, bool]]:
+    """``DEMO_SERVER_MODELS`` as (provider, model, team only, text only) entries."""
+    import os
+
+    entries = []
+    for item in os.getenv("DEMO_SERVER_MODELS", "").split(","):
+        parts = [p.strip() for p in item.split(":")]
+        if len(parts) >= 2 and parts[0] and parts[1]:
+            entries.append((parts[0], parts[1], "staff" in parts[2:], "text" in parts[2:]))
+    return entries
+
+
+def open_models() -> list[str]:
+    """The chat models everyone may run on the server's credentials (``DEMO_OPEN_MODELS``)."""
+    import os
+
+    names = os.getenv("DEMO_OPEN_MODELS", _OPEN_MODELS)
+    return [name.strip() for name in names.split(",") if name.strip()]
+
+
+def is_open_model(model: str | None) -> bool:
+    """Whether everyone may run ``model`` on the server's credentials.
+
+    A ``DEMO_SERVER_MODELS`` entry decides for the model it names (``:staff`` or
+    not); any other model is open when ``open_models`` lists it or it is a built-in
+    model of an open family (CSC Aitta).
+    """
+    for _provider, name, staff, _text in _configured_entries():
+        if name == model:
+            return not staff
+    if not model:
+        return False
+    return model in open_models() or any(
+        name == model and family in _OPEN_FAMILIES for family, name in _DEFAULT_MODELS
+    )
+
+
+def is_listed_team_model(model: str | None) -> bool:
+    """Whether the server catalogue lists ``model`` (built in or in
+    ``DEMO_SERVER_MODELS``) and keeps it for the team. A deployment name the
+    catalogue does not know is not one: it may be the only model the account has."""
+    listed = {m for _family, m in _DEFAULT_MODELS} | {m for _p, m, _s, _t in _configured_entries()}
+    return model in listed and not is_open_model(model)
+
+
+def open_model_for(provider: str) -> str | None:
+    """The first open model on ``provider``: what a request outside the team runs
+    when the deployment's own model is for the team (``config.server_api_config``)."""
+    configured = _configured_entries()
+    candidates = (
+        [(p, m) for p, m, _staff, _text in configured]
+        if configured
+        else [(p, m) for family, m in _DEFAULT_MODELS for p in _FAMILIES[family]]
+    )
+    return next((m for p, m in candidates if p == provider and is_open_model(m)), None)
+
+
 def server_models() -> list[ServerModel]:
     """Models the deployment's own credentials can run, default first.
 
     ``DEMO_SERVER_MODELS`` overrides the list as comma-separated
     ``provider:model`` entries, with ``:staff`` for a team-only model and
     ``:text`` for one that cannot read images. A provider without credentials
-    is left out.
+    is left out. Without it, a model is for the team unless ``open_models``
+    lists it.
     """
-    import os
-
-    configured = os.getenv("DEMO_SERVER_MODELS", "").strip()
+    configured = _configured_entries()
     entries: list[tuple[str, str, bool]] = []
     text_only: set[tuple[str, str]] = set()
     if configured:
-        for item in configured.split(","):
-            parts = [p.strip() for p in item.split(":")]
-            if len(parts) >= 2 and parts[0] and parts[1]:
-                entries.append((parts[0], parts[1], "staff" in parts[2:]))
-                if "text" in parts[2:]:
-                    text_only.add((parts[0], parts[1]))
+        for provider, model, staff, text in configured:
+            entries.append((provider, model, staff))
+            if text:
+                text_only.add((provider, model))
     else:
-        for family, model, staff in _DEFAULT_MODELS:
+        for family, model in _DEFAULT_MODELS:
             provider = next((p for p in _FAMILIES[family] if _has_credentials(p)), None)
             if provider:
-                entries.append((provider, model, staff))
-    # The model a request without a choice runs on leads the list and is open to
-    # everyone: it already runs for anyone who picks nothing.
+                entries.append((provider, model, not is_open_model(model)))
+    # The model a request without a choice runs on leads the list. Outside the team
+    # that is an open model (config.server_api_config), or, when the deployment's
+    # provider has none, the deployment's own model, which then runs for anyone and
+    # so is not locked for them.
     default = _server_default()
     if default is not None:
-        entries = [(default[0], default[1], False)] + [
+        staff = request_is_staff() and not is_open_model(default[1])
+        entries = [(default[0], default[1], staff)] + [
             e for e in entries if (e[0], e[1]) != default
         ]
     models, seen = [], set()
