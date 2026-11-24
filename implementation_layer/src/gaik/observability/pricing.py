@@ -64,6 +64,8 @@ ANTHROPIC_PRICING_PER_M: dict[str, tuple[float, float]] = {
     "claude-opus-4-8": (5.00, 25.00),
     "claude-opus-4-7": (5.00, 25.00),
     "claude-sonnet-5": (2.00, 10.00),
+    # Prompts up to 100K tokens; longer ones bill 0.50 / 2.50 (verified 2026-11-24).
+    "claude-haiku-5-5": (0.10, 0.50),
     "claude-haiku-4-5": (1.00, 5.00),
     "claude-haiku-3-5": (0.80, 4.00),
     "claude-haiku-3": (0.25, 1.25),
