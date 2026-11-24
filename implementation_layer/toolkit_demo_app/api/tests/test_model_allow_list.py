@@ -268,13 +268,15 @@ def test_a_judge_with_no_model_runs_the_server_model(server_env, monkeypatch):
 
     monkeypatch.setattr(validators, "LLMJudge", FakeJudge)
     monkeypatch.setenv("DEMO_LLM_MODEL", "gpt-6-sol")
-    llm_judge._make_judge("azure", None)
-    token = settings._staff.set(True)
-    try:
-        llm_judge._make_judge("azure", None)
-    finally:
-        settings._staff.reset(token)
-    assert built == ["gpt-6-luna", "gpt-6-sol"]
+    # The pages ask for "openai", which runs on the deployment's Azure.
+    for provider in ("openai", "azure"):
+        llm_judge._make_judge(provider, None)
+        token = settings._staff.set(True)
+        try:
+            llm_judge._make_judge(provider, None)
+        finally:
+            settings._staff.reset(token)
+    assert built == ["gpt-6-luna", "gpt-6-sol"] * 2
 
 
 def test_rag_collections_are_built_on_an_open_model_for_the_team_too(server_env, monkeypatch):

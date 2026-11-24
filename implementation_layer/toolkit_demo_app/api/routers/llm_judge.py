@@ -115,12 +115,17 @@ _CATALOGUE_PROVIDER: dict[str, str] = {
 
 
 def _server_default(provider: JudgeProvider) -> dict | None:
-    """The deployment's server model when the judge asks for its provider, else None."""
+    """The deployment's server model when the judge asks for its provider, else None.
+
+    The pages ask for "openai", which runs on Azure on Rahti (``_resolve_provider``).
+    Claude and Gemini keep their own route: Foundry, and the open-model check.
+    """
     try:
         config = server_api_config()
     except HTTPException:
         return None
-    return config if config.get("provider") == provider and config.get("model") else None
+    wanted = _resolve_provider(provider) if provider in ("openai", "azure") else provider
+    return config if config.get("provider") == wanted and config.get("model") else None
 
 
 def _make_judge(provider: JudgeProvider, model: str | None):
