@@ -108,6 +108,7 @@ export const DIALECT_LINKS = {
   toolkitDocs:
     "https://github.com/GAIK-project/gaik-toolkit/tree/main/evaluation_layer/eval_methods/transcription_eval/finnish_dialect_asr",
   moreClips: "https://gaik-project.github.io/finnish-asr/listen.html",
-  dataset: "https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr",
+  dataset:
+    "https://huggingface.co/datasets/GAIK-project/skn-finnish-dialects-asr",
   kielipankki: "http://urn.fi/urn:nbn:fi:lb-2020112937",
 };

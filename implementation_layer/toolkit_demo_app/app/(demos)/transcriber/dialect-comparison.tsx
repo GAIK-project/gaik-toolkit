@@ -87,10 +87,7 @@ export function DialectComparison() {
       className="scroll-mt-24 space-y-3"
     >
       <div className="space-y-1">
-        <h2
-          id="dialect-comparison-heading"
-          className="text-sm font-semibold"
-        >
+        <h2 id="dialect-comparison-heading" className="text-sm font-semibold">
           Finnish dialects: how the models compare
         </h2>
         <p className="text-muted-foreground max-w-3xl text-sm">
@@ -151,7 +148,10 @@ export function DialectComparison() {
             <span>Model</span>
             <span>Words wrong</span>
           </div>
-          <ul className="divide-y">
+          <ul
+            key={clip.id}
+            className="animate-in fade-in slide-in-from-bottom-1 divide-y duration-300 motion-reduce:animate-none"
+          >
             {DIALECT_MODELS.map((model) => {
               const result = clip.results[model.id];
               return (
@@ -186,9 +186,7 @@ export function DialectComparison() {
                   </span>
                   <p className="col-span-2 col-start-2 text-sm leading-6 break-words">
                     {result.words.length === 0 ? (
-                      <span className="text-muted-foreground">
-                        (no text)
-                      </span>
+                      <span className="text-muted-foreground">(no text)</span>
                     ) : (
                       result.words.map(([word, wrong], index) => (
                         <span key={index}>
@@ -254,7 +252,7 @@ export function DialectComparison() {
                     <div className="bg-muted h-1.5 overflow-hidden rounded-full">
                       <div
                         className={cn(
-                          "h-full rounded-full",
+                          "h-full origin-left rounded-full transition-[width] duration-500",
                           model.ours ? "bg-primary" : "bg-muted-foreground/40",
                         )}
                         style={{ width: `${wer}%` }}
