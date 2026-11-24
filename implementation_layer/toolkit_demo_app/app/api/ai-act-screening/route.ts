@@ -7,6 +7,7 @@ import {
 import { userTextsOf } from "@/lib/ai-act-screening/verify";
 import { clientIp } from "@/lib/client-ip";
 import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
+import { ADMIN_COOKIE_NAME, isModelStaff } from "@/lib/model-tier";
 import { getAccessState } from "@/lib/supabase/proxy";
 import { accessRefusal } from "@/lib/api-access";
 import { takeTrialRun } from "@/lib/trial";
@@ -39,10 +40,8 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const refusal = await accessRefusal(
-    await getAccessState(request),
-    takeTrialRun,
-  );
+  const access = await getAccessState(request);
+  const refusal = await accessRefusal(access, takeTrialRun);
   if (refusal) {
     return NextResponse.json(
       { error: refusal.error },
@@ -93,7 +92,10 @@ export async function POST(request: NextRequest) {
       console.error("[ai-act-screening]", error);
       return "The screening could not continue. Please try again.";
     },
-    agent: createScreeningAgent(userTexts),
+    agent: createScreeningAgent(
+      userTexts,
+      isModelStaff(access.email, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+    ),
     uiMessages: messages,
     abortSignal: request.signal,
     // Rahti does not enforce maxDuration, so bound the call here.

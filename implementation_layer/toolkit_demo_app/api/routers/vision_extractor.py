@@ -433,11 +433,17 @@ def _server_model() -> str:
 def _offered_models(provider: str) -> tuple[str, ...]:
     """The models of a provider; the server's own model is always among the OpenAI/Azure ones.
 
-    Google offers none without credentials, so the demo does not show a provider that fails.
+    Google and Claude offer none without credentials, so the demo does not show a provider
+    that fails (the LLM Judge panel takes its Claude judge from here too).
     """
     models = PROVIDER_MODELS[provider]
     if provider == "google" and not any(
         os.getenv(name) for name in ("GOOGLE_API_KEY", "GEMINI_API_KEY", "GOOGLE_PROJECT_ID")
+    ):
+        return ()
+    if provider == "claude" and not (
+        os.getenv("ANTHROPIC_API_KEY")
+        or (os.getenv("ANTHROPIC_FOUNDRY_API_KEY") and os.getenv("ANTHROPIC_FOUNDRY_RESOURCE"))
     ):
         return ()
     if provider in {"openai", "azure"}:

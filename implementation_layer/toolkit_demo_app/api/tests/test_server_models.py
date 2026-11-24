@@ -22,6 +22,7 @@ TIER = settings.TIER_HEADER.decode()
 def server_env(monkeypatch):
     for name in (
         "DEMO_SERVER_MODELS",
+        "DEMO_OPEN_MODELS",
         "DEMO_LLM_MODEL",
         "DEMO_LLM_PROVIDER",
         "LLM_PROVIDER",
@@ -55,6 +56,9 @@ def test_lists_only_providers_with_credentials_default_first(server_env, monkeyp
     assert models["anthropic_foundry:claude-haiku-5-5"].label == "Claude Haiku 5.5"
     assert models["anthropic_foundry:claude-haiku-5-5"].audio is False
     assert models["azure:gpt-6-astra"].staff and not models["azure:gpt-6-luna"].staff
+    # Open to everyone: GPT-6 Luna and Claude Haiku; the rest is for the team.
+    assert models["azure:gpt-6-sol"].staff and models["anthropic_foundry:claude-sonnet-5-5"].staff
+    assert not models["anthropic_foundry:claude-haiku-5-5"].staff
     assert models["anthropic_foundry:claude-opus-5-5"].staff
     assert models["anthropic_foundry:claude-opus-5-5"].label == "Claude Opus 5.5"
 
@@ -62,6 +66,7 @@ def test_lists_only_providers_with_credentials_default_first(server_env, monkeyp
     monkeypatch.setenv("GOOGLE_PROJECT_ID", "p")
     models = {m.id: m for m in settings.server_models()}
     assert models["vertex:gemini-3.8-flash"].label == "Gemini 3.8 Flash"
+    assert models["vertex:gemini-3.8-flash"].staff
     assert models["vertex:gemini-4-argon"].staff
     assert models["vertex:gemini-4-carbon"].staff
     assert models["vertex:gemini-4-carbon"].label == "Gemini 4 Carbon"
@@ -82,11 +87,31 @@ def test_env_list_overrides_and_still_needs_credentials(server_env, monkeypatch)
     ]
 
 
-def test_a_team_model_as_server_default_is_open_to_all(server_env, monkeypatch):
-    # With no choice the default runs for anyone, so the list must not lock it.
+def test_a_team_model_as_server_default_leads_for_the_team_only(server_env, monkeypatch):
+    # Outside the team a request with no choice runs on GPT-6 Luna, which leads the list.
     monkeypatch.setenv("DEMO_LLM_MODEL", "gpt-6-astra")
     models = settings.server_models()
-    assert models[0].id == "azure:gpt-6-astra" and not models[0].staff
+    assert models[0].id == "azure:gpt-6-luna" and not models[0].staff
+    assert next(m for m in models if m.id == "azure:gpt-6-astra").staff
+    token = settings._staff.set(True)
+    try:
+        assert settings.server_models()[0].id == "azure:gpt-6-astra"
+    finally:
+        settings._staff.reset(token)
+
+
+@pytest.mark.asyncio
+async def test_the_catalogue_default_follows_the_tier(server_env, monkeypatch):
+    monkeypatch.setenv("DEMO_LLM_MODEL", "gpt-6-sol")
+    observed = []
+    app = _app(observed)
+    everyone = (await _call(app, "GET", "/model-settings/server", {})).json()
+    team = (await _call(app, "GET", "/model-settings/server", {TIER: "staff"})).json()
+    assert everyone["default"] == "azure:gpt-6-luna"
+    assert team["default"] == "azure:gpt-6-sol"
+    assert (await _call(app, "POST", "/extract", {})).status_code == 200
+    assert (await _call(app, "POST", "/extract", {TIER: "staff"})).status_code == 200
+    assert observed == [("azure", "gpt-6-luna"), ("azure", "gpt-6-sol")]
 
 
 def _app(observed):
@@ -136,7 +161,8 @@ async def _call(app, method, path, headers):
 async def test_picked_server_model_runs_the_request(server_env):
     observed = []
     app = _app(observed)
-    assert (await _call(app, "POST", "/extract", {SERVER: "azure:gpt-6-sol"})).status_code == 200
+    sol = {SERVER: "azure:gpt-6-sol", TIER: "staff"}  # GPT-6 Sol is a team model
+    assert (await _call(app, "POST", "/extract", sol)).status_code == 200
     assert (await _call(app, "POST", "/extract", {})).status_code == 200
     assert observed == [("azure", "gpt-6-sol"), ("azure", "gpt-6-luna")]
     assert settings.request_server_model() is None
@@ -168,7 +194,9 @@ async def test_team_models_need_the_staff_tier(server_env):
 
 
 @pytest.mark.asyncio
-async def test_claude_extracts_audio_after_the_server_transcribes(server_env):
+async def test_claude_extracts_audio_after_the_server_transcribes(server_env, monkeypatch):
+    # GPT-6 Sol open here, so an open pick with embeddings other than the default exists.
+    monkeypatch.setenv("DEMO_OPEN_MODELS", "gpt-6-luna,gpt-6-sol,claude-haiku-5-5")
     observed = []
     app = _app(observed)
     response = await _call(

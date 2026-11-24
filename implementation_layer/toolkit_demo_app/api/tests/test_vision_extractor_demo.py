@@ -72,6 +72,12 @@ def test_temporary_schema_task_matching_normalizes_multipart_newlines() -> None:
     ) == (schema, requirements)
 
 
+@pytest.fixture(autouse=True)
+def claude_credentials(monkeypatch):
+    """The catalogue offers Claude only with Claude credentials (_offered_models)."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+
 def test_provider_model_allowlists(monkeypatch) -> None:
     assert route.PROVIDER_MODELS == {
         "openai": (
@@ -116,13 +122,15 @@ def test_google_is_offered_only_with_credentials(monkeypatch) -> None:
     )
 
 
-def test_gemini_4_models_are_offered_to_the_team_only(monkeypatch) -> None:
+def test_gemini_models_are_offered_to_the_team_only(monkeypatch) -> None:
     monkeypatch.setenv("GOOGLE_PROJECT_ID", "test-project")
     monkeypatch.delenv("DEMO_SERVER_MODELS", raising=False)
+    monkeypatch.delenv("DEMO_OPEN_MODELS", raising=False)
     monkeypatch.setattr(model_allow_list, "request_is_staff", lambda: False)
-    assert model_allow_list.offered_to(route._offered_models("google")) == ["gemini-3.8-flash"]
-    with pytest.raises(HTTPException, match="GAIK project team"):
-        model_allow_list.check_team_tier("gemini-4-carbon")
+    assert model_allow_list.offered_to(route._offered_models("google")) == []
+    for model in ("gemini-3.8-flash", "gemini-4-carbon"):
+        with pytest.raises(HTTPException, match="GAIK project team"):
+            model_allow_list.check_team_tier(model)
 
 
 @pytest.mark.asyncio
@@ -296,6 +304,8 @@ def test_example_schema_comes_with_a_field_table_and_its_real_structure() -> Non
 @pytest.mark.asyncio
 async def test_vision_models_default_to_the_servers_model(monkeypatch) -> None:
     monkeypatch.setattr(route, "get_api_config", lambda: {"model": "server-model-x"})
+    # The model a request without a choice runs on is open to it.
+    monkeypatch.setattr(model_allow_list, "_server_config", lambda: {"model": "server-model-x"})
 
     catalogue = await route.model_catalogue()
 

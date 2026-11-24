@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import contextvars
 import json
 import logging
 import queue
@@ -428,7 +429,9 @@ async def generate_report(
             finally:
                 done_event.set()
 
-    threading.Thread(target=run_report, daemon=True).start()
+    # The worker sees the request's model tier and choices (utils/model_settings.py).
+    context = contextvars.copy_context()
+    threading.Thread(target=context.run, args=(run_report,), daemon=True).start()
 
     async def event_stream():
         loop = asyncio.get_running_loop()
