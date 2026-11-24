@@ -167,6 +167,12 @@ export default function AudioStructuredPage() {
 
   useEffect(() => () => abortControllerRef.current?.abort(), []);
 
+  // The selected example's recording is loaded when the page opens, so it is ready to run.
+  useEffect(() => {
+    void pickExample(EXAMPLES[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // The player of the chosen recording; the object URL is released when it changes.
   useEffect(() => {
     if (!file) {
@@ -330,75 +336,17 @@ export default function AudioStructuredPage() {
     <PageTransition>
       <DemoPageHeader
         icon={AudioWaveform}
-        title="Audio → Structured Data"
+        title="Audio → structured data"
         description="Turn a recording into structured data: it is transcribed, and the fields you describe are extracted from the text"
         className="mb-6"
       />
 
       <div className="space-y-6">
         <SectionGuide
-          heading="How to use Audio → Structured Data"
+          heading="How to use Audio → structured data"
           steps={GUIDE_STEPS}
           notes={GUIDE_NOTES}
         />
-
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold">
-            Start from a ready-made recording
-          </h2>
-          <div
-            role="radiogroup"
-            aria-label="Ready-made recordings"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
-          >
-            {EXAMPLES.map((entry) => (
-              <div
-                key={entry.id}
-                className={cn(
-                  "flex flex-col gap-2 rounded-xl border-2 p-3 transition-all",
-                  example?.id === entry.id
-                    ? "border-primary bg-primary/5"
-                    : "bg-card hover:border-primary/40",
-                )}
-              >
-                <button
-                  type="button"
-                  role="radio"
-                  aria-checked={example?.id === entry.id}
-                  disabled={busy}
-                  onClick={() => void pickExample(entry)}
-                  className="flex flex-1 flex-col gap-1.5 text-left"
-                >
-                  <span className="font-semibold">{entry.title}</span>
-                  <span className="text-primary text-xs font-medium">
-                    {entry.shape}
-                  </span>
-                  <span className="text-muted-foreground text-sm">
-                    {entry.summary}
-                  </span>
-                  <span className="flex flex-wrap gap-1">
-                    {entry.tags.map((tag) => (
-                      <Badge
-                        key={tag}
-                        variant="outline"
-                        className="font-normal"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </span>
-                </button>
-                <audio
-                  src={entry.url}
-                  controls
-                  preload="none"
-                  className="h-8 w-full"
-                  aria-label={`Listen to ${entry.title}`}
-                />
-              </div>
-            ))}
-          </div>
-        </section>
 
         <div className="grid grid-cols-1 items-start gap-6 md:gap-8 lg:grid-cols-2">
           <div className="flex flex-col gap-6">
@@ -449,6 +397,54 @@ export default function AudioStructuredPage() {
                     aria-label="Watch the recording"
                   />
                 )}
+                <div className="space-y-2">
+                  <p className="text-muted-foreground text-sm">
+                    Or try a ready-made recording; it comes with the task and
+                    the options that suit it.
+                  </p>
+                  <div
+                    role="radiogroup"
+                    aria-label="Ready-made recordings"
+                    className="grid gap-2 sm:grid-cols-2"
+                  >
+                    {EXAMPLES.map((entry) => {
+                      const picked = example?.id === entry.id;
+                      return (
+                        <button
+                          key={entry.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={picked}
+                          disabled={busy}
+                          onClick={() => void pickExample(entry)}
+                          title={`${entry.summary} The result: ${entry.shape}.`}
+                          className={cn(
+                            "flex min-w-0 items-start gap-2 rounded-lg border px-3 py-2 text-left transition-colors disabled:opacity-60",
+                            picked
+                              ? "border-primary bg-primary/5"
+                              : "bg-card hover:border-primary/40",
+                          )}
+                        >
+                          <AudioLines
+                            className={cn(
+                              "mt-0.5 h-4 w-4 shrink-0",
+                              picked ? "text-primary" : "text-muted-foreground",
+                            )}
+                            aria-hidden
+                          />
+                          <span className="min-w-0">
+                            <span className="block text-sm font-medium">
+                              {entry.title}
+                            </span>
+                            <span className="text-muted-foreground block text-xs">
+                              {entry.tags.join(" · ")}
+                            </span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -625,7 +621,7 @@ export default function AudioStructuredPage() {
                 >
                   Extract data
                 </RunButton>
-                {!file && (
+                {!file && !isLoadingExample && (
                   <p className="text-muted-foreground text-center text-xs">
                     Add a recording first.
                   </p>
