@@ -72,6 +72,12 @@ def test_temporary_schema_task_matching_normalizes_multipart_newlines() -> None:
     ) == (schema, requirements)
 
 
+@pytest.fixture(autouse=True)
+def claude_credentials(monkeypatch):
+    """The catalogue offers Claude only with Claude credentials (_offered_models)."""
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-anthropic-key")
+
+
 def test_provider_model_allowlists(monkeypatch) -> None:
     assert route.PROVIDER_MODELS == {
         "openai": (
