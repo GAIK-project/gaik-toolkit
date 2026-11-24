@@ -133,6 +133,7 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setattr(route, "_gaik", lambda: FakeGaik)
     monkeypatch.setattr(route, "get_api_config", lambda: CONFIG)
     monkeypatch.setattr(route, "chat_models", lambda: ["gpt-x"])
+    monkeypatch.setenv("DEMO_OPEN_MODELS", "gpt-x")  # not a team-only model
     app = FastAPI()
     app.include_router(route.router, prefix="/knowledge-curator")
     return TestClient(app)

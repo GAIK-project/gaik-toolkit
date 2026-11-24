@@ -77,6 +77,10 @@ def _provider_configured(provider: str) -> bool:
     return any(os.getenv(k) for k in _PROVIDER_ENV_KEYS.get(provider, ()))
 
 
+def _foundry_configured() -> bool:
+    return bool(os.getenv("ANTHROPIC_FOUNDRY_API_KEY") and os.getenv("ANTHROPIC_FOUNDRY_RESOURCE"))
+
+
 def _resolve_provider(requested: JudgeProvider) -> JudgeProvider:
     """Return the requested provider if its credentials are present, otherwise
     fall back to the first configured provider. Lets the demo run on an
@@ -116,6 +120,16 @@ def _make_judge(provider: JudgeProvider, model: str | None):
     if request_config is not None:
         return LLMJudge(config=request_config, model=request_config["model"])
     check_model(model, _offered_models(_CATALOGUE_PROVIDER[provider]))
+    if provider == "anthropic" and not _provider_configured("anthropic") and _foundry_configured():
+        # Claude through the deployment's Azure AI Foundry resource, as the Vision
+        # Extractor and the model menu run it; the panel's Claude judge comes here.
+        from gaik.software_components.llm import get_llm_config
+
+        try:
+            config = get_llm_config("anthropic_foundry", **({"model": model} if model else {}))
+            return LLMJudge(config=config, model=config["model"])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=component_error(e)) from e
     provider = _resolve_provider(provider)
     # LLMJudge defaults use_azure=True, which would force the Azure OpenAI config
     # even for the plain "openai" provider. Drive it from the environment so an

@@ -109,7 +109,8 @@ const DEFAULT_OPTIONS: ReportOptions = {
   curate: true,
   polish: true,
   strictReview: true,
-  reviewModel: "gpt-5.5-deployment",
+  // Empty: the reviewer runs on the writer's model, one a signed-in user may run.
+  reviewModel: "",
   reportLanguage: "English",
   includeSourceRefs: false,
   outputDocx: true,

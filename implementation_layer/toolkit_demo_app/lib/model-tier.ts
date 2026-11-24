@@ -8,10 +8,33 @@ export const MODEL_TIER_HEADER = "x-gaik-model-tier";
 
 const STAFF_DOMAIN = "@haaga-helia.fi";
 
+// The chat models everyone signed in may run on the server's credentials; every
+// other model is for the team. The API reads the same DEMO_OPEN_MODELS
+// (api/utils/model_settings.py), so set it on both deployments.
+const OPEN_MODELS = "gpt-6-luna,claude-haiku-5-5";
+
+export function openModels(): string[] {
+  return (process.env.DEMO_OPEN_MODELS ?? OPEN_MODELS)
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+}
+
 /**
- * The GAIK team may run the costlier server models: the admin, the shared demo
- * account (DEMO_USER_NAME), haaga-helia.fi addresses and anyone listed in
- * MODEL_STAFF_EMAILS (comma-separated, set on the deployment, not in the repo).
+ * The Azure deployment a demo that runs its model in Next.js uses for this user:
+ * the configured one for the team or when it is open, else the first open GPT model.
+ */
+export function deploymentFor(configured: string, staff: boolean): string {
+  const open = openModels();
+  if (staff || open.includes(configured)) return configured;
+  return open.find((name) => name.startsWith("gpt-")) ?? configured;
+}
+
+/**
+ * The GAIK team may run every server model; everyone else the open ones
+ * (openModels). The team: the admin, the shared demo account (DEMO_USER_NAME),
+ * haaga-helia.fi addresses and anyone listed in MODEL_STAFF_EMAILS
+ * (comma-separated, set on the deployment, not in the repo).
  */
 export function isModelStaff(
   email: string | null,

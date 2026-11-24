@@ -11,8 +11,11 @@ from .model_settings import (
     aitta_embedding_model,
     aitta_speech_model,
     get_request_api_config,
+    is_listed_team_model,
     model_name,
+    open_model_for,
     reads_images,
+    request_is_staff,
     request_model_settings,
     request_reasoning_effort,
     request_server_model,
@@ -165,7 +168,13 @@ def require_vision(config: dict) -> dict:
 
 
 def server_api_config():
-    """The deployment's own provider and model, ignoring any per-request choice."""
+    """The deployment's own provider and model, ignoring any per-request choice.
+
+    Outside the GAIK team a request runs on an open model: when the deployment's
+    model (``DEMO_LLM_MODEL``) is one the catalogue keeps for the team, the first
+    open model on the same provider takes its place (``model_settings.open_model_for``).
+    A deployment name the catalogue does not know stays, as it may be the only one.
+    """
     from gaik.software_components.llm import get_llm_config
 
     provider = os.getenv("DEMO_LLM_PROVIDER") or os.getenv("LLM_PROVIDER")
@@ -184,7 +193,13 @@ def server_api_config():
     if os.getenv("DEMO_LLM_MODEL"):
         overrides["model"] = os.environ["DEMO_LLM_MODEL"]
     try:
-        return get_llm_config(provider, **overrides)
+        config = get_llm_config(provider, **overrides)
+        model = config.get("model")
+        if not request_is_staff() and is_listed_team_model(str(model or "")):
+            fallback = open_model_for(provider)
+            if fallback:
+                config = get_llm_config(provider, **{**overrides, "model": fallback})
+        return config
     except ValueError:
         raise HTTPException(503, "The server model provider is not configured correctly.") from None
 

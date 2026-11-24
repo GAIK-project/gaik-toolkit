@@ -10,6 +10,7 @@ import {
   wrapLanguageModel,
 } from "ai";
 import { z } from "zod";
+import { deploymentFor } from "@/lib/model-tier";
 import { SKILL_TEXT } from "./skill.generated";
 import { intakeProblems } from "./verify";
 
@@ -32,7 +33,7 @@ const deployment =
   process.env.HELPDESK_CHAT_DEPLOYMENT ??
   "gpt-6-sol";
 
-function chatModel() {
+function chatModel(staff: boolean) {
   const azure = createAzure({
     apiKey: process.env.AZURE_API_KEY,
     baseURL: azureBaseUrl(),
@@ -43,7 +44,8 @@ function chatModel() {
   // Classifying against the Act is reasoning work; the questions are not. A
   // little reasoning keeps the findings consistent without a long wait.
   return wrapLanguageModel({
-    model: azure.responses(deployment),
+    // Outside the GAIK team an open model (lib/model-tier.ts).
+    model: azure.responses(deploymentFor(deployment, staff)),
     middleware: defaultSettingsMiddleware({
       settings: {
         providerOptions: {
@@ -181,9 +183,9 @@ function buildTools(userTexts: string[]) {
   };
 }
 
-export function createScreeningAgent(userTexts: string[]) {
+export function createScreeningAgent(userTexts: string[], staff = false) {
   return new ToolLoopAgent({
-    model: chatModel(),
+    model: chatModel(staff),
     instructions: buildInstructions(new Date().toISOString().slice(0, 10)),
     tools: buildTools(userTexts),
     stopWhen: isStepCount(6),
