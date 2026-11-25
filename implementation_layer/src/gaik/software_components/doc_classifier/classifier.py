@@ -16,6 +16,7 @@ from gaik.software_components._log_names import error_text, file_tag
 from gaik.software_components.file_type import detect_file_type
 from gaik.software_components.input_limits import InputLimitError, InputLimits
 from gaik.software_components.llm.base import FIT_TO_BOUNDS, ProviderClient
+from gaik.software_components.llm.blocked import checked_openai
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.source_material import (
@@ -413,7 +414,7 @@ Provide your classification with:
                 )
             else:
                 sampling = {} if self.temperature is None else {"temperature": self.temperature}
-                response = self.client.beta.chat.completions.parse(
+                response = checked_openai(self.client).beta.chat.completions.parse(
                     model=self.model,
                     messages=messages,
                     response_format=ClassificationModel,

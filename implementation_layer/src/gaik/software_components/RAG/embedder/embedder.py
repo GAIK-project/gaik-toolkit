@@ -18,6 +18,7 @@ from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.providers import resolve_provider
+from gaik.software_components.llm.retries import is_transient_error
 
 
 def _chunked(items: list[str], batch_size: int) -> Iterable[list[str]]:
@@ -29,8 +30,9 @@ def _with_retries(call, *, tries: int = 4) -> object:
     for attempt in range(tries):
         try:
             return call()
-        except (RateLimitError, APITimeoutError, APIError):
-            if attempt == tries - 1:
+        except (RateLimitError, APITimeoutError, APIError) as error:
+            # A refused request (a 400 such as a content filter) is refused again.
+            if attempt == tries - 1 or not is_transient_error(error):
                 raise
             time.sleep(2**attempt)
 

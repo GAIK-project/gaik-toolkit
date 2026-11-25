@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
+from gaik.software_components.llm.blocked import blocked_request_error, check_openai_choice
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
 
@@ -40,17 +41,27 @@ class OpenAIProvider:
     def _build_client(config: dict):
         return create_openai_client(config)
 
+    def _send(self, create: Any, model: str, **params: Any) -> Any:
+        """``create(**params)``, with a content-filter refusal raised as
+        ContentBlockedError."""
+        try:
+            return create(model=model, **params)
+        except Exception as error:
+            blocked = blocked_request_error(error, provider=self.provider, model=model)
+            if blocked is not None:
+                raise blocked from error
+            raise
+
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         model = kwargs.pop("model", self.model)
         kwargs = normalize_chat_kwargs(model, kwargs, config=self._config)
-        completion = self.raw.chat.completions.create(
-            model=model,
-            messages=messages,
-            **kwargs,
+        completion = self._send(
+            self.raw.chat.completions.create, model, messages=messages, **kwargs
         )
-        choice = completion.choices[0].message
         usage = _usage(completion)
         self.usage.add(usage)
+        check_openai_choice(completion.choices[0], provider=self.provider, model=model)
+        choice = completion.choices[0].message
         return ChatResponse(
             text=choice.content or "",
             model=completion.model,
@@ -67,13 +78,15 @@ class OpenAIProvider:
     ) -> BaseModel:
         model = kwargs.pop("model", self.model)
         kwargs = normalize_chat_kwargs(model, kwargs, config=self._config)
-        completion = self.raw.beta.chat.completions.parse(
-            model=model,
+        completion = self._send(
+            self.raw.beta.chat.completions.parse,
+            model,
             messages=messages,
             response_format=response_format,
             **kwargs,
         )
         self.usage.add(_usage(completion))
+        check_openai_choice(completion.choices[0], provider=self.provider, model=model)
         parsed = completion.choices[0].message.parsed
         if parsed is None:
             raise ValueError("OpenAI parse() returned None — check the model/schema.")
@@ -82,15 +95,13 @@ class OpenAIProvider:
     def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         model = kwargs.pop("model", self.model)
         kwargs = normalize_chat_kwargs(model, kwargs, config=self._config)
-        stream = self.raw.chat.completions.create(
-            model=model,
-            messages=messages,
-            stream=True,
-            **kwargs,
+        stream = self._send(
+            self.raw.chat.completions.create, model, messages=messages, stream=True, **kwargs
         )
         for chunk in stream:
             if not chunk.choices:
                 continue
+            check_openai_choice(chunk.choices[0], provider=self.provider, model=model)
             delta = chunk.choices[0].delta
             if delta and delta.content:
                 yield delta.content

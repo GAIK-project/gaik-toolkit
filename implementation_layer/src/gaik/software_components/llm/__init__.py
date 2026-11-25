@@ -7,6 +7,7 @@ unchanged for OpenAI/Azure-only use cases.
 """
 
 from gaik.software_components.llm.base import ChatResponse, ProviderClient
+from gaik.software_components.llm.blocked import ContentBlockedError
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import (
     assert_openai_or_azure,
@@ -17,6 +18,7 @@ from gaik.software_components.llm.providers import Provider, resolve_provider
 
 __all__ = [
     "ChatResponse",
+    "ContentBlockedError",
     "Provider",
     "ProviderClient",
     "assert_openai_or_azure",

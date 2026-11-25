@@ -83,6 +83,7 @@ def _with_llm(
     config = settings.llm_config()
     try:
         from gaik.software_components.llm import ProviderClient, build_compat_client
+        from gaik.software_components.llm.blocked import checked_openai
         from gaik.software_components.llm.parameters import normalize_chat_kwargs
         from gaik.software_components.source_material import (
             SourceMaterial,
@@ -122,7 +123,7 @@ def _with_llm(
         )
     else:
         options: dict[str, Any] = {"top_p": 1.0, "timeout": config.get("timeout", 30), **sampling}
-        response = client.beta.chat.completions.parse(
+        response = checked_openai(client).beta.chat.completions.parse(
             model=model,
             messages=messages,
             response_format=answer,

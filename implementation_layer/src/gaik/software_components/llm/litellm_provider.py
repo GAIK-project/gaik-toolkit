@@ -16,6 +16,7 @@ from gaik.software_components.llm.base import (
     ChatResponse,
     UsageCounter,
 )
+from gaik.software_components.llm.blocked import blocked_request_error, check_openai_choice
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 
 
@@ -79,17 +80,28 @@ class LiteLLMProvider:
             options = normalize_chat_kwargs(model, options, config=self._config)
         return options
 
+    def _completion(self, messages: list[ChatMessage], options: dict[str, Any]) -> tuple[str, Any]:
+        """The model and ``litellm.completion``'s response, with a content-filter
+        refusal raised as ContentBlockedError."""
+        model = options.pop("model", self.model)
+        try:
+            return model, litellm.completion(model=model, messages=messages, **options)
+        except Exception as error:
+            blocked = blocked_request_error(error, provider=self.provider, model=model)
+            if blocked is not None:
+                raise blocked from error
+            raise
+
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         options = self._options(kwargs)
-        response = litellm.completion(
-            model=options.pop("model", self.model), messages=messages, **options
-        )
+        model, response = self._completion(messages, options)
         usage = (
             {k: v for k, v in response.usage.model_dump().items() if isinstance(v, int)}
             if response.usage
             else {}
         )
         self.usage.add(usage)
+        check_openai_choice(response.choices[0], provider=self.provider, model=str(model))
         return ChatResponse(
             text=response.choices[0].message.content or "",
             model=response.model,
@@ -109,13 +121,19 @@ class LiteLLMProvider:
 
     def chat_stream(self, messages: list[ChatMessage], **kwargs: Any) -> Iterator[str]:
         options = self._options(kwargs)
-        stream = litellm.completion(
-            model=options.pop("model", self.model), messages=messages, stream=True, **options
-        )
+        model, stream = self._completion(messages, {**options, "stream": True})
         try:
             for chunk in stream:
+                if chunk.choices:
+                    check_openai_choice(chunk.choices[0], provider=self.provider, model=str(model))
                 if chunk.choices and chunk.choices[0].delta.content:
                     yield chunk.choices[0].delta.content
+        except Exception as error:
+            # LiteLLM can raise its filter error while the stream is read, too.
+            blocked = blocked_request_error(error, provider=self.provider, model=str(model))
+            if blocked is not None:
+                raise blocked from error
+            raise
         finally:
             close = getattr(stream, "close", None)
             if callable(close):

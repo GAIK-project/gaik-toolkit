@@ -15,8 +15,10 @@ except ImportError:
 
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.blocked import checked_openai
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.retries import is_transient_error
 from gaik.software_components.source_material import (
     SourceMaterial,
     with_source_material_instruction,
@@ -89,8 +91,9 @@ def _with_retries(call, *, tries: int = 4):
     for attempt in range(tries):
         try:
             return call()
-        except (RateLimitError, APITimeoutError, APIError):
-            if attempt == tries - 1:
+        except (RateLimitError, APITimeoutError, APIError) as error:
+            # A refused request (a 400 such as a content filter) is refused again.
+            if attempt == tries - 1 or not is_transient_error(error):
                 raise
             time.sleep(2**attempt)
 
@@ -194,7 +197,7 @@ class AnswerGenerator:
             answer = result.text or ""
         else:
             response = _with_retries(
-                lambda: self.client.chat.completions.create(
+                lambda: checked_openai(self.client).chat.completions.create(
                     model=self.model,
                     messages=messages,
                     **normalize_chat_kwargs(self.model, {"temperature": 0.0}, config=self.config),
@@ -265,7 +268,7 @@ class AnswerGenerator:
                         yield delta
             else:
                 response = _with_retries(
-                    lambda: self.client.chat.completions.create(
+                    lambda: checked_openai(self.client).chat.completions.create(
                         model=self.model,
                         messages=messages,
                         **normalize_chat_kwargs(
