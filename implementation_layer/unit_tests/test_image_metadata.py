@@ -346,3 +346,204 @@ def test_the_judge_sends_source_pages_without_their_metadata(monkeypatch):
     judge._dispatch([_jpeg_with_text()], "user", "system")
 
     assert sent["pages"] and SB not in sent["pages"][0]
+
+
+# --- GIF: rebuilt, so nothing but the frames, their timing and the loop stays --
+
+
+def _gif_frames(data: bytes) -> list[tuple[bytes, int | None]]:
+    """Each displayed frame, composited, with its duration."""
+    from PIL import ImageSequence
+
+    with Image.open(io.BytesIO(data)) as image:
+        return [
+            (frame.convert("RGBA").tobytes(), frame.info.get("duration"))
+            for frame in ImageSequence.Iterator(image)
+        ]
+
+
+def _gif_image_data(indices: bytes, size: tuple[int, int]) -> bytes:
+    """The LZW minimum code size, image sub-blocks and terminator for the indices."""
+    from PIL import GifImagePlugin
+
+    written = b"".join(GifImagePlugin.getdata(Image.frombytes("L", size, indices)))
+    return written[10:]
+
+
+def _crafted_gif(version: bytes = b"GIF89a") -> bytes:
+    """Two frames with text where a GIF reader skips it: unused colour-table
+    entries, a graphic control's extra sub-block, an application block whose
+    first sub-block is not the loop, image sub-blocks after the pixels end,
+    comment and plain-text extensions, and data after the trailer."""
+    import struct
+
+    w, h = 16, 8
+    palette = bytearray(3 * 256)
+    palette[0:12] = bytes([10, 120, 200, 250, 0, 0, 0, 0, 0, 255, 255, 255])
+    palette[300 : 300 + len(SB)] = SB  # entries 100 onwards: no pixel uses them
+    local = bytearray(3 * 64)
+    local[0:6] = bytes([0, 200, 0, 200, 0, 200])
+    local[60 : 60 + len(SB)] = SB
+    first = bytes(([0] * 3 + [1] + [0] * 12) * h)
+    second = bytes(([1, 0] * 8) * 4 + [0] * 16 * 4)
+
+    data1 = _gif_image_data(first, (w, h))
+    data1 = data1[:-1] + bytes([len(SB)]) + SB + b"\x00"  # a sub-block after the pixels
+    data2 = _gif_image_data(second, (w, h))
+
+    def blocks(text: bytes) -> bytes:
+        return bytes([len(text)]) + text + b"\x00"
+
+    gce1 = b"\x21\xf9\x04" + struct.pack("<BHB", 0x08 | 0x01, 20, 3)  # disposal 2, transparent
+    gce1 += bytes([len(SB)]) + SB + b"\x00"  # a second sub-block, not needed
+    gce2 = b"\x21\xf9\x04" + struct.pack("<BHB", 0x04, 35, 0) + b"\x00"
+    return b"".join(
+        [
+            version,
+            struct.pack("<HHBBB", w, h, 0xF7, 2, 0),
+            bytes(palette),
+            b"\x21\xff\x0bNETSCAPE2.0" + b"\x05\x02" + SB[:4] + b"\x03\x01\x00\x00" + blocks(SB),
+            b"\x21\xff\x0bNETSCAPE2.0\x03\x01\x00\x00\x00",
+            b"\x21\xfe" + blocks(SB),
+            gce1,
+            b"\x2c" + struct.pack("<HHHHB", 0, 0, w, h, 0) + data1,
+            b"\x21\x01\x0c" + bytes(12) + blocks(SB),  # plain text
+            gce2,
+            b"\x2c" + struct.pack("<HHHHB", 0, 0, w, h, 0x85) + bytes(local) + data2,
+            b"\x3b",
+            SB,
+        ]
+    )
+
+
+@pytest.mark.parametrize("version", [b"GIF89a", b"GIF87a"])
+def test_gif_text_in_parts_a_reader_skips_goes_and_the_frames_stay(version):
+    data = _crafted_gif(version)
+    assert data.count(SB) >= 6
+
+    cleaned, removed = strip_image_metadata(data, strict=True)
+
+    assert SB not in cleaned and SB[:4] not in cleaned
+    assert {"comment", "other metadata", "data after the image"} <= set(removed)
+    assert _gif_frames(cleaned) == _gif_frames(data)
+    with Image.open(io.BytesIO(data)) as before, Image.open(io.BytesIO(cleaned)) as after:
+        assert after.n_frames == before.n_frames == 2
+        assert after.info.get("loop") == before.info.get("loop") == 0
+        assert after.mode == before.mode == "P"
+        assert after.info.get("transparency") == before.info.get("transparency") == 3
+        assert after.disposal_method == before.disposal_method == 2
+
+
+def test_an_interlaced_animated_gif_keeps_its_pixels_and_timing():
+    frames = [
+        _picture().resize((40, 30)).convert("P"),
+        Image.new("RGB", (40, 30), (0, 0, 0)).convert("P"),
+        _picture().resize((40, 30)).rotate(90).convert("P"),
+    ]
+    out = io.BytesIO()
+    frames[0].save(
+        out,
+        format="GIF",
+        save_all=True,
+        append_images=frames[1:],
+        loop=3,
+        duration=[40, 80, 120],
+        disposal=[1, 2, 1],
+        interlace=True,
+        comment=SECRET,
+    )
+    data = out.getvalue()
+    cleaned, _ = strip_image_metadata(data, strict=True)
+    assert SB not in cleaned
+    assert _gif_frames(cleaned) == _gif_frames(data)
+    with Image.open(io.BytesIO(cleaned)) as image:
+        assert image.info.get("loop") == 3
+
+
+def test_a_gif_that_cannot_be_rebuilt_is_refused(monkeypatch):
+    from gaik.software_components.image_metadata import UnreadableImageError
+
+    data = _crafted_gif()
+    truncated = data[: data.index(b"\x2c") + 14]  # inside the first frame's pixels
+    with pytest.raises(UnreadableImageError):
+        strip_image_metadata(truncated, strict=True)
+    assert strip_image_metadata(truncated) == (truncated, ())
+
+    monkeypatch.setitem(__import__("sys").modules, "PIL", None)  # Pillow not installed
+    with pytest.raises(UnreadableImageError):
+        strip_image_metadata(data, strict=True)
+
+
+# --- PNG and WebP keep their orientation, alone --------------------------------
+
+
+def _upright(data: bytes) -> tuple[tuple[int, int], bytes]:
+    from PIL import ImageOps
+
+    with Image.open(io.BytesIO(data)) as image:
+        upright = ImageOps.exif_transpose(image)
+        return upright.size, upright.convert("RGBA").tobytes()
+
+
+def _only_orientation(cleaned: bytes, orientation: int) -> None:
+    with Image.open(io.BytesIO(cleaned)) as image:
+        exif = dict(image.getexif())
+    assert exif == ({0x0112: orientation} if orientation != 1 else {})
+
+
+@pytest.mark.parametrize("orientation", range(1, 9))
+def test_png_keeps_its_orientation_and_loses_the_rest_of_its_exif(orientation):
+    out = io.BytesIO()
+    _picture().save(out, format="PNG", exif=_exif(orientation=orientation))
+    data = out.getvalue()
+
+    cleaned, removed = _check_upright(data)
+
+    assert "EXIF" in removed
+    _only_orientation(cleaned, orientation)
+    if orientation != 1:
+        assert cleaned.index(b"eXIf") < cleaned.index(b"IDAT")
+
+
+@pytest.mark.parametrize("lossless", [True, False])
+@pytest.mark.parametrize("orientation", range(1, 9))
+def test_webp_keeps_its_orientation_and_loses_the_rest_of_its_exif(orientation, lossless):
+    out = io.BytesIO()
+    _picture().save(out, format="WEBP", lossless=lossless, exif=_exif(orientation), xmp=XMP)
+
+    cleaned, removed = _check_upright(out.getvalue())
+
+    assert {"EXIF", "XMP"} <= set(removed)
+    _only_orientation(cleaned, orientation)
+    assert cleaned[4:8] == (len(cleaned) - 8).to_bytes(4, "little")
+
+
+@pytest.mark.parametrize("mode", ["RGB", "RGBA"])
+def test_a_simple_webp_with_exif_gets_the_container_its_orientation_needs(mode):
+    exif = _exif(orientation=6).tobytes()[6:]  # without the "Exif" header
+    out = io.BytesIO()
+    _picture(mode).save(out, format="WEBP", lossless=True)
+    simple = out.getvalue()
+    assert simple[12:16] == b"VP8L"
+    chunk = b"EXIF" + len(exif).to_bytes(4, "little") + exif + b"\x00" * (len(exif) & 1)
+    body = simple[8:] + chunk
+    data = b"RIFF" + len(body).to_bytes(4, "little") + body
+
+    cleaned, removed = strip_image_metadata(data, strict=True)
+
+    assert SB not in cleaned and removed == ("EXIF",)
+    assert cleaned[12:16] == b"VP8X"
+    _only_orientation(cleaned, 6)
+    with Image.open(io.BytesIO(simple)) as image:
+        turned = image.transpose(Image.Transpose.ROTATE_270)  # what orientation 6 asks
+        assert _upright(cleaned) == ((8, 16), turned.convert("RGBA").tobytes())
+    with Image.open(io.BytesIO(cleaned)) as image:
+        assert image.mode == mode
+
+
+def _check_upright(original: bytes) -> tuple[bytes, tuple[str, ...]]:
+    assert SB in original
+    cleaned, removed = strip_image_metadata(original, strict=True)
+    assert SB not in cleaned
+    assert _upright(cleaned) == _upright(original)
+    return cleaned, removed
