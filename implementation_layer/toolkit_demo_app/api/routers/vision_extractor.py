@@ -575,9 +575,9 @@ async def extract_vision(
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
             suffix = Path(uploaded_file.filename or "").suffix.lower()
-            content = await without_image_metadata(suffix, content)
             if (problem := await upload_problem(suffix, content)) is not None:
                 raise HTTPException(status_code=problem.status, detail=problem.message)
+            content = await without_image_metadata(suffix, content)
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
                 tmp.write(content)
                 temp_paths.append(Path(tmp.name))

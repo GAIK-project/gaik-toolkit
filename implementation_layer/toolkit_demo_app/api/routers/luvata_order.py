@@ -860,11 +860,11 @@ async def process_order(
                 return
             pricing_bytes = await validate_file_size(pricing_file)
             pricing_suffix = Path(pricing_file.filename or "").suffix
-            pricing_bytes = await without_image_metadata(pricing_suffix, pricing_bytes)
             problem = await upload_problem(pricing_suffix, pricing_bytes, check_type=False)
             if problem is not None:
                 yield sse_event("error", {"message": problem.message})
                 return
+            pricing_bytes = await without_image_metadata(pricing_suffix, pricing_bytes)
             # 1. Parse every document to text
             yield sse_event("status", {"message": "Parsing documents..."})
             po_text, *bom_texts = await asyncio.gather(

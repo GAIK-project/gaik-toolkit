@@ -274,9 +274,9 @@ async def upload_file(
         )
 
     content = await validate_file_size(file)
-    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
+    content = await without_image_metadata(suffix, content)
     if not await _evict_stale(make_room=True):
         raise _TOO_MANY_SESSIONS
 

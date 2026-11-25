@@ -316,10 +316,10 @@ async def _checked_attachments(files: list[FileAttachment]) -> list[tuple[str, s
     checked = []
     for name, ext, file_bytes in [(_attachment_name(f), *_decode_attachment(f)) for f in files]:
         # The type was checked in _decode_attachment, with this route's own 400.
-        # An image goes on without the text its file carries besides the pixels.
-        file_bytes = await without_image_metadata(ext, file_bytes)
         if (problem := await upload_problem(ext, file_bytes, check_type=False)) is not None:
             raise HTTPException(problem.status, f"{name}: {problem.message}")
+        # An image goes on without the text its file carries besides the pixels.
+        file_bytes = await without_image_metadata(ext, file_bytes)
         checked.append((name, ext, file_bytes))
     return checked
 

@@ -166,9 +166,9 @@ async def _sample_markdown(upload: UploadFile, gaik) -> str:
     """The sample report as Markdown: text files as they are, DOCX and PDF converted locally."""
     suffix = Path(upload.filename or "").suffix.lower()
     data = await upload.read()
-    data = await without_image_metadata(suffix, data)
     if (problem := await upload_problem(suffix, data, check_type=False)) is not None:
         raise HTTPException(problem.status, f"The sample report: {problem.message}")
+    data = await without_image_metadata(suffix, data)
     if suffix in _SAMPLE_TEXT:
         try:
             return data.decode("utf-8-sig")

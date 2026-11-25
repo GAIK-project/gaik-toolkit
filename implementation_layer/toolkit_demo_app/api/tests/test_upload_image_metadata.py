@@ -69,7 +69,7 @@ def test_the_wizard_parses_the_cleaned_attachment(monkeypatch):
 
 def test_every_route_that_checks_an_upload_cleans_images_first():
     """A route that calls upload_problem on a file that may be an image cleans
-    that same variable just before (PDF-only calls excepted), and awaits it."""
+    that same variable once the checks have passed it (PDF-only calls excepted)."""
     import re
 
     routers = Path(wizard.__file__).parent
@@ -86,7 +86,10 @@ def test_every_route_that_checks_an_upload_cleans_images_first():
                 continue
             found += 1
             expected = f"{variable} = await without_image_metadata({suffix}, {variable})"
-            assert lines[number - 1].strip() == expected, f"{path.name}:{number + 1}"
+            before = [text.strip() for text in lines[max(0, number - 3) : number]]
+            after = [text.strip() for text in lines[number + 1 : number + 10]]
+            assert expected not in before, f"{path.name}:{number + 1} cleans before the check"
+            assert expected in after, f"{path.name}:{number + 1}"
     assert found >= 15
 
 
@@ -126,6 +129,10 @@ def test_each_image_format_loses_its_text(fmt):
     assert _pixels(cleaned) == _pixels(data)
 
 
-def test_a_damaged_image_that_cannot_be_cleaned_is_left_for_the_checks():
+def test_an_image_that_cannot_be_cleaned_is_refused():
+    from fastapi import HTTPException
+
     broken = b"\xff\xd8\xff\xfe\x00\x10" + SECRET
-    assert asyncio.run(without_image_metadata(".jpg", broken)) == broken
+    with pytest.raises(HTTPException) as refused:
+        asyncio.run(without_image_metadata(".jpg", broken))
+    assert refused.value.status_code == 422

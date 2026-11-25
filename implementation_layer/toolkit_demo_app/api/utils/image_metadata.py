@@ -44,9 +44,10 @@ logger = logging.getLogger(__name__)
 
 __all__ = ["UnreadableImageError", "strip_image_metadata"]
 
-#: Not decoded past this many pixels in all (``input_limits``' image pixel
-#: limit, four times over for a multi-page scan), nor more frames than this.
-_MAX_DECODED_PIXELS = 4 * 89_478_485
+#: Not decoded past this many pixels for one picture or page (``input_limits``'
+#: image pixel limit), four times that for all pages of a scan, nor more pages.
+_MAX_IMAGE_PIXELS = 89_478_485
+_MAX_DECODED_PIXELS = 4 * _MAX_IMAGE_PIXELS
 _MAX_FRAMES = 1000
 
 # The names reported as removed.
@@ -100,6 +101,10 @@ def _orientation_segment(orientation: int) -> bytes:
     return b"\xff" + bytes([_APP1]) + struct.pack(">H", len(payload) + 2) + payload
 
 
+def _segment(marker: int, payload: bytes) -> bytes:
+    return b"\xff" + bytes([marker]) + struct.pack(">H", len(payload) + 2) + payload
+
+
 def _scan_end(data: bytes, i: int) -> int | None:
     """Where the entropy-coded data starting at ``i`` ends: at the first marker
     that is not a restart marker, a stuffed 0xFF00 or a fill byte."""
@@ -151,12 +156,17 @@ def _jpeg(data: bytes) -> tuple[bytes, list[str]] | None:
                 return None
             out += [segment, data[i:scan_end]]
             i = scan_end
-        elif (
-            marker in _JPEG_KEEP
-            or (marker == _APP0 and payload.startswith(b"JFIF\x00"))
-            or (marker == _APP14 and payload.startswith(b"Adobe"))
-            or (marker == _APP2 and payload.startswith(_ICC))
-        ):
+        elif marker == _APP0 and payload.startswith(b"JFIF\x00") and len(payload) >= 14:
+            # The JFIF header alone: version, density; no thumbnail, nothing after.
+            out.append(_segment(_APP0, payload[:12] + b"\x00\x00"))
+            if len(payload) > 14:
+                removed.append(OTHER)
+        elif marker == _APP14 and payload.startswith(b"Adobe") and len(payload) >= 12:
+            # Version, flags and colour transform: 12 bytes; nothing after.
+            out.append(_segment(_APP14, payload[:12]))
+            if len(payload) > 12:
+                removed.append(OTHER)
+        elif marker in _JPEG_KEEP or (marker == _APP2 and payload.startswith(_ICC)):
             out.append(segment)
         elif marker == _APP1 and payload.startswith(_EXIF_HEADER):
             orientation = _exif_orientation(payload) or orientation
@@ -179,14 +189,16 @@ def _jpeg(data: bytes) -> tuple[bytes, list[str]] | None:
 # --- PNG ------------------------------------------------------------------
 
 _PNG = b"\x89PNG\r\n\x1a\n"
-#: Ancillary chunks a picture needs to look right; every other ancillary chunk
-#: (tEXt, zTXt, iTXt, eXIf, tIME and private ones) goes. Critical chunks stay.
-_PNG_KEEP = frozenset(
-    {
-        b"tRNS", b"gAMA", b"cHRM", b"sRGB", b"iCCP", b"sBIT", b"bKGD", b"pHYs",
-        b"hIST", b"cICP", b"mDCv", b"cLLi", b"acTL", b"fcTL", b"fdAT",
-    }
-)  # fmt: skip
+#: The chunks a picture needs, critical and ancillary; every other ancillary
+#: chunk (tEXt, zTXt, iTXt, eXIf, tIME and private ones) goes, and so does a
+#: kept chunk longer than its kind holds.
+#: Each with the most bytes it holds (None: image or profile data, any length).
+_PNG_KEEP = {
+    b"IHDR": 13, b"PLTE": 768, b"IDAT": None, b"IEND": 0,
+    b"tRNS": 256, b"gAMA": 4, b"cHRM": 32, b"sRGB": 1, b"iCCP": None, b"sBIT": 4,
+    b"bKGD": 6, b"pHYs": 9, b"hIST": 512, b"cICP": 4, b"mDCv": 24, b"cLLi": 8,
+    b"acTL": 8, b"fcTL": 26, b"fdAT": None,
+}  # fmt: skip
 _PNG_NAMES = {b"tEXt": PNG_TEXT, b"zTXt": PNG_TEXT, b"iTXt": PNG_TEXT, b"eXIf": EXIF}
 
 
@@ -214,8 +226,10 @@ def _png(data: bytes) -> tuple[bytes, list[str]] | None:
             if name_end < 0:
                 return None
             out.append(_png_chunk(kind, b"ICC profile" + data[name_end : end - 4]))
-        elif kind[:1].isupper() or kind in _PNG_KEEP:
+        elif kind in _PNG_KEEP and (_PNG_KEEP[kind] is None or length <= _PNG_KEEP[kind]):
             out.append(data[i:end])
+        elif kind[:1].isupper():
+            return None  # a critical chunk not known here: not walked, saved again
         else:
             removed.append(_PNG_NAMES.get(kind, OTHER))
         i = end
@@ -363,8 +377,9 @@ def _resave(data: bytes, tiff: bool) -> tuple[bytes, list[str]] | None:
             frames, pixels = 0, 0
             for frame in ImageSequence.Iterator(image):
                 frames += 1
-                pixels += frame.size[0] * frame.size[1]
-                if frames > _MAX_FRAMES or pixels > _MAX_DECODED_PIXELS:
+                size = frame.size[0] * frame.size[1]
+                pixels += size
+                if frames > _MAX_FRAMES or size > _MAX_IMAGE_PIXELS or pixels > _MAX_DECODED_PIXELS:
                     logger.info("An image too large to clean is sent as it is")
                     return None
             image.seek(0)
@@ -390,9 +405,11 @@ def _resave(data: bytes, tiff: bool) -> tuple[bytes, list[str]] | None:
                 return None  # an animation the walk could not follow: not re-encoded here
             upright = ImageOps.exif_transpose(image).copy()
             upright.info = {}  # Pillow writes a JPEG's comment back from it
-            options = {}
-            if image.info.get("icc_profile"):
-                options["icc_profile"] = image.info["icc_profile"]
+            options = {
+                key: image.info[key]
+                for key in ("icc_profile", "transparency")
+                if image.info.get(key) is not None
+            }
             if image.format == "JPEG":
                 options["quality"] = 95
             upright.save(out, format=image.format, **options)

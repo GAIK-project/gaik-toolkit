@@ -165,9 +165,9 @@ async def transcribe_audio(
         )
 
     content = await validate_audio_file_size(file)
-    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
+    content = await without_image_metadata(suffix, content)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name

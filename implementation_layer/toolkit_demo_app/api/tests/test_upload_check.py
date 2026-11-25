@@ -27,7 +27,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 EICAR = b"X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*"
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+PNG = (
+    # A real 1x1 PNG: an image is cleaned of its metadata once the checks pass it.
+    b"\x89PNG\r\n\x1a\n"
+    + struct.pack(">I", 13) + b"IHDR" + struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    + struct.pack(">I", zlib.crc32(b"IHDR" + struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)))
+    + struct.pack(">I", len(zlib.compress(b"\x00\x00\x00\x00"))) + b"IDAT"
+    + zlib.compress(b"\x00\x00\x00\x00")
+    + struct.pack(">I", zlib.crc32(b"IDAT" + zlib.compress(b"\x00\x00\x00\x00")))
+    + b"\x00\x00\x00\x00IEND\xaeB`\x82"
+)  # fmt: skip
 JS_ACTION = b"<< /S /JavaScript /JS (app.alert(1)) >>"
 
 

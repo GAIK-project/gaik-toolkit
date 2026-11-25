@@ -318,10 +318,10 @@ async def generate_report(
         if refused is not None:
             raise HTTPException(415, f"{name}: {refused}")
         data = await upload.read()
-        data = await without_image_metadata(Path(name).suffix, data)
         problem = await upload_problem(Path(name).suffix, data, check_type=False)
         if problem is not None:
             raise HTTPException(problem.status, f"{name}: {problem.message}")
+        data = await without_image_metadata(Path(name).suffix, data)
         return name, data
 
     try:
