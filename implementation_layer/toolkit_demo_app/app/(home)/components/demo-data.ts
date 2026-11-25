@@ -178,20 +178,7 @@ export const modules: Demo[] = [
       { label: "Source Tracking", icon: Database },
     ],
   },
-  {
-    title: "Report writer",
-    description:
-      "Generate structured reports from documents, audio, images and spreadsheets, with per-section review",
-    href: "/report-writer",
-    icon: FileText,
-    process: SYNTHESIS,
-    featureList: [
-      { label: "Mixed inputs", icon: FileUp },
-      { label: "Agentic review", icon: Sparkles },
-      { label: "Section dependencies", icon: Database },
-      { label: "Config import/export", icon: Download },
-    ],
-  },
+  // Report writer v1 (/report-writer) is hidden here and in the menu; see site-nav.tsx.
   {
     title: "Report writer v2",
     description:

@@ -240,12 +240,8 @@ const navGroups: NavGroup[] = [
         section: CAPTURE,
       },
       { label: "RAG builder", href: "/rag", icon: Bot, section: ACCESS },
-      {
-        label: "Report writer",
-        href: "/report-writer",
-        icon: FileText,
-        section: SYNTHESIS,
-      },
+      // Report writer v1 (/report-writer) is hidden, not removed: its page still
+      // works by URL and v2 and the Knowledge demos import its components.
       {
         label: "Report writer v2",
         href: "/report-writer-v2",
