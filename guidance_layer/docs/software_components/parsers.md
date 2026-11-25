@@ -78,9 +78,10 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 **Images and vision models.** VisionParser and MultimodalParser send
 images without the text their files carry besides the pixels: EXIF
 (also the GPS position), XMP, IPTC, PNG text chunks and JPEG/GIF comments are
-removed first, losslessly, and a JPEG keeps its orientation
-(`gaik.software_components.image_metadata.strip_image_metadata`). TIFF is
-cleaned only when Pillow is installed. Text drawn in the picture is material for
+removed first, without re-encoding the pixels, and a JPEG keeps its orientation
+(`gaik.software_components.image_metadata.strip_image_metadata`); so is
+anything after the image's end. TIFF, and a file the cleaner cannot walk, is
+re-saved with Pillow without its tags. Text drawn in the picture is material for
 the model, never instructions.
 
 ---
