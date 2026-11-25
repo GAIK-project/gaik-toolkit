@@ -125,7 +125,7 @@ UNREADABLE_IMAGE_MESSAGE = (
     "The image could not be read to remove the text its file carries besides the "
     "picture. Save it again as PNG or JPEG and upload it."
 )
-_IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff"})
+_IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff", ".bmp"})
 
 
 async def without_image_metadata(suffix: str, data: bytes) -> bytes:

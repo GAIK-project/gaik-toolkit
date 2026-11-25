@@ -136,3 +136,61 @@ def test_an_image_that_cannot_be_cleaned_is_refused():
     with pytest.raises(HTTPException) as refused:
         asyncio.run(without_image_metadata(".jpg", broken))
     assert refused.value.status_code == 422
+
+
+def _image_with_text(fmt: str) -> bytes:
+    """A small picture of ``fmt`` whose file carries SECRET besides its pixels."""
+    from PIL import PngImagePlugin
+
+    image = Image.new("RGB", (12, 6), (20, 90, 160))
+    out = io.BytesIO()
+    if fmt == "JPEG":
+        image.save(out, format="JPEG", comment=SECRET)
+    elif fmt == "PNG":
+        info = PngImagePlugin.PngInfo()
+        info.add_text("Comment", SECRET.decode())
+        image.save(out, format="PNG", pnginfo=info)
+    elif fmt == "GIF":
+        image.convert("P").save(out, format="GIF", comment=SECRET)
+    elif fmt == "WEBP":
+        image.save(out, format="WEBP", lossless=True, xmp=SECRET)
+    elif fmt == "TIFF":
+        image.save(out, format="TIFF", tiffinfo={270: SECRET.decode()})
+    else:
+        image.save(out, format=fmt)
+        out.write(SECRET)  # after the pixels
+    data = out.getvalue()
+    assert SECRET in data
+    return data
+
+
+_FORMAT_OF = {
+    ".jpg": "JPEG", ".jpeg": "JPEG", ".png": "PNG", ".gif": "GIF", ".bmp": "BMP",
+    ".tiff": "TIFF", ".tif": "TIFF", ".webp": "WEBP",
+}  # fmt: skip
+
+
+@pytest.mark.parametrize("suffix", sorted(_FORMAT_OF))
+def test_every_image_the_parser_route_takes_reaches_the_parser_cleaned(suffix, monkeypatch):
+    """What reaches the parser after the upload checks, for each accepted image type."""
+    from api.routers import parser as route
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    received = {}
+
+    async def capture(path, file_suffix, parser_type):
+        received["bytes"] = Path(path).read_bytes()
+        return {"text_content": "", "metadata": {}}
+
+    monkeypatch.setattr(route, "run_parser", capture)
+    app = FastAPI()
+    app.include_router(route.router, prefix="/parse")
+    response = TestClient(app).post(
+        "/parse",
+        files={"file": (f"scan{suffix}", _image_with_text(_FORMAT_OF[suffix]), "image/*")},
+        data={"parser_type": "vision"},
+    )
+
+    assert response.status_code == 200, response.text
+    assert SECRET not in received["bytes"]

@@ -29,7 +29,7 @@ Pillow, and colour-table entries no pixel uses are written as zero. Frames,
 timing, disposal, transparency and the palette stay; a GIF that cannot be
 rebuilt, or without Pillow, is not cleaned.
 
-TIFF, and a PNG, JPEG or WebP the walk cannot follow, is re-saved with Pillow
+TIFF, BMP, and a PNG, JPEG or WebP the walk cannot follow, is re-saved with Pillow
 when it is installed: the pixels (turned upright), the compression, the ICC
 profile and the resolution are kept, every other tag goes. A file that cannot be
 cleaned either way is returned unchanged with nothing reported as removed, or,
@@ -602,7 +602,7 @@ def strip_image_metadata(data: bytes, *, strict: bool = False) -> tuple[bytes, t
     Returns the cleaned bytes and the names of what was removed (``"EXIF"``,
     ``"XMP"``, ``"IPTC"``, ``"comment"``, ``"PNG text"``, ``"TIFF tags"``,
     ``"data after the image"``, ``"other metadata"``), each once. A file that is
-    not a PNG, JPEG, WebP, GIF or TIFF comes back unchanged with nothing
+    not a PNG, JPEG, WebP, GIF, TIFF or BMP comes back unchanged with nothing
     removed. One of those that cannot be cleaned comes back unchanged too, or,
     with ``strict``, raises ``UnreadableImageError``.
     """
@@ -614,6 +614,10 @@ def strip_image_metadata(data: bytes, *, strict: bool = False) -> tuple[bytes, t
         result = _webp(data)
     elif data.startswith((b"GIF87a", b"GIF89a")):
         result = _gif(data)
+    elif data.startswith(b"BM"):
+        # BMP: a V5 header can embed a profile, and bytes can sit between the
+        # headers and the pixels or after them. Saved again, it holds pixels only.
+        result = _resave(data, tiff=False)
     elif data.startswith((b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")):
         result = _resave(data, tiff=True)
         if result is None:
