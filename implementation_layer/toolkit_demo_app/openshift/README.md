@@ -273,7 +273,7 @@ oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACC
 | `WIZARD_AGENT_MAX_BUDGET_USD` | Optional, off unless set. The CLI's estimated USD one first-wizard session's agent may spend | `oc set env` |
 | `GOOGLE_CLOUD_LOCATION` | Optional. The Vertex AI location of the server's model calls made through gaik's providers (default `eu`); those requests stay there. The Vision Extractor's own Gemini calls use `GOOGLE_GENERATE_CONTENT_URL` instead | `oc set env` |
 | `GOOGLE_CLOUD_LOCATION_FALLBACK` | Optional, off unless set. A location (for example `global`) that takes over when the Vertex location does not serve a model or does not answer | `oc set env` |
-| `DEMO_BYOK_OPENAI_REGION` | Optional: `global` (default) or `eu`. Where a user's own OpenAI key is sent; `eu` is `eu.api.openai.com`, for keys of EU data-residency projects | `oc set env` |
+| `GOOGLE_VERTEXAI_LOCATION` | Set it to `eu`. The location of the LLM judge's own Gemini calls, which do not read `GOOGLE_CLOUD_LOCATION`; unset, gaik asks the EU first and falls back to the global endpoint | `oc set env` |
 
 ## Route Annotations
 

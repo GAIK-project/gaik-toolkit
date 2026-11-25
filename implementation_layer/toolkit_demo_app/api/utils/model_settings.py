@@ -553,32 +553,6 @@ def _validate_public_endpoint(endpoint: str) -> None:
         )
 
 
-#: Where a user's own OpenAI key is sent: OpenAI's global API, or its EU endpoint
-#: for a key from a project with EU data residency (DEMO_BYOK_OPENAI_REGION=eu).
-_BYOK_OPENAI_BASE_URLS = {
-    "global": "https://api.openai.com/v1",
-    "eu": "https://eu.api.openai.com/v1",
-}
-
-
-def byok_openai_overrides() -> dict:
-    """The base URL for a user's own OpenAI key, and the host it needs allowed."""
-    import os
-
-    region = (os.getenv("DEMO_BYOK_OPENAI_REGION") or "global").strip().lower()
-    if region not in _BYOK_OPENAI_BASE_URLS:
-        logging.getLogger(__name__).warning(
-            "DEMO_BYOK_OPENAI_REGION %r is not global or eu; using global", region
-        )
-        region = "global"
-    url = _BYOK_OPENAI_BASE_URLS[region]
-    overrides: dict = {"base_url": url}
-    if region == "eu":
-        # gaik before the release that lists it does not accept this host by itself.
-        overrides["allowed_endpoint_hosts"] = [urlsplit(url).hostname]
-    return overrides
-
-
 def region_overrides(provider: str) -> dict:
     """Settings that keep a server provider's requests in their region.
 
@@ -620,10 +594,10 @@ def get_request_api_config() -> dict | None:
         overrides.update(
             azure_endpoint=settings.azure_endpoint, base_url=None, api_version=settings.api_version
         )
-    elif settings.provider == "aitta":
-        overrides["base_url"] = AITTA_BASE_URL
     else:
-        overrides.update(byok_openai_overrides())
+        overrides["base_url"] = (
+            AITTA_BASE_URL if settings.provider == "aitta" else "https://api.openai.com/v1"
+        )
     if _http_client.get() is not None:
         overrides["http_client"] = _http_client.get()
     return get_llm_config(settings.provider, **overrides)

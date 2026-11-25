@@ -4,16 +4,12 @@ from __future__ import annotations
 
 import pytest
 from api.utils import model_settings
-from api.utils.model_settings import byok_openai_overrides, region_overrides
+from api.utils.model_settings import region_overrides
 
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    for name in (
-        "GOOGLE_CLOUD_LOCATION",
-        "GOOGLE_CLOUD_LOCATION_FALLBACK",
-        "DEMO_BYOK_OPENAI_REGION",
-    ):
+    for name in ("GOOGLE_CLOUD_LOCATION", "GOOGLE_CLOUD_LOCATION_FALLBACK"):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -40,22 +36,6 @@ def test_vertex_takes_its_location_and_a_named_fallback_from_the_environment(mon
 @pytest.mark.parametrize("provider", ["azure", "openai", "aitta", "anthropic_foundry"])
 def test_other_providers_get_nothing_added(provider):
     assert region_overrides(provider) == {}
-
-
-def test_an_own_openai_key_goes_to_the_global_api_unless_the_eu_is_chosen(monkeypatch):
-    from gaik.software_components.endpoints import check_endpoint
-
-    assert byok_openai_overrides() == {"base_url": "https://api.openai.com/v1"}
-
-    monkeypatch.setenv("DEMO_BYOK_OPENAI_REGION", "EU")
-    eu = byok_openai_overrides()
-    assert eu["base_url"] == "https://eu.api.openai.com/v1"
-    assert check_endpoint(
-        eu["base_url"], provider="openai", allowed_hosts=eu["allowed_endpoint_hosts"]
-    )
-
-    monkeypatch.setenv("DEMO_BYOK_OPENAI_REGION", "mars")
-    assert byok_openai_overrides() == {"base_url": "https://api.openai.com/v1"}
 
 
 def test_the_server_model_path_names_the_vertex_location(monkeypatch):

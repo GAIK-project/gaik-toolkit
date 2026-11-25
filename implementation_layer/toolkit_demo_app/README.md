@@ -159,6 +159,9 @@ Argon timed out on every request in `eu` (gaik 0.9.1): if a model is needed that
 does not serve, set `GOOGLE_CLOUD_LOCATION_FALLBACK=global` and accept that its requests
 leave the EU. The Vision Extractor's own Gemini calls
 take a fixed `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`) and have no fallback.
+The LLM judge's own Gemini calls read `GOOGLE_VERTEXAI_LOCATION` instead of the setting
+above: unset, gaik asks the EU first and falls back to the global endpoint, so the
+deployment sets `GOOGLE_VERTEXAI_LOCATION=eu` and the judge's requests stay in the EU.
 The deployed demo calls GPT and Claude through an Azure resource in Sweden.
 
 `DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,
