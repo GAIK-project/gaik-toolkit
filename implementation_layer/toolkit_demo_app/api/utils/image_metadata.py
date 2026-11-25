@@ -11,22 +11,29 @@ can carry instructions to a parser, an agent or a model that reads the file, and
 personal data the user did not mean to send. ``strip_image_metadata`` returns
 the same picture without it.
 
-PNG, JPEG, WebP and GIF are cleaned without decoding the pixels: the file is
-walked part by part, a part is kept only when the picture needs it, and kept
-parts are copied byte for byte. What stays: a JPEG's JFIF and Adobe segments,
-tables, frames and scans (also the later scans of a progressive JPEG), its ICC
-colour profile and its orientation (written back as the only EXIF field, so a
-phone photo is not turned on its side); a PNG's critical chunks and its
-transparency, colour and animation chunks (the ICC profile's name is replaced);
-a WebP's image, alpha, animation and ICC chunks (also inside animation frames);
-a GIF's frames, graphic control and loop count. Everything else goes, also a
-part this module does not know, and anything after the image's end.
+PNG, JPEG and WebP are cleaned without decoding the pixels: the file is walked
+part by part, a part is kept only when the picture needs it, and kept parts are
+copied byte for byte. What stays: a JPEG's JFIF and Adobe segments, tables,
+frames and scans (also the later scans of a progressive JPEG), its ICC colour
+profile; a PNG's critical chunks and its transparency, colour and animation
+chunks (the ICC profile's name is replaced); a WebP's image, alpha, animation
+and ICC chunks (also inside animation frames). The orientation of all three is
+written back as the only EXIF field, so a phone photo is not turned on its side.
+Everything else goes, also a part this module does not know, and anything after
+the image's end.
 
-TIFF, and a PNG, JPEG, WebP or GIF the walk cannot follow, is re-saved with
-Pillow when it is installed: the pixels (turned upright), the compression, the
-ICC profile and the resolution are kept, every other tag goes. A file that
-cannot be cleaned either way is returned unchanged with nothing reported as
-removed, or, with ``strict=True``, refused with ``UnreadableImageError``.
+A GIF is rebuilt instead, because its parts can hold bytes a reader skips: the
+screen, frame and graphic-control fields and the loop count are written again
+from their values, each frame's pixels are decoded and encoded again with
+Pillow, and colour-table entries no pixel uses are written as zero. Frames,
+timing, disposal, transparency and the palette stay; a GIF that cannot be
+rebuilt, or without Pillow, is not cleaned.
+
+TIFF, and a PNG, JPEG or WebP the walk cannot follow, is re-saved with Pillow
+when it is installed: the pixels (turned upright), the compression, the ICC
+profile and the resolution are kept, every other tag goes. A file that cannot be
+cleaned either way is returned unchanged with nothing reported as removed, or,
+with ``strict=True``, refused with ``UnreadableImageError``.
 
 Text drawn in the pixels is not touched: it is the picture. Prompts frame it as
 material, never instructions (``source_material.SOURCE_MATERIAL_INSTRUCTION``).
@@ -73,9 +80,10 @@ _EXIF_HEADER = b"Exif\x00\x00"
 _ORIENTATION_TAG = 0x0112
 
 
-def _exif_orientation(payload: bytes) -> int | None:
-    """The orientation in an EXIF APP1 payload, or None."""
-    tiff = payload[len(_EXIF_HEADER) :]
+def _tiff_orientation(tiff: bytes) -> int | None:
+    """The orientation in an EXIF block (a TIFF header and its first IFD), or None."""
+    if tiff.startswith(_EXIF_HEADER):
+        tiff = tiff[len(_EXIF_HEADER) :]
     if len(tiff) < 8 or tiff[:2] not in (b"II", b"MM"):
         return None
     order = "<" if tiff[:2] == b"II" else ">"
@@ -92,13 +100,11 @@ def _exif_orientation(payload: bytes) -> int | None:
     return None
 
 
-def _orientation_segment(orientation: int) -> bytes:
-    """An APP1 segment whose EXIF holds the orientation alone."""
+def _orientation_exif(orientation: int) -> bytes:
+    """An EXIF block (without the ``Exif`` header) holding the orientation alone."""
     tiff = b"MM\x00\x2a" + struct.pack(">I", 8)
     tiff += struct.pack(">H", 1) + struct.pack(">HHIHH", _ORIENTATION_TAG, 3, 1, orientation, 0)
-    tiff += struct.pack(">I", 0)  # no next IFD
-    payload = _EXIF_HEADER + tiff
-    return b"\xff" + bytes([_APP1]) + struct.pack(">H", len(payload) + 2) + payload
+    return tiff + struct.pack(">I", 0)  # no next IFD
 
 
 def _segment(marker: int, payload: bytes) -> bytes:
@@ -169,7 +175,7 @@ def _jpeg(data: bytes) -> tuple[bytes, list[str]] | None:
         elif marker in _JPEG_KEEP or (marker == _APP2 and payload.startswith(_ICC)):
             out.append(segment)
         elif marker == _APP1 and payload.startswith(_EXIF_HEADER):
-            orientation = _exif_orientation(payload) or orientation
+            orientation = orientation or _tiff_orientation(payload)
             removed.append(EXIF)
         elif marker == _APP1:
             removed.append(XMP)
@@ -182,7 +188,7 @@ def _jpeg(data: bytes) -> tuple[bytes, list[str]] | None:
     if orientation and orientation != 1:
         # After SOI and a JFIF APP0, where readers look for it.
         at = 2 if len(out) > 1 and out[1][1:2] == bytes([_APP0]) else 1
-        out.insert(at, _orientation_segment(orientation))
+        out.insert(at, _segment(_APP1, _EXIF_HEADER + _orientation_exif(orientation)))
     return b"".join(out), removed
 
 
@@ -212,6 +218,8 @@ def _png_chunk(kind: bytes, payload: bytes) -> bytes:
 def _png(data: bytes) -> tuple[bytes, list[str]] | None:
     out = [_PNG]
     removed: list[str] = []
+    orientation: int | None = None
+    first_idat: int | None = None
     i = len(_PNG)
     while True:
         if i + 12 > len(data):
@@ -226,17 +234,25 @@ def _png(data: bytes) -> tuple[bytes, list[str]] | None:
             if name_end < 0:
                 return None
             out.append(_png_chunk(kind, b"ICC profile" + data[name_end : end - 4]))
+        elif kind == b"IDAT" and first_idat is None:
+            first_idat = len(out)
+            out.append(data[i:end])
         elif kind in _PNG_KEEP and (_PNG_KEEP[kind] is None or length <= _PNG_KEEP[kind]):
             out.append(data[i:end])
         elif kind[:1].isupper():
             return None  # a critical chunk not known here: not walked, saved again
         else:
+            if kind == b"eXIf":
+                orientation = orientation or _tiff_orientation(data[i + 8 : end - 4])
             removed.append(_PNG_NAMES.get(kind, OTHER))
         i = end
         if kind == b"IEND":
             if i < len(data):
                 removed.append(TRAILING)
             break
+    if orientation and orientation != 1 and first_idat is not None:
+        # The orientation alone, before the image data, where readers look for it.
+        out.insert(first_idat, _png_chunk(b"eXIf", _orientation_exif(orientation)))
     return b"".join(out), removed
 
 
@@ -245,7 +261,8 @@ def _png(data: bytes) -> tuple[bytes, list[str]] | None:
 _WEBP_KEEP = frozenset({b"VP8 ", b"VP8L", b"VP8X", b"ALPH", b"ANIM", b"ANMF", b"ICCP"})
 _ANMF_KEEP = frozenset({b"VP8 ", b"VP8L", b"ALPH"})
 _ANMF_HEADER = 16
-_VP8X_EXIF, _VP8X_XMP = 0x08, 0x04
+_VP8X_EXIF, _VP8X_XMP, _VP8X_ALPHA = 0x08, 0x04, 0x10
+_VP8X_SIZE = 10
 
 
 def _riff_chunks(data: bytes, start: int, end: int) -> list[tuple[bytes, bytes]] | None:
@@ -267,6 +284,30 @@ def _riff_chunk(kind: bytes, payload: bytes) -> bytes:
     return kind + struct.pack("<I", len(payload)) + payload + (b"\x00" if len(payload) & 1 else b"")
 
 
+def _webp_vp8x(chunks: list[tuple[bytes, bytes]]) -> bytes | None:
+    """A VP8X chunk for a simple WebP (one VP8 or VP8L image), or None."""
+    images = [(kind, payload) for kind, payload in chunks if kind in _WEBP_KEEP]
+    if len(images) != 1 or images[0][0] not in (b"VP8 ", b"VP8L"):
+        return None
+    kind, image = images[0]
+    flags = 0
+    if kind == b"VP8L":  # signature, then 14 bits each of width-1 and height-1, alpha
+        if len(image) < 5 or image[0] != 0x2F:
+            return None
+        (bits,) = struct.unpack_from("<I", image, 1)
+        width, height = (bits & 0x3FFF) + 1, ((bits >> 14) & 0x3FFF) + 1
+        flags = _VP8X_ALPHA if bits & (1 << 28) else 0
+    else:  # a key frame: frame tag, start code, 14-bit width and height
+        if len(image) < 10 or image[3:6] != b"\x9d\x01\x2a":
+            return None
+        width = struct.unpack_from("<H", image, 6)[0] & 0x3FFF
+        height = struct.unpack_from("<H", image, 8)[0] & 0x3FFF
+    if not width or not height:
+        return None
+    size = (width - 1).to_bytes(3, "little") + (height - 1).to_bytes(3, "little")
+    return _riff_chunk(b"VP8X", bytes([flags, 0, 0, 0]) + size)
+
+
 def _webp(data: bytes) -> tuple[bytes, list[str]] | None:
     if len(data) < 12 or data[8:12] != b"WEBP":
         return None
@@ -279,11 +320,16 @@ def _webp(data: bytes) -> tuple[bytes, list[str]] | None:
         return None
     removed = [TRAILING] if len(data) > riff_end else []
     kept: list[bytes] = []
+    orientation: int | None = None
     for kind, payload in chunks:
         if kind not in _WEBP_KEEP:
+            if kind == b"EXIF":
+                orientation = orientation or _tiff_orientation(payload)
             removed.append({b"EXIF": EXIF, b"XMP ": XMP}.get(kind, OTHER))
             continue
-        if kind == b"VP8X" and payload:
+        if kind == b"VP8X":
+            if len(payload) != _VP8X_SIZE:
+                return None
             payload = bytes([payload[0] & ~(_VP8X_EXIF | _VP8X_XMP)]) + payload[1:]
         elif kind == b"ANMF":
             frame = _riff_chunks(payload, _ANMF_HEADER, len(payload))
@@ -294,67 +340,199 @@ def _webp(data: bytes) -> tuple[bytes, list[str]] | None:
                 removed.append(OTHER)
             payload = payload[:_ANMF_HEADER] + b"".join(parts)
         kept.append(_riff_chunk(kind, payload))
+    if orientation and orientation != 1:
+        # The orientation alone, flagged in VP8X (added for a simple WebP).
+        if kept[0][:4] != b"VP8X":
+            vp8x = _webp_vp8x(chunks)
+            if vp8x is None:
+                return None
+            kept.insert(0, vp8x)
+        kept[0] = kept[0][:8] + bytes([kept[0][8] | _VP8X_EXIF]) + kept[0][9:]
+        kept.append(_riff_chunk(b"EXIF", _orientation_exif(orientation)))
     body = b"WEBP" + b"".join(kept)
     return b"RIFF" + struct.pack("<I", len(body)) + body, removed
 
 
 # --- GIF ------------------------------------------------------------------
+#
+# A GIF is rebuilt, not copied: each part the picture needs is written again
+# from the values read out of it, and each frame's pixels are decoded and
+# encoded again (with Pillow), so no byte of the original file reaches the
+# output as it was. Colour-table entries that no pixel, background or
+# transparency uses are written as zero.
 
 _GIF_LOOPING = (b"NETSCAPE2.0", b"ANIMEXTS1.0")
 
 
-def _sub_blocks_end(data: bytes, i: int) -> int:
-    """The index after a run of GIF data sub-blocks starting at ``i``."""
+def _sub_blocks(data: bytes, i: int) -> tuple[list[bytes], int]:
+    """The GIF data sub-blocks starting at ``i`` and the index after them."""
+    blocks = []
     while True:
         size = data[i]
-        i += 1 + size
+        if i + 1 + size > len(data):
+            raise IndexError
         if size == 0:
-            return i
+            return blocks, i + 1
+        blocks.append(data[i + 1 : i + 1 + size])
+        i += 1 + size
+
+
+def _gif_table(data: bytes, i: int, packed: int) -> tuple[bytearray | None, int]:
+    """The colour table a packed field announces at ``i``, and the index after it."""
+    if not packed & 0x80:
+        return None, i
+    size = 3 << ((packed & 0x07) + 1)
+    if i + size > len(data):
+        raise IndexError
+    return bytearray(data[i : i + size]), i + size
+
+
+class _GifFrame:
+    def __init__(self, control, left, top, width, height, interlaced, table, lzw):
+        self.control = control  # (disposal and transparency flags, delay, index) or None
+        self.left, self.top, self.width, self.height = left, top, width, height
+        self.interlaced, self.table, self.lzw = interlaced, table, lzw
+        self.used: set[int] = set()
+
+
+def _gif_indices(frame: _GifFrame, image_module):
+    """A frame's colour indices as an "L" image, decoded by Pillow from a one-frame GIF."""
+    w, h = frame.width, frame.height
+    lone = (
+        b"GIF89a" + struct.pack("<HHBBB", w, h, 0, 0, 0)  # no colour table: read as indices
+        + b"\x2c" + struct.pack("<HHHHB", 0, 0, w, h, 0x40 if frame.interlaced else 0)
+        + frame.lzw + b"\x3b"
+    )  # fmt: skip
+    with image_module.open(io.BytesIO(lone)) as image:
+        if image.mode != "L" or image.size != (w, h):
+            raise ValueError("unexpected GIF frame")
+        image.load()
+        return image.copy()
+
+
+def _gif_lzw(indices, gif_module) -> bytes:
+    """The LZW minimum code size and image sub-blocks Pillow writes for the indices."""
+    written = b"".join(gif_module.getdata(indices))
+    if written[:1] != b"\x2c" or written[9] & 0x80:
+        raise ValueError("unexpected GIF encoder output")
+    return written[10:]
 
 
 def _gif(data: bytes) -> tuple[bytes, list[str]] | None:
     if len(data) < 13 or data[:6] not in (b"GIF87a", b"GIF89a"):
         return None
-    removed: list[str] = []
     try:
-        i = 13
-        if data[10] & 0x80:  # global colour table
-            i += 3 * (2 ** ((data[10] & 0x07) + 1))
-        out = [data[:i]]
+        from PIL import GifImagePlugin, Image
+    except ImportError:
+        return None
+    removed: list[str] = []
+    frames: list[_GifFrame] = []
+    loop: int | None = None
+    control = None
+    try:
+        width, height, screen, background, _ = struct.unpack_from("<HHBBB", data, 6)
+        palette, i = _gif_table(data, 13, screen)
         while True:
+            if i == len(data) and frames:
+                break  # no trailer: the frames before the end are kept
             block = data[i]
             if block == 0x3B:  # trailer
-                out.append(b"\x3b")
                 if i + 1 < len(data):
                     removed.append(TRAILING)
                 break
             if block == 0x2C:  # image descriptor
-                start = i
-                packed = data[i + 9]
-                i += 10
-                if packed & 0x80:  # local colour table
-                    i += 3 * (2 ** ((packed & 0x07) + 1))
-                i = _sub_blocks_end(data, i + 1)  # after the LZW minimum code size
-                out.append(data[start:i])
+                left, top, w, h, packed = struct.unpack_from("<HHHHB", data, i + 1)
+                table, i = _gif_table(data, i + 10, packed)
+                start = i  # the LZW minimum code size, then the image sub-blocks
+                _, i = _sub_blocks(data, i + 1)
+                frames.append(
+                    _GifFrame(control, left, top, w, h, packed & 0x40, table, data[start:i])
+                )
+                control = None
+                if len(frames) > _MAX_FRAMES:
+                    logger.info("A GIF with too many frames to clean")
+                    return None
             elif block == 0x21:  # extension
-                label, start = data[i + 1], i
-                end = _sub_blocks_end(data, i + 2)
-                if label == 0xF9:  # graphic control: delay, disposal, transparency
-                    out.append(data[start:end])
-                elif label == 0xFF and data[i + 2] == 11 and data[i + 3 : i + 14] in _GIF_LOOPING:
-                    # Only the loop count (sub-block 1, 3 bytes); any other data goes.
-                    loop = data[i + 14 : i + 18]
-                    if loop[:2] == b"\x03\x01":
-                        out.append(data[i : i + 14] + loop + b"\x00")
-                    if end - (i + 14) != (5 if loop[:2] == b"\x03\x01" else 1):
+                label = data[i + 1]
+                blocks, i = _sub_blocks(data, i + 2)
+                if label == 0xF9 and blocks and len(blocks[0]) == 4:
+                    # Disposal, transparency flag, delay and transparent index.
+                    packed, delay, index = struct.unpack("<BHB", blocks[0])
+                    control = (packed & 0x1D, delay, index if packed & 0x01 else 0)
+                    if len(blocks) > 1 or packed & ~0x1D:
                         removed.append(OTHER)
+                elif (
+                    label == 0xFF
+                    and blocks
+                    and blocks[0] in _GIF_LOOPING
+                    and loop is None
+                    and len(blocks) > 1
+                    and len(blocks[1]) == 3
+                    and blocks[1][0] == 1
+                ):
+                    (loop,) = struct.unpack_from("<H", blocks[1], 1)
+                    if len(blocks) > 2:
+                        removed.append(OTHER)
+                elif label == 0xF9:
+                    return None  # a graphic control not read here
                 else:
                     removed.append({0xFE: COMMENT}.get(label, OTHER))
-                i = end
             else:
                 return None
-    except IndexError:
+    except (IndexError, struct.error):
         return None
+    if not frames:
+        return None
+    if any(f.width * f.height > _MAX_IMAGE_PIXELS for f in frames) or (
+        sum(f.width * f.height for f in frames) > _MAX_DECODED_PIXELS
+    ):
+        logger.info("A GIF too large to clean")
+        return None
+
+    global_used: set[int] = {background}
+    lzw: list[bytes] = []
+    try:
+        for frame in frames:
+            indices = _gif_indices(frame, Image)
+            used = {n for n, count in enumerate(indices.histogram()) if count}
+            if frame.control and frame.control[0] & 0x01:
+                used.add(frame.control[2])
+            if frame.table is None:
+                global_used |= used
+            frame.used = used
+            lzw.append(_gif_lzw(indices, GifImagePlugin))
+    except Exception:  # noqa: BLE001 - not readable here: the caller decides
+        return None
+
+    def zeroed(table: bytearray, used) -> bytes:
+        kept = bytearray(len(table))
+        for n in used:
+            kept[3 * n : 3 * n + 3] = table[3 * n : 3 * n + 3]
+        if kept != table:
+            removed.append(OTHER)
+        return bytes(kept)
+
+    out = [
+        b"GIF89a",
+        struct.pack("<HHBBB", width, height, screen, background if palette is not None else 0, 0),
+    ]
+    if palette is not None:
+        out.append(zeroed(palette, global_used))
+    if loop is not None:
+        out.append(b"\x21\xff\x0bNETSCAPE2.0\x03\x01" + struct.pack("<H", loop) + b"\x00")
+    for frame, image_data in zip(frames, lzw):
+        if frame.control is not None:
+            out.append(b"\x21\xf9\x04" + struct.pack("<BHB", *frame.control) + b"\x00")
+        # The local table's flag and size; not interlaced, as Pillow writes the pixels.
+        packed = 0
+        if frame.table is not None:
+            packed = 0x80 | ((len(frame.table) // 3).bit_length() - 2)
+        place = struct.pack("<HHHH", frame.left, frame.top, frame.width, frame.height)
+        out.append(b"\x2c" + place + bytes([packed]))
+        if frame.table is not None:
+            out.append(zeroed(frame.table, frame.used))
+        out.append(image_data)
+    out.append(b"\x3b")
     return b"".join(out), removed
 
 
@@ -447,7 +625,8 @@ def strip_image_metadata(data: bytes, *, strict: bool = False) -> tuple[bytes, t
             return data, ()
     else:
         return data, ()
-    if result is None:
+    if result is None and not data.startswith(b"GIF"):
+        # A GIF is rebuilt by Pillow or not at all (see the GIF part above).
         result = _resave(data, tiff=False)
     if result is None:
         if strict:
