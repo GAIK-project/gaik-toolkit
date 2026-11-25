@@ -217,6 +217,8 @@ export default function WebScraperPage() {
   );
   const [siteId, setSiteId] = useState(DEFAULT_SITES[0].id);
   const [startUrl, setStartUrl] = useState(DEFAULT_SITES[0].url);
+  // The server reads the web only from the domains its deployment lists; none: off.
+  const [off, setOff] = useState(false);
   const [maxPages, setMaxPages] = useState(6);
   const [maxDepth, setMaxDepth] = useState(1);
   const [pattern, setPattern] = useState("");
@@ -234,6 +236,11 @@ export default function WebScraperPage() {
     apiFetch("/api/web-scraper/sites")
       .then((response) => (response.ok ? response.json() : null))
       .then((data) => {
+        if (Array.isArray(data?.allowed_domains) && data.allowed_domains.length === 0) {
+          setOff(true);
+          setDomains([]);
+          return;
+        }
         if (!data?.sites?.length) return;
         setSites(data.sites);
         setDomains(data.allowed_domains);
@@ -245,7 +252,7 @@ export default function WebScraperPage() {
   const site = sites.find((s) => s.id === siteId) ?? sites[0];
   const presets = PRESETS[site.id] ?? [];
   const running = ["crawling", "schema", "extracting"].includes(state.phase);
-  const urlAllowed = inDomains(startUrl, domains);
+  const urlAllowed = !off && inDomains(startUrl, domains);
   const extracting = requirements.trim().length > 0;
   const pages = state.nodes.filter((node) => node.status === "page");
   const skipped = state.nodes.filter((node) => node.status === "skipped");
@@ -300,7 +307,11 @@ export default function WebScraperPage() {
   async function handleRun() {
     if (running) return;
     if (!urlAllowed) {
-      toast.error(`Start from a page on ${domains.join(" or ")}`);
+      toast.error(
+        off
+          ? "Web scraping is not turned on in this demo."
+          : `Start from a page on ${domains.join(" or ")}`,
+      );
       return;
     }
     const controller = new AbortController();
@@ -416,8 +427,9 @@ export default function WebScraperPage() {
             <CardHeader>
               <CardTitle>Site</CardTitle>
               <CardDescription>
-                This demo scrapes only {domains.join(" and ")}. The crawler
-                obeys robots.txt and waits between requests.
+                {off
+                  ? "Web scraping is not turned on in this demo."
+                  : `This demo scrapes only ${domains.join(" and ")}. The crawler obeys robots.txt and waits between requests.`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
@@ -465,7 +477,7 @@ export default function WebScraperPage() {
                   inputMode="url"
                   aria-invalid={!urlAllowed}
                 />
-                {!urlAllowed && (
+                {!urlAllowed && !off && (
                   <p className="text-destructive text-xs">
                     Use a page on {domains.join(" or ")}.
                   </p>
