@@ -15,6 +15,7 @@ from .model_settings import (
     model_name,
     open_model_for,
     reads_images,
+    region_overrides,
     request_is_staff,
     request_model_settings,
     request_reasoning_effort,
@@ -191,7 +192,7 @@ def server_api_config(*, team: bool | None = None):
             raise HTTPException(
                 503, "Configure a server model provider or use Model settings with your own key."
             )
-    overrides = {}
+    overrides = region_overrides(provider)
     if os.getenv("DEMO_LLM_MODEL"):
         overrides["model"] = os.environ["DEMO_LLM_MODEL"]
     try:
