@@ -150,13 +150,18 @@ transcription `DEMO_TRANSCRIPTION_MODELS` (default
 `gpt-4o-transcribe,gpt-4o-mini-transcribe,whisper-1,whisper`).
 Another name is refused with a 422, which lists the names that work, before any model call.
 
-Gemini on Vertex AI: leave `GOOGLE_CLOUD_LOCATION` unset. gaik 0.10.0 and later then ask
-the EU multi-region first and uses the global endpoint for a model the EU does not
-serve, or for ten minutes after the EU failed to answer; each switch is a warning in
-the API log. A location you set is used as given, with no fallback: on 2026-11-16 the
-demo ran with `GOOGLE_CLOUD_LOCATION=eu` on gaik 0.9.1 and Gemini 4 Argon timed out on
-every request, so it went back to `global`. The Vision Extractor's own Gemini calls
+Gemini on Vertex AI: the demo names the location for gaik, `GOOGLE_CLOUD_LOCATION` or by
+default the EU multi-region `eu`, so requests stay there. A model the location does not
+serve, or a location that does not answer, is an error unless
+`GOOGLE_CLOUD_LOCATION_FALLBACK` names a fallback (for example `global`, which is not tied
+to a region); each switch to it is a warning in the API log. On 2026-11-16 Gemini 4
+Argon timed out on every request in `eu` (gaik 0.9.1): if a model is needed that the EU
+does not serve, set `GOOGLE_CLOUD_LOCATION_FALLBACK=global` and accept that its requests
+leave the EU. The Vision Extractor's own Gemini calls
 take a fixed `GOOGLE_GENERATE_CONTENT_URL` (see `.env.example`) and have no fallback.
+The LLM judge's own Gemini calls read `GOOGLE_VERTEXAI_LOCATION` instead of the setting
+above: unset, gaik asks the EU first and falls back to the global endpoint, so the
+deployment sets `GOOGLE_VERTEXAI_LOCATION=eu` and the judge's requests stay in the EU.
 The deployed demo calls GPT and Claude through an Azure resource in Sweden.
 
 `DEMO_SERVER_MODELS_NOTE` is one sentence the menu shows under the server models,

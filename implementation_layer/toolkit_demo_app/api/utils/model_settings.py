@@ -553,6 +553,23 @@ def _validate_public_endpoint(endpoint: str) -> None:
         )
 
 
+def region_overrides(provider: str) -> dict:
+    """Settings that keep a server provider's requests in their region.
+
+    Vertex AI: the location is named (GOOGLE_CLOUD_LOCATION, default the EU), so
+    gaik uses it as given and never hands requests to the global endpoint by
+    itself. A fallback only when GOOGLE_CLOUD_LOCATION_FALLBACK names one.
+    """
+    import os
+
+    if provider != "vertex":
+        return {}
+    overrides: dict = {"location": os.getenv("GOOGLE_CLOUD_LOCATION") or "eu"}
+    if os.getenv("GOOGLE_CLOUD_LOCATION_FALLBACK"):
+        overrides["location_fallback"] = os.environ["GOOGLE_CLOUD_LOCATION_FALLBACK"]
+    return overrides
+
+
 def get_request_api_config() -> dict | None:
     settings = _settings.get()
     if settings is None:
@@ -561,7 +578,9 @@ def get_request_api_config() -> dict | None:
             return None
         from gaik.software_components.llm import get_llm_config
 
-        return get_llm_config(chosen.provider, model=chosen.model)
+        return get_llm_config(
+            chosen.provider, model=chosen.model, **region_overrides(chosen.provider)
+        )
     from gaik.software_components.llm import get_llm_config
 
     overrides = {
