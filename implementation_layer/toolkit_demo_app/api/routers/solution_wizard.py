@@ -502,7 +502,15 @@ def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
     if _TOOL_GUARD is None:
         logger.error("Solution Wizard is not configured: no agent_tool_guard.py in WIZARD_DIR")
         raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
-    guard = _TOOL_GUARD.ToolGuard(WIZARD_DIR, output_dir, scripts=_demo_scripts())
+    try:
+        guard = _TOOL_GUARD.ToolGuard(WIZARD_DIR, output_dir, scripts=_demo_scripts())
+    except Exception as exc:  # noqa: BLE001
+        # Only the type: the message may carry paths or settings.
+        logger.error(
+            "Solution Wizard is not configured: the tool guard could not be built (%s)",
+            type(exc).__name__,
+        )
+        raise HTTPException(status_code=503, detail=NOT_CONFIGURED) from exc
     return ClaudeAgentOptions(
         cwd=str(WIZARD_DIR),
         add_dirs=[str(output_dir)],

@@ -14,7 +14,7 @@ dependencies = [
     "boto3>=1.35.0",              # S3 presigned URLs for the video-search demo
     "yt-dlp>=2026.8.19",          # video download in api/scripts/seed_dental_demo.py — YouTube changes break older releases
     "gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]>=0.8.0",
-    "claude-agent-sdk>=0.2.97",   # the first Solution Wizard's agent session; the wheel carries the claude CLI
+    "claude-agent-sdk>=0.2.177",   # the first Solution Wizard's agent session; the wheel carries the claude CLI
 ]
 
 [tool.uv.sources]

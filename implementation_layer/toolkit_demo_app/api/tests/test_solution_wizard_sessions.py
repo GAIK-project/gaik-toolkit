@@ -528,9 +528,11 @@ def test_a_guard_that_cannot_be_built_leaves_nothing_behind(api, monkeypatch) ->
     monkeypatch.setattr(route, "_build_options", _REAL_BUILD_OPTIONS)
     monkeypatch.setattr(route._TOOL_GUARD, "ToolGuard", broken_guard)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(route.HTTPException) as refused:
         asyncio.run(route.start_session("alice"))
 
+    assert refused.value.status_code == 503
+    assert refused.value.detail == route.NOT_CONFIGURED
     assert route.WIZARD_SESSIONS == {}
     assert not route.WORKSPACES_DIR.exists()
     assert Client.started == []
