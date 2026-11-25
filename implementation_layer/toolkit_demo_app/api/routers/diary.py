@@ -143,7 +143,7 @@ async def diary_audio_pipeline_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         raise HTTPException(status_code=413, detail=AUDIO_TOO_LARGE_DETAIL)
-    content = without_image_metadata(suffix, content)
+    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
 

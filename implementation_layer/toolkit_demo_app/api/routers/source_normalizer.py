@@ -136,7 +136,7 @@ async def run(manifest: str = Form(...), files: list[UploadFile] = File(...)):
         inputs.mkdir()
         for name, upload in zip(names, files):
             data = await upload.read()
-            data = without_image_metadata(Path(name).suffix, data)
+            data = await without_image_metadata(Path(name).suffix, data)
             problem = await upload_problem(Path(name).suffix, data, check_type=False)
             if problem is not None:
                 raise HTTPException(problem.status, f"{name}: {problem.message}")

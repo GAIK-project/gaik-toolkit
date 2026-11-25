@@ -9,7 +9,6 @@ from pathlib import Path
 
 import pytest
 from api.routers import solution_wizard as wizard
-from api.utils import upload_check
 from api.utils.image_metadata import strip_image_metadata
 from api.utils.upload_check import without_image_metadata
 
@@ -37,7 +36,7 @@ def test_an_image_upload_loses_its_metadata_and_keeps_its_pixels_and_orientation
     photo = _photo()
     assert SECRET in photo
 
-    cleaned = without_image_metadata(".JPG", photo)
+    cleaned = asyncio.run(without_image_metadata(".JPG", photo))
 
     assert SECRET not in cleaned
     assert _pixels(cleaned) == _pixels(photo)
@@ -48,8 +47,8 @@ def test_an_image_upload_loses_its_metadata_and_keeps_its_pixels_and_orientation
 
 def test_other_files_are_left_as_they_are():
     pdf = b"%PDF-1.4\n% " + SECRET + b"\n%%EOF\n"
-    assert without_image_metadata(".pdf", pdf) is pdf
-    assert without_image_metadata(".png", b"not really a png") == b"not really a png"
+    assert asyncio.run(without_image_metadata(".pdf", pdf)) is pdf
+    assert asyncio.run(without_image_metadata(".png", b"not really a png")) == b"not really a png"
 
 
 def test_the_wizard_parses_the_cleaned_attachment(monkeypatch):
@@ -69,16 +68,64 @@ def test_the_wizard_parses_the_cleaned_attachment(monkeypatch):
 
 
 def test_every_route_that_checks_an_upload_cleans_images_first():
-    """A route that calls upload_problem on a file that may be an image passes it
-    through without_image_metadata first (PDF-only calls excepted)."""
+    """A route that calls upload_problem on a file that may be an image cleans
+    that same variable just before (PDF-only calls excepted), and awaits it."""
+    import re
+
     routers = Path(wizard.__file__).parent
+    call = re.compile(r"upload_problem\(([^,]+), (\w+)")
+    found = 0
     for path in sorted(routers.glob("*.py")):
         lines = path.read_text(encoding="utf-8").splitlines()
         for number, line in enumerate(lines):
-            if "await upload_problem(" not in line or 'upload_problem(".pdf"' in line:
+            match = call.search(line)
+            if "await upload_problem(" not in line or match is None:
                 continue
-            assert "without_image_metadata(" in lines[number - 1], f"{path.name}:{number + 1}"
+            suffix, variable = match.groups()
+            if suffix.strip() == '".pdf"':
+                continue
+            found += 1
+            expected = f"{variable} = await without_image_metadata({suffix}, {variable})"
+            assert lines[number - 1].strip() == expected, f"{path.name}:{number + 1}"
+    assert found >= 15
 
 
-def test_the_copy_matches_its_module_docstring_promise():
-    assert upload_check.strip_image_metadata is strip_image_metadata
+def _png_with_text() -> bytes:
+    from PIL import PngImagePlugin
+
+    info = PngImagePlugin.PngInfo()
+    info.add_text("Comment", SECRET.decode())
+    out = io.BytesIO()
+    Image.new("RGBA", (6, 4), (1, 2, 3, 90)).save(out, format="PNG", pnginfo=info)
+    return out.getvalue()
+
+
+@pytest.mark.parametrize("fmt", ["PNG", "WEBP", "GIF", "TIFF", "PROGRESSIVE"])
+def test_each_image_format_loses_its_text(fmt):
+    image = Image.new("RGB", (24, 12), (20, 90, 160))
+    out = io.BytesIO()
+    if fmt == "PNG":
+        data = _png_with_text()
+    else:
+        if fmt == "WEBP":
+            image.save(out, format="WEBP", lossless=True, xmp=SECRET)
+        elif fmt == "GIF":
+            image.convert("P").save(out, format="GIF", comment=SECRET)
+        elif fmt == "TIFF":
+            image.save(out, format="TIFF", tiffinfo={270: SECRET.decode()})
+        else:
+            image.save(out, format="JPEG", progressive=True)
+        data = out.getvalue()
+        if fmt == "PROGRESSIVE":
+            data += SECRET  # after the image's end
+    assert SECRET in data
+
+    cleaned, removed = strip_image_metadata(data)
+
+    assert SECRET not in cleaned and removed
+    assert _pixels(cleaned) == _pixels(data)
+
+
+def test_a_damaged_image_that_cannot_be_cleaned_is_left_for_the_checks():
+    broken = b"\xff\xd8\xff\xfe\x00\x10" + SECRET
+    assert asyncio.run(without_image_metadata(".jpg", broken)) == broken

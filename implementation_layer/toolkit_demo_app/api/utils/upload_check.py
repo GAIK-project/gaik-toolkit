@@ -121,11 +121,14 @@ async def upload_problem(
 _IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff"})
 
 
-def without_image_metadata(suffix: str, data: bytes) -> bytes:
+async def without_image_metadata(suffix: str, data: bytes) -> bytes:
     """An image upload without the text its file carries besides the pixels
-    (EXIF with the GPS position, XMP, IPTC, PNG text, comments), so neither a
-    parser nor a model reads it; any other file as it is. The pixels are kept
-    (``image_metadata``)."""
+    (EXIF with the GPS position, XMP, IPTC, PNG text, comments, data after the
+    image), so neither a parser nor a model reads it; any other file as it is.
+    The pixels are kept (``image_metadata``). It runs in the checks' own pool,
+    off the event loop: a TIFF is decoded to be cleaned."""
     if suffix.lower() not in _IMAGE_SUFFIXES:
         return data
-    return strip_image_metadata(data)[0]
+    loop = asyncio.get_running_loop()
+    cleaned, _ = await loop.run_in_executor(_checks, strip_image_metadata, data)
+    return cleaned

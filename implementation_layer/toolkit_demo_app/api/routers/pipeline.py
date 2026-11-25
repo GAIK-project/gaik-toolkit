@@ -362,7 +362,7 @@ async def audio_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_audio_file_size(file)
-    content = without_image_metadata(suffix, content)
+    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -561,7 +561,7 @@ async def document_pipeline(
 
     # Validate file size and save temporarily
     content = await validate_file_size(file)
-    content = without_image_metadata(suffix, content)
+    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -896,7 +896,7 @@ async def audio_pipeline_stream(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
-    content = without_image_metadata(suffix, content)
+    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
 
         async def error_gen() -> AsyncGenerator[str, None]:
@@ -1387,7 +1387,7 @@ async def document_pipeline_stream(
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
 
-    content = without_image_metadata(suffix, content)
+    content = await without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
 
         async def error_gen() -> AsyncGenerator[str, None]:
