@@ -547,3 +547,20 @@ def _check_upright(original: bytes) -> tuple[bytes, tuple[str, ...]]:
     assert SB not in cleaned
     assert _upright(cleaned) == _upright(original)
     return cleaned, removed
+
+
+def test_a_bmp_is_saved_again_with_its_pixels_only():
+    out = io.BytesIO()
+    _picture().save(out, format="BMP")
+    data = out.getvalue()
+    offset = int.from_bytes(data[10:14], "little")
+    # Text between the headers and the pixels, and after the pixels.
+    padded = data[:10] + (offset + len(SB)).to_bytes(4, "little") + data[14:offset] + SB
+    padded += data[offset:] + SB
+    with Image.open(io.BytesIO(padded)) as image:
+        image.load()  # decoders read it
+
+    cleaned, removed = strip_image_metadata(padded, strict=True)
+
+    assert SB not in cleaned and removed
+    assert _pixels(cleaned) == _pixels(padded)
