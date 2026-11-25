@@ -852,3 +852,14 @@ def test_the_guard_never_writes_the_repository(output) -> None:
     options = runner.build_session_options(output, {}, "m")
     guard = options.hooks["PreToolUse"][0].hooks[0].__self__
     assert agent_tool_guard.under_any(Path(os.path.realpath(runner.REPO_ROOT)), guard.protected)
+
+
+def test_the_agent_sends_nothing_but_its_model_calls(tmp_path, shell_env) -> None:
+    for name in _FOUNDRY_NAMES:
+        os.environ[name] = "1"
+    os.environ.pop("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", None)
+
+    env = runner.load_environment(tmp_path / "missing.env")
+
+    assert env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] == "1"
+    assert env["DISABLE_TELEMETRY"] == "1"

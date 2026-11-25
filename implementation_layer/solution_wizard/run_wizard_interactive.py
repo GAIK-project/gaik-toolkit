@@ -44,6 +44,7 @@ Optional (timeouts / telemetry):
     API_TIMEOUT_MS=600000
     CLAUDE_CODE_MAX_RETRIES=2
     DISABLE_TELEMETRY=1
+    CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
 
 The agent gets the system basics (PATH, home and temp folders, locale, proxy
 and certificate settings) plus the names this .env file sets, nothing else
@@ -148,6 +149,9 @@ AGENT_ENV_DEFAULTS = {
     "API_TIMEOUT_MS": "600000",
     "CLAUDE_CODE_MAX_RETRIES": "2",
     "DISABLE_TELEMETRY": "1",
+    # Nothing but the model calls: no update checks, error reports or other
+    # traffic to the CLI vendor.
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
     # Bash starts every command in the wizard folder, so `python scripts/...` works.
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
 }
