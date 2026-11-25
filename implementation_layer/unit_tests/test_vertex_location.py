@@ -1,5 +1,6 @@
-"""Vertex AI runs in the EU multi-region, and on the global endpoint for a model
-the EU does not serve or while the EU does not answer."""
+"""Vertex AI runs in the EU multi-region, and on a named fallback (the global
+endpoint, say) for a model the EU does not serve or while the EU does not answer;
+without one, requests stay in the EU."""
 
 from __future__ import annotations
 
@@ -13,6 +14,13 @@ pytest.importorskip("google.genai")
 from gaik.software_components.llm import google_provider  # noqa: E402
 from gaik.software_components.llm.config import get_llm_config  # noqa: E402
 from google.genai import errors as genai_errors  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _named_fallback(monkeypatch):
+    """These tests cover the fallback, so they name it; unnamed, requests stay
+    in the EU (test_vertex_location.py, test_without_a_named_fallback...)."""
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
 
 
 def _error(code: int) -> Exception:
@@ -62,6 +70,8 @@ def world(monkeypatch):
     monkeypatch.setattr(google_provider, "_UNAVAILABLE_UNTIL", {})
     for name in ("GOOGLE_CLOUD_LOCATION", "GOOGLE_SERVICE_ACCOUNT_JSON"):
         monkeypatch.delenv(name, raising=False)
+    # The fallback is asked for here; without it requests stay in the EU (below).
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
     return state
 
 
@@ -71,6 +81,62 @@ def _provider(**overrides):
 
 
 USER = [{"role": "user", "content": "hello"}]
+
+
+def test_without_a_named_fallback_requests_stay_in_the_eu(world, monkeypatch):
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
+    config = get_llm_config("vertex", project_id="project", model="gemini-test")
+    assert (config["location"], config["location_fallback"]) == ("eu", None)
+    world["failures"]["eu"] = _error(404)
+    provider = google_provider.GoogleProvider(config)
+    with pytest.raises(genai_errors.ClientError):
+        provider.chat(USER)
+    # A config without either key (the judge builds one) stays in the EU too.
+    bare = google_provider.GoogleProvider(
+        {"provider": "vertex", "project_id": "project", "model": "gemini-test"}
+    )
+    with pytest.raises(genai_errors.ClientError):
+        bare.chat(USER)
+    assert world["log"] == [("eu", "chat"), ("eu", "chat")]
+
+
+@pytest.mark.parametrize("failure", [_error(404), _error(429), TimeoutError()])
+def test_without_a_fallback_the_eu_error_names_the_location_settings(world, monkeypatch, failure):
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
+    world["failures"]["eu"] = failure
+    provider = google_provider.GoogleProvider(
+        get_llm_config("vertex", project_id="project", model="gemini-test")
+    )
+    with pytest.raises(type(failure)) as raised:
+        provider.chat(USER)
+    # The SDK's error itself, so a caller that catches it still does.
+    assert raised.value is failure
+    note = " ".join(getattr(raised.value, "__notes__", []))
+    assert "may not offer gemini-test or may be busy" in note
+    assert "GOOGLE_CLOUD_LOCATION " in note
+    assert "GOOGLE_CLOUD_LOCATION_FALLBACK=global" in note
+    assert "no data-residency guarantee" in note
+
+
+@pytest.mark.parametrize(
+    ("config", "failure"),
+    [
+        # A location the caller chose, and a refusal, get no note.
+        ({"location": "europe-north1"}, _error(404)),
+        ({"location_fallback": None}, _error(404)),
+        ({}, _error(403)),
+        ({}, _error(503)),
+    ],
+)
+def test_the_settings_note_is_only_for_the_default_eu_location(world, monkeypatch, config, failure):
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
+    world["failures"][config.get("location", "eu")] = failure
+    provider = google_provider.GoogleProvider(
+        {"provider": "vertex", "project_id": "project", "model": "gemini-test", **config}
+    )
+    with pytest.raises(type(failure)) as raised:
+        provider.chat(USER)
+    assert not getattr(raised.value, "__notes__", [])
 
 
 def test_the_default_location_is_the_eu(world):
@@ -258,3 +324,17 @@ def test_the_judge_asks_the_eu_once_within_a_time_limit(monkeypatch):
         judge_module.LLMJudge._call_google(judge, [], "user", "system")
     assert len(clients) == 1 and clients[0]["http_options"].timeout == 600_000
     assert clients[1:] == []
+
+
+def test_a_blank_fallback_name_is_no_fallback(world, monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "  ")
+    provider = google_provider.GoogleProvider(
+        {"provider": "vertex", "project_id": "project", "model": "gemini-test"}
+    )
+    assert provider._fallback_location is None
+
+
+def test_a_named_fallback_does_not_apply_to_a_location_set_in_the_environment(world, monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "europe-north1")
+    config = get_llm_config("vertex", project_id="project", model="gemini-test")
+    assert (config["location"], config["location_fallback"]) == ("europe-north1", None)

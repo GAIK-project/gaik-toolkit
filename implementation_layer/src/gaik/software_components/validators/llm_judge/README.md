@@ -244,7 +244,7 @@ variables work for both; the Google route reads its own:
 | `ANTHROPIC_API_KEY` | Anthropic direct |
 | `ANTHROPIC_FOUNDRY_API_KEY` (or `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` | Anthropic on Microsoft Foundry (`use_azure=True`) |
 | `GOOGLE_VERTEXAI_PROJECT`, `GOOGLE_APPLICATION_CREDENTIALS` | Vertex AI (preferred) |
-| `GOOGLE_VERTEXAI_LOCATION` | Vertex AI location; used as given when set. Unset, the judge asks the EU multi-region and falls back to `global` when the EU does not serve the model or does not answer |
+| `GOOGLE_VERTEXAI_LOCATION` | Vertex AI location; used as given when set. Unset, the judge asks the EU multi-region and stays there; `GOOGLE_CLOUD_LOCATION_FALLBACK` (for example `global`) names a location for when the EU does not serve the model or does not answer |
 | `GOOGLE_GEMINI_API_KEY` | Generative Language API (alternative) |
 
 ## Research references

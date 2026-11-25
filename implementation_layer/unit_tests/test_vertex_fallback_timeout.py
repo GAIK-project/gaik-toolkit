@@ -16,6 +16,14 @@ from gaik.software_components.llm import google_provider  # noqa: E402
 from gaik.software_components.llm.config import get_llm_config  # noqa: E402
 from google.genai import errors as genai_errors  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _named_fallback(monkeypatch):
+    """These tests cover the fallback, so they name it; unnamed, requests stay
+    in the EU (test_vertex_location.py, test_without_a_named_fallback...)."""
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
+
+
 ROOT = Path(__file__).resolve().parents[2]
 USER = [{"role": "user", "content": "hello"}]
 
@@ -114,6 +122,11 @@ def test_release_smoke_runs_the_default_vertex_path(monkeypatch):
     monkeypatch.setenv("GOOGLE_CLOUD_PROJECT", "project")
     config = smoke.smoke_config("vertex", "gemini-test", 180)
     assert config["location_fallback"] == "global"
+    assert "timeout" not in config and "max_retries" not in config
+    # Without a named fallback the default path is the EU alone, still certified.
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
+    config = smoke.smoke_config("vertex", "gemini-test", 180)
+    assert (config["location"], config["location_fallback"]) == ("eu", None)
     assert "timeout" not in config and "max_retries" not in config
     # A location from the environment, or the LiteLLM route, keeps the run's limits.
     assert smoke.smoke_config("vertex", "gemini-test", 180, "litellm")["max_retries"] == 0

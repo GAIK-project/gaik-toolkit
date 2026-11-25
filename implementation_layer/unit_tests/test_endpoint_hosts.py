@@ -32,6 +32,7 @@ def _clean_environment(monkeypatch):
     ("provider", "url"),
     [
         ("openai", "https://api.openai.com/v1"),
+        ("openai", "https://eu.api.openai.com/v1"),  # EU data residency
         ("azure", "https://res.openai.azure.com"),
         ("azure", "https://res.cognitiveservices.azure.com/openai/deployments/tts/audio/speech"),
         ("azure", "https://res.services.ai.azure.com"),

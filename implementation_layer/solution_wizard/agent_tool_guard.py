@@ -74,6 +74,7 @@ PROVIDER_HOSTS = (
     ".services.ai.azure.com",
     ".cognitiveservices.azure.com",
     "api.openai.com",
+    "eu.api.openai.com",
     "api.anthropic.com",
     "aitta-api.csc.fi",
     "generativelanguage.googleapis.com",

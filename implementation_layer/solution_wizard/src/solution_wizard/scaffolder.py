@@ -386,6 +386,7 @@ _NUMERIC_LABEL_RE = re.compile(r"\d+|0x[0-9a-f]*")
 #: ``*`` matches any host ending in the rest of the pattern.
 CLOUD_MODEL_API_HOSTS = (
     "api.openai.com",
+    "eu.api.openai.com",
     "*.openai.azure.com",
     "*.cognitiveservices.azure.com",
     "*.services.ai.azure.com",

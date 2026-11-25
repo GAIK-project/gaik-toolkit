@@ -76,8 +76,9 @@ def test_card_imports_resolve(card):
 
 
 def test_judge_card_names_the_eu_default_location(monkeypatch):
-    # What the judge does: its Vertex AI provider asks the EU, then the global
-    # endpoint, when GOOGLE_VERTEXAI_LOCATION is unset; a set location has no fallback.
+    # What the judge does: its Vertex AI provider asks the EU when
+    # GOOGLE_VERTEXAI_LOCATION is unset, and stays there unless
+    # GOOGLE_CLOUD_LOCATION_FALLBACK names a fallback; a set location has none.
     pytest.importorskip("google.genai")
     from gaik.software_components.llm import google_provider
     from gaik.software_components.validators.llm_judge import llm_judge
@@ -85,14 +86,21 @@ def test_judge_card_names_the_eu_default_location(monkeypatch):
     monkeypatch.setattr(google_provider.genai, "Client", lambda **kwargs: object())
     monkeypatch.setenv("GOOGLE_VERTEXAI_PROJECT", "project")
     monkeypatch.delenv("GOOGLE_VERTEXAI_LOCATION", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK", raising=False)
+    judge = llm_judge.LLMJudge(model_provider="google", model="gemini-test")
+    provider = llm_judge._vertex_provider(judge)
+    assert (provider.location, provider._fallback_location) == ("eu", None)
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
     judge = llm_judge.LLMJudge(model_provider="google", model="gemini-test")
     provider = llm_judge._vertex_provider(judge)
     assert (provider.location, provider._fallback_location) == ("eu", "global")
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
     monkeypatch.setenv("GOOGLE_VERTEXAI_LOCATION", "europe-north1")
     provider = llm_judge._vertex_provider(judge)
     assert (provider.location, provider._fallback_location) == ("europe-north1", None)
     effect = _option("LLMJudge", "use_vertexai")["effect"]
     assert "default 'global'" not in effect
+    assert "GOOGLE_CLOUD_LOCATION_FALLBACK" in effect
     assert "'eu'" in effect and "'global'" in effect
     # The validated release a PoC installs has the EU default; the card says so.
     assert "Unset, the judge calls the EU multi-region 'eu'" in effect

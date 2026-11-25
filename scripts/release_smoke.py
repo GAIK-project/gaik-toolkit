@@ -301,12 +301,15 @@ def smoke_config(provider: str, model: str, timeout: float, backend: str = "nati
 
     Every provider gets the run's timeout and no retries, except Vertex AI with
     no location set: it runs with the defaults a user gets, so the run certifies
-    the EU request's own limit, its single attempt and the global fallback.
+    the default EU location (and, when GOOGLE_CLOUD_LOCATION_FALLBACK names one,
+    the EU request's own limit, its single attempt and the fallback).
     """
+    import os
+
     from gaik.software_components.llm import get_llm_config
 
     config = get_llm_config(provider, model=model)
-    if provider == "vertex" and backend == "native" and config.get("location_fallback"):
+    if provider == "vertex" and backend == "native" and not os.getenv("GOOGLE_CLOUD_LOCATION"):
         return config
     return get_llm_config(provider, model=model, timeout=timeout, max_retries=0)
 
@@ -579,7 +582,7 @@ def run_smoke(args) -> dict:
         result["max_requests"] = args.max_calls
         result["max_output_tokens_per_request"] = args.output_tokens
         if args.provider == "vertex":
-            # Which endpoint answered: "eu", or "global" after a fallback.
+            # Which endpoint answered: "eu", or the named fallback after one.
             result["vertex_locations"] = vertex_locations(created_clients)
         for original in created_clients:
             with contextlib.suppress(Exception):

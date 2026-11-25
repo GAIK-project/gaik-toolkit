@@ -67,7 +67,8 @@ const GENERATED = `# Environment variables for Invoice extraction
 
 # --- Native Google Vertex AI ---
 # GOOGLE_PROJECT_ID=your-gcp-project-id
-# Unset: the EU multi-region first, the global endpoint as its fallback.
+# Unset: the EU multi-region, and requests stay there. A fallback location
+# (for example global) only when GOOGLE_CLOUD_LOCATION_FALLBACK names one.
 # A location set here is used as given, without a fallback.
 # GOOGLE_CLOUD_LOCATION=eu
 # GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/credentials.json
@@ -173,7 +174,7 @@ describe("parseEnvSections", () => {
     expect(of("AITTA_API_KEY", "CSC Aitta")?.help).toBe("AITTA_API_TOKEN and AITTA_TOKEN are also accepted.");
     expect(of("AITTA_MODEL", "CSC Aitta")?.help).toBe("");
     expect(of("GOOGLE_CLOUD_LOCATION", "Native Google Vertex AI")?.help).toBe(
-      "Unset: the EU multi-region first, the global endpoint as its fallback. A location set here is used as given, without a fallback.",
+      "Unset: the EU multi-region, and requests stay there. A fallback location (for example global) only when GOOGLE_CLOUD_LOCATION_FALLBACK names one. A location set here is used as given, without a fallback.",
     );
     expect(of("OPENAI_API_KEY", "Explicit OpenAI-compatible endpoint")?.help).toBe(
       "Shares OPENAI_* with the OpenAI section, so one PoC cannot use both providers.",

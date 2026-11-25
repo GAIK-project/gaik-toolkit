@@ -315,7 +315,7 @@ providers and their environment variables are:
 | `google` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL`; install `gaik[llm-google]` |
 | `anthropic` | `ANTHROPIC_API_KEY` | `ANTHROPIC_MODEL`; install `gaik[llm-anthropic]` |
 | `anthropic_foundry` | `ANTHROPIC_FOUNDRY_API_KEY` (fallback `AZURE_API_KEY`), `ANTHROPIC_FOUNDRY_RESOURCE` | `ANTHROPIC_MODEL`; install `gaik[llm-anthropic]` |
-| `vertex` | `GOOGLE_PROJECT_ID` and Google application-default or service-account credentials | `GOOGLE_MODEL`, `GOOGLE_CLOUD_LOCATION`; install `gaik[llm-google]` |
+| `vertex` | `GOOGLE_PROJECT_ID` and Google application-default or service-account credentials | `GOOGLE_MODEL`, `GOOGLE_CLOUD_LOCATION` (default `eu`), `GOOGLE_CLOUD_LOCATION_FALLBACK` (unset: requests stay in that location); install `gaik[llm-google]` |
 | `litellm` | Provider credentials or `LITELLM_API_KEY` | Required provider-prefixed `LITELLM_MODEL`; install `gaik[llm-litellm]` |
 | `aitta` | `AITTA_API_KEY` (also accepts `AITTA_API_TOKEN` or `AITTA_TOKEN`) | `AITTA_MODEL`, default `google/gemma-4-31b-it` |
 | `openai_compatible` | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Explicit model required |

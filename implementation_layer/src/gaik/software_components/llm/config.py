@@ -46,10 +46,13 @@ _REQUIRED_FIELDS = {
 }
 
 
-# Vertex AI: the EU multi-region first, the global endpoint for a model the EU
-# does not serve. The global endpoint is not tied to a region.
+# Vertex AI: the EU multi-region. Requests stay there: a model the EU does not
+# serve, or an EU that does not answer, is an error, unless a fallback is named
+# (GOOGLE_CLOUD_LOCATION_FALLBACK, for example "global", which is not tied to a
+# region, or location_fallback in the config).
 VERTEX_DEFAULT_LOCATION = "eu"
 VERTEX_FALLBACK_LOCATION = "global"
+VERTEX_FALLBACK_ENV = "GOOGLE_CLOUD_LOCATION_FALLBACK"
 
 
 def _embedding_model_default(provider: str) -> str:
@@ -214,11 +217,11 @@ def _vertex_config() -> dict:
     return {
         "provider": Provider.VERTEX.value,
         "project_id": _env("GOOGLE_PROJECT_ID", "GOOGLE_CLOUD_PROJECT"),
-        # The EU multi-region keeps requests in the EU. A model it does not serve
-        # falls back to the global endpoint, with a warning; a location set in the
-        # environment or by the caller is used as given.
+        # The EU multi-region keeps requests in the EU, and they stay there: a
+        # fallback (the global endpoint, say) only when one is named. A location
+        # set in the environment or by the caller is used as given.
         "location": location or VERTEX_DEFAULT_LOCATION,
-        "location_fallback": None if location else VERTEX_FALLBACK_LOCATION,
+        "location_fallback": None if location else (_env(VERTEX_FALLBACK_ENV) or None),
         # Marks the fallback as the default's, so a location set on this dict
         # later does not inherit it.
         "_default_location_fallback": not location,

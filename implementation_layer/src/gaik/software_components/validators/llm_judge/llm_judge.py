@@ -524,8 +524,8 @@ class LLMJudge:
 def _vertex_provider(judge: Any) -> Any:
     """The judge's :class:`GoogleProvider` for the current Vertex AI settings.
 
-    The EU multi-region unless ``GOOGLE_VERTEXAI_LOCATION`` is set, and the global
-    endpoint for a model the EU does not serve or while the EU does not answer.
+    The EU multi-region unless ``GOOGLE_VERTEXAI_LOCATION`` is set. Requests stay
+    there unless ``GOOGLE_CLOUD_LOCATION_FALLBACK`` names a fallback location.
     The provider is built once per project and location and kept on the judge, so
     its clients are not built again for each call; what the EU was found not to
     serve is shared by every provider in the process. Threads that share a judge
