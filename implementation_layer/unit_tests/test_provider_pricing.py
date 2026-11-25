@@ -31,6 +31,7 @@ def test_custom_endpoint_does_not_inherit_model_vendors_price():
         ("claude-opus-4-8", (5.00, 25.00)),
         ("claude-opus-4-7", (5.00, 25.00)),
         ("claude-fable-5-1", (10.00, 50.00)),
+        ("claude-haiku-5-5", (0.10, 0.50)),
         ("claude-haiku-4-5", (1.00, 5.00)),
         ("claude-opus-4-1", (15.00, 75.00)),
     ],
