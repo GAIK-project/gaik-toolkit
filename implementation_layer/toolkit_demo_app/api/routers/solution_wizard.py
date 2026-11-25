@@ -151,8 +151,9 @@ AGENT_TOOLS = ["Read", "Grep", "Glob", "Write", "Edit", "Bash", "TodoWrite"]
 _TOOL_GUARD = _load_tool_guard()
 #: Options the demo's agent may not pass to the wizard's scripts: the schema
 #: script calls a model with the deployment's Azure key, so it goes to the
-#: configured AZURE_ENDPOINT only, not to an address the agent names.
-_DEMO_LEFT_OUT_OPTIONS = {"generate_schema.py": ("--base-url", "--no-azure")}
+#: configured AZURE_ENDPOINT only, not to another provider or an address the
+#: agent names. Without --provider and --no-azure the script uses Azure.
+_DEMO_LEFT_OUT_OPTIONS = {"generate_schema.py": ("--base-url", "--no-azure", "--provider")}
 
 
 def _demo_scripts() -> dict[str, dict[str, str]]:

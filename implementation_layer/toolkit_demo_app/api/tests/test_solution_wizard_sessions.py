@@ -515,24 +515,45 @@ def test_the_schema_script_goes_to_the_configured_endpoint_only(monkeypatch, tmp
     assert _decide(options, "Bash", {"command": base + " --model gpt-4.1"}) is None
     assert _decide(options, "Bash", {"command": base + " --base-url https://x.openai.azure.com"})
     assert _decide(options, "Bash", {"command": base + " --no-azure"})
+    assert _decide(options, "Bash", {"command": base + " --use-azure"}) is None
+    for provider in ("openai", "litellm", "azure"):
+        assert _decide(options, "Bash", {"command": f"{base} --provider {provider}"})
+
+
+def test_the_ai_act_screening_check_runs_in_the_demo(monkeypatch, tmp_path) -> None:
+    workspace, options = _guarded_options(monkeypatch, tmp_path)
+    run = f"python ai_act_screening/scripts/{{}} --pack {workspace.as_posix()}"
+
+    assert (
+        _decide(options, "Bash", {"command": run.format("check_screening.py") + " --status"})
+        is None
+    )
+    assert (
+        _decide(options, "Bash", {"command": run.format("render_brief.py") + " --outdated"}) is None
+    )
+    assert _decide(options, "Bash", {"command": run.format("render_brief.py") + " --force"})
 
 
 # Taken at import, before the api fixture replaces it.
 _REAL_BUILD_OPTIONS = route._build_options
 
 
-def test_a_guard_that_cannot_be_built_leaves_nothing_behind(api, monkeypatch) -> None:
-    def broken_guard(*args, **kwargs):
+@pytest.mark.parametrize("broken", ["load_scripts", "ToolGuard"])
+def test_a_guard_that_cannot_be_built_leaves_nothing_behind(api, monkeypatch, broken) -> None:
+    """A script table that cannot be read or a guard that cannot be built answers
+    503 with the not-configured message, and no session or workspace is left."""
+
+    def fails(*args, **kwargs):
         raise ValueError("the scripts table is malformed")
 
     monkeypatch.setattr(route, "_build_options", _REAL_BUILD_OPTIONS)
-    monkeypatch.setattr(route._TOOL_GUARD, "ToolGuard", broken_guard)
+    monkeypatch.setattr(route._TOOL_GUARD, broken, fails)
 
-    with pytest.raises(route.HTTPException) as refused:
-        asyncio.run(route.start_session("alice"))
+    refused = api.post("/wizard/start", headers=ALICE)
 
-    assert refused.value.status_code == 503
-    assert refused.value.detail == route.NOT_CONFIGURED
+    assert refused.status_code == 503
+    assert refused.json() == {"detail": route.NOT_CONFIGURED}
+    assert "malformed" not in refused.text
     assert route.WIZARD_SESSIONS == {}
     assert not route.WORKSPACES_DIR.exists()
     assert Client.started == []
