@@ -69,7 +69,9 @@ def _fallback_location(config: dict) -> str | None:
         if config.get("_default_location_fallback") and (config.get("location") or "eu") != "eu":
             return None
     else:
-        fallback = None if config.get("location") else (os.getenv(FALLBACK_ENV) or None)
+        fallback = (
+            None if config.get("location") else ((os.getenv(FALLBACK_ENV) or "").strip() or None)
+        )
     return fallback if fallback and fallback != (config.get("location") or "eu") else None
 
 

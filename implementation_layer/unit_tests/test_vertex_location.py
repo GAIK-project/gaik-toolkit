@@ -284,3 +284,17 @@ def test_the_judge_asks_the_eu_once_within_a_time_limit(monkeypatch):
         judge_module.LLMJudge._call_google(judge, [], "user", "system")
     assert len(clients) == 1 and clients[0]["http_options"].timeout == 600_000
     assert clients[1:] == []
+
+
+def test_a_blank_fallback_name_is_no_fallback(world, monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "  ")
+    provider = google_provider.GoogleProvider(
+        {"provider": "vertex", "project_id": "project", "model": "gemini-test"}
+    )
+    assert provider._fallback_location is None
+
+
+def test_a_named_fallback_does_not_apply_to_a_location_set_in_the_environment(world, monkeypatch):
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "europe-north1")
+    config = get_llm_config("vertex", project_id="project", model="gemini-test")
+    assert (config["location"], config["location_fallback"]) == ("europe-north1", None)

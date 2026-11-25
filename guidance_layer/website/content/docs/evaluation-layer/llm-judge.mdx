@@ -157,8 +157,9 @@ only a chat model. See [Multi-Provider LLM Client](/toolkit/multi-provider-llm)
 for each provider's environment variables with `LLMJudge(config=get_llm_config(...))`.
 The `model_provider="google", use_vertexai=True` path reads its own:
 `GOOGLE_VERTEXAI_PROJECT` with `GOOGLE_APPLICATION_CREDENTIALS`, and
-`GOOGLE_VERTEXAI_LOCATION` (unset: the EU multi-region with `global` as its fallback
-after gaik 0.9.1, `global` in 0.9.1).
+`GOOGLE_VERTEXAI_LOCATION` (unset: the EU multi-region, where requests stay unless
+`GOOGLE_CLOUD_LOCATION_FALLBACK` names a fallback; gaik 0.10.0 to 0.12.0 fell back to
+`global` by themselves, 0.9.1 used `global`).
 
 ## End-to-end synthetic example
 

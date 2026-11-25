@@ -123,6 +123,11 @@ def test_release_smoke_runs_the_default_vertex_path(monkeypatch):
     config = smoke.smoke_config("vertex", "gemini-test", 180)
     assert config["location_fallback"] == "global"
     assert "timeout" not in config and "max_retries" not in config
+    # Without a named fallback the default path is the EU alone, still certified.
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
+    config = smoke.smoke_config("vertex", "gemini-test", 180)
+    assert (config["location"], config["location_fallback"]) == ("eu", None)
+    assert "timeout" not in config and "max_retries" not in config
     # A location from the environment, or the LiteLLM route, keeps the run's limits.
     assert smoke.smoke_config("vertex", "gemini-test", 180, "litellm")["max_retries"] == 0
     monkeypatch.setenv("GOOGLE_CLOUD_LOCATION", "europe-west4")
