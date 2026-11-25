@@ -36,9 +36,9 @@ except ImportError:
     from api.utils.model_settings import unsupported_option_detail
     from api.utils.report_runs import require_report_run_grant
 try:
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 try:
     from utils.errors import component_error
@@ -280,6 +280,7 @@ async def run_stage(
         (inputs / "report_spec.json").unlink()  # a source may have the same name
         for name, upload in zip(names, uploads):
             data = await upload.read()
+            data = without_image_metadata(Path(name).suffix, data)
             problem = await upload_problem(Path(name).suffix, data, check_type=False)
             if problem is not None:
                 raise HTTPException(problem.status, f"{name}: {problem.message}")

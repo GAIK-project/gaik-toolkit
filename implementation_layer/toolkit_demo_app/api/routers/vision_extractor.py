@@ -65,9 +65,9 @@ except ImportError:
     from api.utils.schema_view import describe_fields, specs_by_name, structure_of
 
 try:
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 try:
     from utils.errors import error_detail
@@ -575,6 +575,7 @@ async def extract_vision(
         for uploaded_file in files:
             content = await validate_file_size(uploaded_file)
             suffix = Path(uploaded_file.filename or "").suffix.lower()
+            content = without_image_metadata(suffix, content)
             if (problem := await upload_problem(suffix, content)) is not None:
                 raise HTTPException(status_code=problem.status, detail=problem.message)
             with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:

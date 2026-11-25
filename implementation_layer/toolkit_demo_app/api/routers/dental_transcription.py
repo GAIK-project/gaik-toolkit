@@ -34,9 +34,9 @@ except ImportError:
 from fastapi.responses import Response, StreamingResponse
 
 try:
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 try:
     from utils.errors import error_detail
@@ -122,6 +122,7 @@ async def dental_transcription_stream(
     content = await file.read()
     if len(content) > MAX_AUDIO_FILE_SIZE_BYTES:
         return sse_error_response(AUDIO_TOO_LARGE_DETAIL)
+    content = without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         return sse_error_response(problem.message)
 

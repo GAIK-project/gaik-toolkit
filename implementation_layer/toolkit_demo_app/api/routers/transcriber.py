@@ -19,9 +19,9 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from pydantic import BaseModel
 
 try:
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 try:
     from utils.errors import error_detail
@@ -165,6 +165,7 @@ async def transcribe_audio(
         )
 
     content = await validate_audio_file_size(file)
+    content = without_image_metadata(suffix, content)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:

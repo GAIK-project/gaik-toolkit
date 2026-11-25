@@ -16,6 +16,8 @@ so it never holds the API's interpreter, and that process is stopped at a
 deadline.
 
 ``upload_problem`` returns what to answer, or None for a file the route may use.
+``without_image_metadata`` takes the text an image file carries besides its
+pixels out of an image upload before a route uses it.
 """
 
 from __future__ import annotations
@@ -29,9 +31,11 @@ from dataclasses import dataclass
 try:
     from utils import malware_scan, pdf_content, pdf_process
     from utils.file_content import content_mismatch
+    from utils.image_metadata import strip_image_metadata
 except ImportError:
     from api.utils import malware_scan, pdf_content, pdf_process
     from api.utils.file_content import content_mismatch
+    from api.utils.image_metadata import strip_image_metadata
 
 _OFFICE = {".docx", ".xlsx", ".xlsm"}
 MACRO_MESSAGE = "Files with macros are not accepted. Save the document without macros."
@@ -112,3 +116,16 @@ async def upload_problem(
         text = malware_scan.UNAVAILABLE_MESSAGE
         return UploadProblem(503, text[:1].upper() + text[1:] + ".")
     return None
+
+
+_IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff"})
+
+
+def without_image_metadata(suffix: str, data: bytes) -> bytes:
+    """An image upload without the text its file carries besides the pixels
+    (EXIF with the GPS position, XMP, IPTC, PNG text, comments), so neither a
+    parser nor a model reads it; any other file as it is. The pixels are kept
+    (``image_metadata``)."""
+    if suffix.lower() not in _IMAGE_SUFFIXES:
+        return data
+    return strip_image_metadata(data)[0]

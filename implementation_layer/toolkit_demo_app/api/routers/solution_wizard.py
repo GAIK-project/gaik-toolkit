@@ -61,13 +61,13 @@ try:
     from utils.errors import public_error
     from utils.file_content import content_mismatch
     from utils.model_settings import provider_error_detail
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
     from api.utils import get_api_config, get_model_options, sse_event
     from api.utils.errors import public_error
     from api.utils.file_content import content_mismatch
     from api.utils.model_settings import provider_error_detail
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 try:
     from utils.log_names import error_kind, file_tag
 except ImportError:
@@ -313,12 +313,15 @@ async def _checked_attachments(files: list[FileAttachment]) -> list[tuple[str, s
 
     Raises what the page shows; nothing is parsed or sent to a model before this.
     """
-    decoded = [(_attachment_name(f), *_decode_attachment(f)) for f in files]
-    for name, ext, file_bytes in decoded:
+    checked = []
+    for name, ext, file_bytes in [(_attachment_name(f), *_decode_attachment(f)) for f in files]:
         # The type was checked in _decode_attachment, with this route's own 400.
+        # An image goes on without the text its file carries besides the pixels.
+        file_bytes = without_image_metadata(ext, file_bytes)
         if (problem := await upload_problem(ext, file_bytes, check_type=False)) is not None:
             raise HTTPException(problem.status, f"{name}: {problem.message}")
-    return decoded
+        checked.append((name, ext, file_bytes))
+    return checked
 
 
 def _extract_text_from_attachment(attachment: FileAttachment) -> str:
