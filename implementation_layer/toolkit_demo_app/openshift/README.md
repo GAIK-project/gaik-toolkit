@@ -271,6 +271,7 @@ oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACC
 | `ANTHROPIC_DEFAULT_SONNET_MODEL` | The first wizard's model id (`ANTHROPIC_MODEL` wins when set) | Secret: `gaik-demo-api-keys` |
 | `WIZARD_MAX_SESSIONS`, `WIZARD_MAX_MESSAGES` | Optional. First-wizard sessions at once (3) and messages per session (60) | `oc set env` |
 | `WIZARD_AGENT_MAX_BUDGET_USD` | Optional, off unless set. The CLI's estimated USD one first-wizard session's agent may spend | `oc set env` |
+| `WEB_SCRAPER_ALLOWED_DOMAINS` | Optional, off unless set. The domains the Web Scraper demo may read, comma-separated (`gaik.ai,haaga-helia.fi` were the default until it became off by default). Without it the page says scraping is off and a run gets 503 | `oc set env` |
 
 ## Route Annotations
 

@@ -238,6 +238,7 @@ export default function WebScraperPage() {
       .then((data) => {
         if (Array.isArray(data?.allowed_domains) && data.allowed_domains.length === 0) {
           setOff(true);
+          setDomains([]);
           return;
         }
         if (!data?.sites?.length) return;
@@ -476,7 +477,7 @@ export default function WebScraperPage() {
                   inputMode="url"
                   aria-invalid={!urlAllowed}
                 />
-                {!urlAllowed && (
+                {!urlAllowed && !off && (
                   <p className="text-destructive text-xs">
                     Use a page on {domains.join(" or ")}.
                   </p>
