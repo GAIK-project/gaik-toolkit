@@ -271,6 +271,9 @@ oc get secret/gaik-demo-admin -n gaik -o jsonpath='{.data}' | grep -q WIZARD_ACC
 | `ANTHROPIC_DEFAULT_SONNET_MODEL` | The first wizard's model id (`ANTHROPIC_MODEL` wins when set) | Secret: `gaik-demo-api-keys` |
 | `WIZARD_MAX_SESSIONS`, `WIZARD_MAX_MESSAGES` | Optional. First-wizard sessions at once (3) and messages per session (60) | `oc set env` |
 | `WIZARD_AGENT_MAX_BUDGET_USD` | Optional, off unless set. The CLI's estimated USD one first-wizard session's agent may spend | `oc set env` |
+| `GOOGLE_CLOUD_LOCATION` | Optional. The server's Vertex AI location (default `eu`); requests stay there | `oc set env` |
+| `GOOGLE_CLOUD_LOCATION_FALLBACK` | Optional, off unless set. A location (for example `global`) that takes over when the Vertex location does not serve a model or does not answer | `oc set env` |
+| `DEMO_BYOK_OPENAI_REGION` | Optional: `global` (default) or `eu`. Where a user's own OpenAI key is sent; `eu` is `eu.api.openai.com`, for keys of EU data-residency projects | `oc set env` |
 
 ## Route Annotations
 
