@@ -5,6 +5,7 @@ import {
   helpdeskConfigured,
 } from "@/lib/helpdesk-chatbot/agent";
 import { getHelpdeskExample } from "@/lib/helpdesk-chatbot/examples";
+import { conversationFromBrowser } from "@/lib/helpdesk-chatbot/messages";
 import {
   OWN_ID,
   parseOwnKnowledge,
@@ -95,6 +96,12 @@ export async function POST(request: NextRequest) {
       { status: 413 },
     );
   }
+  // Only the user's and the assistant's turns, with the parts the chat writes:
+  // what steers the assistant is set here, not in the request.
+  const conversation = conversationFromBrowser(messages);
+  if (!conversation) {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
 
   return createAgentUIStreamResponse({
     // Whatever this returns reaches the browser: log the provider error here
@@ -107,7 +114,7 @@ export async function POST(request: NextRequest) {
       knowledge,
       isModelStaff(access.email, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
     ),
-    uiMessages: messages,
+    uiMessages: conversation,
     abortSignal: request.signal,
     // Rahti does not enforce maxDuration, so bound the call here.
     timeout: { totalMs: maxDuration * 1000, toolMs: 10_000 },

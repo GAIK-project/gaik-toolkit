@@ -5,8 +5,10 @@ one event per page as it arrives. When the request carries requirements, the sch
 generator and the extractor then turn the pages into records, each value with a
 quote checked against the page text and the URL of the page it came from.
 
-Only the domains in ``WEB_SCRAPER_ALLOWED_DOMAINS`` (default gaik.ai and
-haaga-helia.fi) can be scraped, on every redirect hop: the demo is not an open proxy.
+Only the domains in ``WEB_SCRAPER_ALLOWED_DOMAINS`` (comma-separated, for example
+``gaik.ai,haaga-helia.fi``) can be scraped, on every redirect hop: the demo is not an
+open proxy. Without it the scraper is off: ``/sites`` lists no domain and a run is
+refused with 503.
 Nothing is stored.
 
 gaik is imported inside the worker: the image installs gaik from PyPI, so a release
@@ -58,11 +60,14 @@ except ImportError:
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# Off unless the deployment lists the domains: fetched pages are text written by
+# others, so the demo reads the web only where someone chose to let it.
 ALLOWED_DOMAINS = tuple(
     domain.strip().lower()
-    for domain in os.getenv("WEB_SCRAPER_ALLOWED_DOMAINS", "gaik.ai,haaga-helia.fi").split(",")
+    for domain in os.getenv("WEB_SCRAPER_ALLOWED_DOMAINS", "").split(",")
     if domain.strip()
 )
+OFF_MESSAGE = "Web scraping is not turned on in this demo."
 SITES = [
     {
         "id": "gaik",
@@ -255,6 +260,8 @@ async def run(request: RunRequest):
     """
     from gaik.software_components.web_scraper import UrlPolicy, normalize_url
 
+    if not ALLOWED_DOMAINS:
+        raise HTTPException(503, OFF_MESSAGE)
     try:
         start_url = normalize_url(request.url)
     except ValueError as exc:
