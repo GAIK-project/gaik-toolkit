@@ -16,6 +16,14 @@ from gaik.software_components.llm import google_provider  # noqa: E402
 from gaik.software_components.llm.config import get_llm_config  # noqa: E402
 from google.genai import errors as genai_errors  # noqa: E402
 
+
+@pytest.fixture(autouse=True)
+def _named_fallback(monkeypatch):
+    """These tests cover the fallback, so they name it; unnamed, requests stay
+    in the EU (test_vertex_location.py, test_without_a_named_fallback...)."""
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
+
+
 ROOT = Path(__file__).resolve().parents[2]
 USER = [{"role": "user", "content": "hello"}]
 

@@ -88,7 +88,7 @@ A legacy dict with neither `provider` nor `use_azure`, such as `{"api_key": key,
 | `google` | `GOOGLE_API_KEY` or `GEMINI_API_KEY` | `GOOGLE_MODEL`, default `gemini-2.5-flash` |
 | `aitta` | `AITTA_API_KEY` (aliases: `AITTA_API_TOKEN`, `AITTA_TOKEN`) | `AITTA_MODEL`, default `google/gemma-4-31b-it` |
 | `openai_compatible` | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | Explicit server model; no default |
-| `vertex` | `GOOGLE_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, plus Google credentials | `GOOGLE_MODEL`; location from `GOOGLE_CLOUD_LOCATION`. Unset, gaik after 0.9.1 uses the EU multi-region (`eu`), and the global endpoint for a model the EU does not serve or while the EU does not answer (logged as a warning); gaik 0.9.1 and earlier use `global`. A location you set is used as given unless you also pass `location_fallback` |
+| `vertex` | `GOOGLE_PROJECT_ID` or `GOOGLE_CLOUD_PROJECT`, plus Google credentials | `GOOGLE_MODEL`; location from `GOOGLE_CLOUD_LOCATION`. Unset, gaik uses the EU multi-region (`eu`), and requests stay there: a model the EU does not serve, or an EU that does not answer, is an error unless `GOOGLE_CLOUD_LOCATION_FALLBACK` (for example `global`) or `location_fallback` names a fallback. gaik 0.12.0 and earlier fell back to `global` by themselves; gaik 0.9.1 and earlier used `global`. A location you set is used as given unless you also pass `location_fallback` |
 | `litellm` | `LITELLM_MODEL`; credentials for the selected backend | Provider-prefixed ID, e.g. `azure/gpt-6-luna` |
 
 The Google SDK adapter supports the direct Gemini API and Vertex AI. Vertex accepts application-default credentials (including a `GOOGLE_APPLICATION_CREDENTIALS` file), a `credentials` object, or service-account data via `service_account_json` (`GOOGLE_SERVICE_ACCOUNT_JSON`, inline JSON or a file path). Choose a region where your model is served.
@@ -101,7 +101,7 @@ The configuration helpers (`get_llm_config`, `get_openai_config` and the parsers
 
 ### Timeouts and retries
 
-When a config sets no `timeout` or `max_retries`, every provider stops a request that gets no answer after 600 seconds and retries a failed one twice, the OpenAI and Anthropic SDKs' own defaults. Gemini, Vertex AI and LiteLLM use the same values instead of waiting without a limit or far longer. A Vertex AI request in the default EU location is asked once for at most 120 seconds before the global endpoint takes over. Pass `timeout` and `max_retries` in the config to choose other values.
+When a config sets no `timeout` or `max_retries`, every provider stops a request that gets no answer after 600 seconds and retries a failed one twice, the OpenAI and Anthropic SDKs' own defaults. Gemini, Vertex AI and LiteLLM use the same values instead of waiting without a limit or far longer. With a fallback named, a Vertex AI request in the default EU location is asked once for at most 120 seconds before the fallback takes over. Pass `timeout` and `max_retries` in the config to choose other values.
 
 ### CSC Aitta
 

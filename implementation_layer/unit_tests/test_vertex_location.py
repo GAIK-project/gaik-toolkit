@@ -15,6 +15,13 @@ from gaik.software_components.llm.config import get_llm_config  # noqa: E402
 from google.genai import errors as genai_errors  # noqa: E402
 
 
+@pytest.fixture(autouse=True)
+def _named_fallback(monkeypatch):
+    """These tests cover the fallback, so they name it; unnamed, requests stay
+    in the EU (test_vertex_location.py, test_without_a_named_fallback...)."""
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
+
+
 def _error(code: int) -> Exception:
     cls = genai_errors.ServerError if code >= 500 else genai_errors.ClientError
     return cls(code, {"error": {"code": code, "message": "synthetic"}})
@@ -62,6 +69,8 @@ def world(monkeypatch):
     monkeypatch.setattr(google_provider, "_UNAVAILABLE_UNTIL", {})
     for name in ("GOOGLE_CLOUD_LOCATION", "GOOGLE_SERVICE_ACCOUNT_JSON"):
         monkeypatch.delenv(name, raising=False)
+    # The fallback is asked for here; without it requests stay in the EU (below).
+    monkeypatch.setenv("GOOGLE_CLOUD_LOCATION_FALLBACK", "global")
     return state
 
 
@@ -71,6 +80,23 @@ def _provider(**overrides):
 
 
 USER = [{"role": "user", "content": "hello"}]
+
+
+def test_without_a_named_fallback_requests_stay_in_the_eu(world, monkeypatch):
+    monkeypatch.delenv("GOOGLE_CLOUD_LOCATION_FALLBACK")
+    config = get_llm_config("vertex", project_id="project", model="gemini-test")
+    assert (config["location"], config["location_fallback"]) == ("eu", None)
+    world["failures"]["eu"] = _error(404)
+    provider = google_provider.GoogleProvider(config)
+    with pytest.raises(Exception):
+        provider.chat(USER)
+    # A config without either key (the judge builds one) stays in the EU too.
+    bare = google_provider.GoogleProvider(
+        {"provider": "vertex", "project_id": "project", "model": "gemini-test"}
+    )
+    with pytest.raises(Exception):
+        bare.chat(USER)
+    assert all(location == "eu" for location, _ in world["log"])
 
 
 def test_the_default_location_is_the_eu(world):

@@ -50,7 +50,8 @@ ALLOWED_HOSTS_ENV = "GAIK_ALLOWED_ENDPOINT_HOSTS"
 # Hosts each provider serves its API from. A pattern starting with ``*`` matches
 # any host that ends with the rest of the pattern.
 PROVIDER_HOSTS: dict[str, tuple[str, ...]] = {
-    "openai": ("api.openai.com",),
+    # The EU endpoint keeps an EU data-residency project's requests in the EU.
+    "openai": ("api.openai.com", "eu.api.openai.com"),
     "azure": (
         "*.openai.azure.com",
         "*.cognitiveservices.azure.com",

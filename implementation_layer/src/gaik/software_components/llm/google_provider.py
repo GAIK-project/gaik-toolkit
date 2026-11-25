@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections.abc import Callable, Iterator
@@ -48,13 +49,17 @@ NOT_SERVED_RETRY_SECONDS = 3600.0
 PREFERRED_LOCATION_TIMEOUT_SECONDS = 120.0
 # The variable a warning tells the reader to set to choose the location.
 LOCATION_ENV = "GOOGLE_CLOUD_LOCATION"
+#: A location named here takes over when the EU does not serve a model or does
+#: not answer. Unset, requests stay in the EU.
+FALLBACK_ENV = "GOOGLE_CLOUD_LOCATION_FALLBACK"
 
 
 def _fallback_location(config: dict) -> str | None:
     """The location that takes over from the config's own, or None.
 
     ``location_fallback`` in the config decides, also when it is None. A config
-    with neither key gets the default pair: the EU, then the global endpoint.
+    with neither key stays in the EU, unless ``GOOGLE_CLOUD_LOCATION_FALLBACK``
+    names a fallback (``global``, say): nothing leaves the region unasked.
     A location other than the EU is used as given when the fallback is still
     the one ``get_llm_config`` filled in by default: the location was then set
     on the returned dict. A fallback the caller named applies with any location.
@@ -64,7 +69,7 @@ def _fallback_location(config: dict) -> str | None:
         if config.get("_default_location_fallback") and (config.get("location") or "eu") != "eu":
             return None
     else:
-        fallback = None if config.get("location") else "global"
+        fallback = None if config.get("location") else (os.getenv(FALLBACK_ENV) or None)
     return fallback if fallback and fallback != (config.get("location") or "eu") else None
 
 
@@ -142,9 +147,8 @@ class GoogleProvider:
                 credentials = service_account.Credentials.from_service_account_info(
                     info, scopes=scopes
                 )
-            # No location in the config: the EU first, the global endpoint for a
-            # model the EU does not serve or while the EU does not answer (see
-            # llm/config.py).
+            # No location in the config: the EU, and a fallback only when one is
+            # named (see llm/config.py).
             self.location = config.get("location") or "eu"
             self._fallback_location = _fallback_location(config)
             self._project = str(config["project_id"])
