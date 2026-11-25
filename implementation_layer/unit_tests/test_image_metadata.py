@@ -578,3 +578,18 @@ def test_a_bmp_is_saved_again_with_its_pixels_only():
 
     assert HIDDEN_BYTES not in cleaned and removed
     assert _pixels(cleaned) == _pixels(padded)
+
+
+def test_a_webp_with_no_image_chunks_is_refused():
+    from gaik.software_components.image_metadata import UnreadableImageError
+
+    exif = _exif(orientation=6).tobytes()[6:]
+    for chunk in (
+        b"EXIF" + len(exif).to_bytes(4, "little") + exif + b"\x00" * (len(exif) & 1),
+        b"XMP " + len(XMP).to_bytes(4, "little") + XMP + b"\x00" * (len(XMP) & 1),
+    ):
+        body = b"WEBP" + chunk
+        data = b"RIFF" + len(body).to_bytes(4, "little") + body
+        assert strip_image_metadata(data) == (data, ())
+        with pytest.raises(UnreadableImageError):
+            strip_image_metadata(data, strict=True)

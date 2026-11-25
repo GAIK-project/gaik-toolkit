@@ -336,6 +336,8 @@ def _webp(data: bytes) -> tuple[bytes, list[str]] | None:
                 removed.append(OTHER)
             payload = payload[:_ANMF_HEADER] + b"".join(parts)
         kept.append(_riff_chunk(kind, payload))
+    if not kept:
+        return None
     if orientation and orientation != 1:
         # The orientation alone, flagged in VP8X (added for a simple WebP).
         if kept[0][:4] != b"VP8X":
