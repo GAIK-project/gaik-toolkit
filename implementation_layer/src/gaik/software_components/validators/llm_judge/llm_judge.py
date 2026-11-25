@@ -322,7 +322,7 @@ class LLMJudge:
         """Route to the right ``_call_*`` for ``self.model_provider``."""
         # Every path sends the pages without the text their files carry besides
         # the pixels (image_metadata): a caller may pass a photo or a scan.
-        source_pages = [strip_image_metadata(page)[0] for page in source_pages]
+        source_pages = [strip_image_metadata(page, strict=True)[0] for page in source_pages]
         if self.config is not None:
             return self._call_shared(user_prompt, system_prompt, source_pages)
         provider_call = {

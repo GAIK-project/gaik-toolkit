@@ -512,7 +512,7 @@ class VisionParser:
 
     def _image_to_base64(self, image_bytes: bytes) -> str:
         """Base64 of the image, without the text its file carries besides the pixels."""
-        return base64.b64encode(strip_image_metadata(image_bytes)[0]).decode("utf-8")
+        return base64.b64encode(strip_image_metadata(image_bytes, strict=True)[0]).decode("utf-8")
 
     def _sampling_kwargs(self) -> dict[str, float | str]:
         """Return only sampling options explicitly configured by the caller."""

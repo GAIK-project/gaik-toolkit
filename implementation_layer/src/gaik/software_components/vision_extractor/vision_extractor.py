@@ -66,7 +66,7 @@ def _encode_input(path: Path) -> str:
     besides the pixels (image_metadata)."""
     if _is_pdf(path):
         return _encode_pdf_base64(path)
-    return base64.b64encode(strip_image_metadata(path.read_bytes())[0]).decode("ascii")
+    return base64.b64encode(strip_image_metadata(path.read_bytes(), strict=True)[0]).decode("ascii")
 
 
 ModelProvider = Literal["openai", "claude", "google"]

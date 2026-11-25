@@ -192,6 +192,9 @@ jev-classifier = [
 
 # Multi-provider PDF-to-markdown parser (OpenAI, Claude, Google Gemini)
 multimodal-parser = [
+    # Re-saves a TIFF, or an image the metadata cleaner cannot walk, without its
+    # tags (software_components/image_metadata.py).
+    "Pillow>=10.0.0",
     "PyMuPDF>=1.26.0",
     "anthropic>=0.96.0,<1",
     "google-auth>=2.0.0",
@@ -201,6 +204,9 @@ multimodal-parser = [
 
 # Single-pass vision extraction: PDF/image → structured data (OpenAI, Claude, Google)
 vision-extract = [
+    # Re-saves a TIFF, or an image the metadata cleaner cannot walk, without its
+    # tags (software_components/image_metadata.py).
+    "Pillow>=10.0.0",
     "PyMuPDF>=1.26.0",
     "anthropic>=0.96.0,<1",
     "google-auth>=2.0.0",

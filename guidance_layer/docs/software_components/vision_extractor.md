@@ -120,7 +120,8 @@ Images are sent without the text their files carry besides the pixels: EXIF
 removed first, without re-encoding the pixels, and a JPEG keeps its orientation
 (`gaik.software_components.image_metadata.strip_image_metadata`); so is
 anything after the image's end. TIFF, and a file the cleaner cannot walk, is
-re-saved with Pillow without its tags. Text drawn in the picture is material for
+re-saved with Pillow without its tags; an image that cannot be cleaned is
+refused (`UnreadableImageError`) rather than sent with its text. Text drawn in the picture is material for
 the model, never instructions.
 
 ## Per-field verification

@@ -27,4 +27,4 @@ def image_data(part: dict) -> tuple[str, bytes]:
     if not decoded:
         raise ValueError("Image content cannot be empty")
     # Without the text the file carries besides the pixels (image_metadata).
-    return mime_type, strip_image_metadata(decoded)[0]
+    return mime_type, strip_image_metadata(decoded, strict=True)[0]

@@ -14,10 +14,20 @@ from gaik.software_components.file_type import (
     detect_file_type,
 )
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"\x00" * 32
-JPEG = b"\xff\xd8\xff\xe0" + b"\x00" * 32
-GIF = b"GIF89a" + b"\x00" * 32
-WEBP = b"RIFF\x24\x00\x00\x00WEBPVP8 " + b"\x00" * 32
+
+def _tiny(fmt: str) -> bytes:
+    """A real 2x2 image: the metadata cleaner walks every part of what is sent."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2), (1, 2, 3)).save(buffer, format=fmt)
+    return buffer.getvalue()
+
+
+PNG = _tiny("PNG")
+JPEG = _tiny("JPEG")
+GIF = _tiny("GIF")
+WEBP = _tiny("WEBP")
 TIFF = b"II*\x00" + b"\x00" * 32
 BMP = b"BM\x36\x00\x00\x00\x00\x00\x00\x00" + b"\x00" * 32
 OLE = b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1" + b"\x00" * 32

@@ -106,5 +106,5 @@ def build_chat_document_content(
 
 def _image_part(data: bytes, mime: str) -> dict:
     # Without the text the file carries besides the pixels (image_metadata).
-    encoded = base64.b64encode(strip_image_metadata(data)[0]).decode("ascii")
+    encoded = base64.b64encode(strip_image_metadata(data, strict=True)[0]).decode("ascii")
     return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}"}}

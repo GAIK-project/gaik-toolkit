@@ -142,6 +142,56 @@ def test_jpeg_segments_that_only_look_needed_go_too():
     assert removed == ("other metadata",)
 
 
+def test_text_after_a_jfif_or_adobe_header_goes():
+    out = io.BytesIO()
+    _picture().save(out, format="JPEG")
+    data = out.getvalue()
+    jfif_end = 4 + int.from_bytes(data[4:6], "big")  # after the JFIF APP0
+    assert data[6:11] == b"JFIF\x00"
+    jfif = data[6 : jfif_end - 0]
+    padded = jfif + SB
+    adobe = b"Adobe\x00\x64\x00\x00\x00\x00\x01" + SB
+    longer = (
+        data[:2]
+        + b"\xff\xe0" + (len(padded) + 2).to_bytes(2, "big") + padded
+        + b"\xff\xee" + (len(adobe) + 2).to_bytes(2, "big") + adobe
+        + data[jfif_end:]
+    )  # fmt: skip
+    cleaned, removed = strip_image_metadata(longer)
+    assert SB not in cleaned and removed == ("other metadata",)
+    assert _pixels(cleaned) == _pixels(data)
+
+
+def test_png_parts_it_does_not_know_or_that_are_too_long_go():
+    import struct
+    import zlib
+
+    def chunk(kind: bytes, payload: bytes) -> bytes:
+        crc = zlib.crc32(kind + payload).to_bytes(4, "big")
+        return struct.pack(">I", len(payload)) + kind + payload + crc
+
+    out = io.BytesIO()
+    _picture().save(out, format="PNG")
+    data = out.getvalue()
+    iend = data.rindex(b"IEND") - 4
+    long_gama = chunk(b"gAMA", b"\x00\x00\xb1\x8f" + SB)
+    cleaned, removed = _check(data[:33] + long_gama + data[33:])
+    assert removed == ("other metadata",)
+    # A critical chunk not known here: the file is saved again, without it.
+    cleaned, _ = _check(data[:iend] + chunk(b"TEXT", SB) + data[iend:])
+
+
+def test_a_component_refuses_an_image_it_cannot_clean():
+    from gaik.software_components.image_metadata import UnreadableImageError
+    from gaik.software_components.parsers.multimodal_parser.chat_content import _image_part
+
+    out = io.BytesIO()
+    _picture().save(out, format="JPEG", comment=SB)
+    truncated = out.getvalue()[:-40]
+    with pytest.raises(UnreadableImageError):
+        _image_part(truncated, "image/jpeg")
+
+
 def test_gif_keeps_only_the_loop_count_of_its_looping_extension():
     frames = [_picture().convert("P"), Image.new("RGB", (16, 8), (0, 0, 0)).convert("P")]
     out = io.BytesIO()
