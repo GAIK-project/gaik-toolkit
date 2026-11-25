@@ -75,6 +75,19 @@ def _fallback_location(config: dict) -> str | None:
     return fallback if fallback and fallback != (config.get("location") or "eu") else None
 
 
+def _fallback_env_applies(config: dict) -> bool:
+    """Whether the location is the default EU one and ``FALLBACK_ENV`` would name
+    its fallback: no location set and no fallback in the config, or the one
+    ``get_llm_config`` filled in from the environment."""
+    if "location_fallback" not in config:
+        return not config.get("location")
+    return (
+        bool(config.get("_default_location_fallback"))
+        and config["location_fallback"] is None
+        and (config.get("location") or "eu") == "eu"
+    )
+
+
 def _on_fallback(key: tuple[str, str, str]) -> bool:
     """Whether the model's requests go to the fallback now; drops expired entries."""
     now = time.monotonic()
@@ -231,7 +244,11 @@ class GoogleProvider:
         """
         fallback = self._fallback_location
         if fallback is None:
-            return call(self.raw)
+            try:
+                return call(self.raw)
+            except Exception as exc:
+                self._note_settings(exc, model)
+                raise
         preferred = self._preferred_location
         key = (self._project, preferred, model)
         if _on_fallback(key):
@@ -270,6 +287,23 @@ class GoogleProvider:
                 self._config.get("_location_env") or LOCATION_ENV,
             )
             return call(self._use(fallback))
+
+    def _note_settings(self, exc: BaseException, model: str) -> None:
+        """Name the location settings on a 404, 429 or timeout from the default
+        EU location without a fallback. The error keeps its type."""
+        if self.provider != "vertex" or not _fallback_env_applies(self._config):
+            return
+        code = getattr(exc, "code", None)
+        if not (
+            (isinstance(exc, genai_errors.ClientError) and code in (404, 429)) or _is_timeout(exc)
+        ):
+            return
+        exc.add_note(
+            f"Vertex AI location {self.location!r} may not offer {model} or may be busy. "
+            f"Set {self._config.get('_location_env') or LOCATION_ENV} to choose another "
+            f"location, or {FALLBACK_ENV}=global to allow the global endpoint, which has "
+            "no data-residency guarantee."
+        )
 
     @staticmethod
     def _text_parts(content: Any) -> list[str]:
