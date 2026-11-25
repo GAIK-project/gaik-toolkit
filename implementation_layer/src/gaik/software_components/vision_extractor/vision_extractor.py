@@ -4,6 +4,7 @@ Single-pass vision extraction: PDF/image → structured data in one LLM call.
 
 from __future__ import annotations
 
+import base64
 import json
 import math
 import time
@@ -38,6 +39,7 @@ from gaik.software_components.extractor.schema import (
     normalize_extracted_data,
     sanitize_model_name,
 )
+from gaik.software_components.image_metadata import strip_image_metadata
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.parsers.multimodal_parser.config import (
     create_claude_client,
@@ -57,6 +59,15 @@ from gaik.software_components.source_material import with_source_material_instru
 
 from . import text_layer
 from .prompts import SYSTEM_PROMPTS, USER_PROMPTS, VERIFICATION_PROMPT
+
+
+def _encode_input(path: Path) -> str:
+    """Base64 of an input file; an image goes without the text its file carries
+    besides the pixels (image_metadata)."""
+    if _is_pdf(path):
+        return _encode_pdf_base64(path)
+    return base64.b64encode(strip_image_metadata(path.read_bytes())[0]).decode("ascii")
+
 
 ModelProvider = Literal["openai", "claude", "google"]
 ReasoningEffort = Literal["low", "medium", "high"]
@@ -1189,7 +1200,7 @@ class VisionExtractor:
         content: list[dict] = []
         for fp in file_paths:
             mime = _detect_mime_type(fp)
-            b64 = _encode_pdf_base64(fp)
+            b64 = _encode_input(fp)
             data_url = f"data:{mime};base64,{b64}"
             if _is_pdf(fp):
                 content.append({"type": "input_file", "filename": fp.name, "file_data": data_url})
@@ -1236,7 +1247,7 @@ class VisionExtractor:
         content: list[dict] = []
         for fp in file_paths:
             mime = _detect_mime_type(fp)
-            b64 = _encode_pdf_base64(fp)
+            b64 = _encode_input(fp)
             if _is_pdf(fp):
                 content.append(
                     {
@@ -1302,7 +1313,7 @@ class VisionExtractor:
         parts: list[dict] = []
         for fp in file_paths:
             mime = _detect_mime_type(fp)
-            parts.append({"inlineData": {"mimeType": mime, "data": _encode_pdf_base64(fp)}})
+            parts.append({"inlineData": {"mimeType": mime, "data": _encode_input(fp)}})
         parts.append({"text": user_prompt})
 
         is_vertex = self.config.get("vertex_ai", True)

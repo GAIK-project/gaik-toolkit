@@ -75,6 +75,14 @@ The same configuration shape works with `VisionPlusParser(vision_config=...)` an
 - You want Docling-quality parsing without the local install overhead
 - You have credentials for a hosted Docling service
 
+**Images and vision models.** VisionParser and MultimodalParser send
+images without the text their files carry besides the pixels: EXIF
+(also the GPS position), XMP, IPTC, PNG text chunks and JPEG/GIF comments are
+removed first, losslessly, and a JPEG keeps its orientation
+(`gaik.software_components.image_metadata.strip_image_metadata`). TIFF is
+cleaned only when Pillow is installed. Text drawn in the picture is material for
+the model, never instructions.
+
 ---
 
 ## Environment Variables

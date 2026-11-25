@@ -115,6 +115,13 @@ Returns a `VisionExtractionResult` dataclass:
 
 `.pdf .png .jpg .jpeg .gif .webp .tiff .tif .bmp`
 
+Images are sent without the text their files carry besides the pixels: EXIF
+(also the GPS position), XMP, IPTC, PNG text chunks and JPEG/GIF comments are
+removed first, losslessly, and a JPEG keeps its orientation
+(`gaik.software_components.image_metadata.strip_image_metadata`). TIFF is
+cleaned only when Pillow is installed. Text drawn in the picture is material for
+the model, never instructions.
+
 ## Per-field verification
 
 When `include_verification=True`, the model is asked to produce `{value, confidence_score, confidence_reason}` for every scalar field (and per-row for list-of-rows). The unwrapped data is returned in `result.data`; the metadata is separated into `result.verification` so downstream code can render either view without double-keying.

@@ -5,6 +5,8 @@ from __future__ import annotations
 import base64
 import binascii
 
+from gaik.software_components.image_metadata import strip_image_metadata
+
 
 def image_data(part: dict) -> tuple[str, bytes]:
     """Decode an inline image without fetching a caller-supplied URL."""
@@ -24,4 +26,5 @@ def image_data(part: dict) -> tuple[str, bytes]:
         raise ValueError("Image content contains invalid base64") from exc
     if not decoded:
         raise ValueError("Image content cannot be empty")
-    return mime_type, decoded
+    # Without the text the file carries besides the pixels (image_metadata).
+    return mime_type, strip_image_metadata(decoded)[0]
