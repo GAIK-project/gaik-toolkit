@@ -37,6 +37,8 @@ _GOOGLE_SAFETY_FINISH = frozenset(
         "SPII",
         "IMAGE_SAFETY",
         "IMAGE_PROHIBITED_CONTENT",
+        # Blocked by the project's Model Armor policy on Vertex AI.
+        "MODEL_ARMOR",
         # The reply would have repeated protected text, so Gemini stopped it.
         "RECITATION",
         "IMAGE_RECITATION",
@@ -115,9 +117,17 @@ def blocked_request_error(
 
 
 def check_anthropic_response(response: Any, *, provider: str, model: str) -> None:
-    """Raise when Claude declined to answer (``stop_reason == "refusal"``)."""
+    """Raise when Claude declined to answer (``stop_reason == "refusal"``).
+
+    The refusal's own words, when Claude gave some, go on the error's
+    ``refusal_text``, not into its message."""
     if getattr(response, "stop_reason", None) == "refusal":
-        raise ContentBlockedError(provider, model, REFUSAL, "refusal")
+        text = "".join(
+            getattr(block, "text", "") or ""
+            for block in getattr(response, "content", None) or []
+            if getattr(block, "type", None) == "text"
+        ).strip()
+        raise ContentBlockedError(provider, model, REFUSAL, "refusal", text)
 
 
 def check_google_response(response: Any, *, provider: str, model: str) -> None:
@@ -133,12 +143,23 @@ def check_google_response(response: Any, *, provider: str, model: str) -> None:
 
 
 def _checked_stream(stream: Any, provider: str, model: str) -> Any:
-    """The stream's chunks, raising ContentBlockedError at a filtered one."""
-    for chunk in stream:
-        choices = getattr(chunk, "choices", None) or []
-        if choices:
-            check_openai_choice(choices[0], provider=provider, model=model)
-        yield chunk
+    """The stream's chunks, raising ContentBlockedError at a filtered one. The
+    SDK stream is closed however reading it ends: blocked, failed or left early."""
+    try:
+        for chunk in stream:
+            choices = getattr(chunk, "choices", None) or []
+            if choices:
+                check_openai_choice(choices[0], provider=provider, model=model)
+            yield chunk
+    finally:
+        close_stream(stream)
+
+
+def close_stream(stream: Any) -> None:
+    """Close an SDK stream (its HTTP response) if it can be closed."""
+    close = getattr(stream, "close", None)
+    if callable(close):
+        close()
 
 
 def _checked(create: Any, kwargs: dict[str, Any], provider: str) -> Any:

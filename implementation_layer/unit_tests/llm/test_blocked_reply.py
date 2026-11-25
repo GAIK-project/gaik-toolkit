@@ -289,3 +289,104 @@ def test_a_rate_limit_or_server_error_is_still_tried_again(status, monkeypatch):
 
     assert generator._with_retries(call) == "ok"
     assert len(calls) == 3
+
+
+# --- review of #339: Model Armor, closing streams, refusal text ----------------
+
+
+@pytest.mark.parametrize("finish", ["MODEL_ARMOR", "SAFETY"])
+@pytest.mark.parametrize("method", ["chat", "chat_parsed", "chat_stream"])
+def test_a_gemini_block_raises_through_every_method(monkeypatch, method, finish):
+    pytest.importorskip("google.genai")
+    from gaik.software_components.llm import google_provider
+    from google.genai import types
+
+    blocked = types.GenerateContentResponse(
+        candidates=[types.Candidate(finish_reason=types.FinishReason[finish])]
+    )
+
+    class Models:
+        def generate_content(self, **_):
+            return blocked
+
+        def generate_content_stream(self, **_):
+            return iter([blocked])
+
+    monkeypatch.setattr(
+        google_provider.genai, "Client", lambda **_: SimpleNamespace(models=Models())
+    )
+    provider = google_provider.GoogleProvider({"api_key": "test", "model": "gemini-test"})
+
+    with pytest.raises(ContentBlockedError) as raised:
+        if method == "chat":
+            provider.chat(MESSAGES)
+        elif method == "chat_parsed":
+            provider.chat_parsed(MESSAGES, Answer)
+        else:
+            list(provider.chat_stream(MESSAGES))
+    assert raised.value.reason == "content_filter"
+    assert raised.value.detail == finish
+
+
+class _ClosingStream:
+    """An SDK stream that records whether it was closed."""
+
+    def __init__(self, chunks):
+        self.chunks, self.closed = iter(chunks), False
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        return next(self.chunks)
+
+    def close(self):
+        self.closed = True
+
+
+def _chunk(content=None, finish=None):
+    return SimpleNamespace(
+        choices=[SimpleNamespace(delta=SimpleNamespace(content=content), finish_reason=finish)]
+    )
+
+
+def test_an_openai_stream_is_closed_when_a_filtered_chunk_stops_it():
+    stream = _ClosingStream([_chunk("Hel"), _chunk(finish="content_filter"), _chunk("lo")])
+    provider = _openai(create=lambda **_: stream)
+
+    with pytest.raises(ContentBlockedError):
+        list(provider.chat_stream(MESSAGES))
+    assert stream.closed
+
+
+def test_an_openai_stream_is_closed_when_the_caller_stops_early():
+    stream = _ClosingStream([_chunk("a"), _chunk("b"), _chunk("c")])
+    reader = _openai(create=lambda **_: stream).chat_stream(MESSAGES)
+    assert next(reader) == "a"
+    reader.close()
+    assert stream.closed
+
+
+def test_a_raw_client_stream_is_closed_when_a_filtered_chunk_stops_it():
+    from gaik.software_components.llm.blocked import checked_openai
+
+    stream = _ClosingStream([_chunk("a"), _chunk(finish="content_filter")])
+    raw = _raw_client(create=lambda **_: stream)
+    reader = checked_openai(raw).chat.completions.create(model="d", messages=MESSAGES, stream=True)
+    with pytest.raises(ContentBlockedError):
+        list(reader)
+    assert stream.closed
+
+
+@pytest.mark.parametrize("words", ["I can't help with that request.", ""])
+def test_claudes_refusal_keeps_its_words_out_of_the_message(words):
+    from gaik.software_components.llm.blocked import check_anthropic_response
+
+    content = [SimpleNamespace(type="text", text=words)] if words else []
+    response = SimpleNamespace(stop_reason="refusal", content=content)
+
+    with pytest.raises(ContentBlockedError) as raised:
+        check_anthropic_response(response, provider="anthropic", model="claude-x")
+    assert raised.value.refusal_text == words
+    if words:
+        assert words not in str(raised.value)

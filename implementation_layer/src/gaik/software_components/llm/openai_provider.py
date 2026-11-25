@@ -9,7 +9,11 @@ from pydantic import BaseModel
 
 from gaik.software_components.config import create_openai_client
 from gaik.software_components.llm.base import ChatMessage, ChatResponse, UsageCounter
-from gaik.software_components.llm.blocked import blocked_request_error, check_openai_choice
+from gaik.software_components.llm.blocked import (
+    blocked_request_error,
+    check_openai_choice,
+    close_stream,
+)
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import Provider, resolve_provider
 
@@ -98,13 +102,18 @@ class OpenAIProvider:
         stream = self._send(
             self.raw.chat.completions.create, model, messages=messages, stream=True, **kwargs
         )
-        for chunk in stream:
-            if not chunk.choices:
-                continue
-            check_openai_choice(chunk.choices[0], provider=self.provider, model=model)
-            delta = chunk.choices[0].delta
-            if delta and delta.content:
-                yield delta.content
+        try:
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                check_openai_choice(chunk.choices[0], provider=self.provider, model=model)
+                delta = chunk.choices[0].delta
+                if delta and delta.content:
+                    yield delta.content
+        finally:
+            # Also when a filtered chunk or the caller stops it early: the HTTP
+            # response is released, as when the stream runs to its end.
+            close_stream(stream)
 
     def embed(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
         model = kwargs.pop("model", self.embedding_model)
