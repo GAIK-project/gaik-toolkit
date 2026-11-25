@@ -28,10 +28,16 @@ What bounds a session (the agent has shell tools and runs in the API pod):
   * An attachment's size and content are checked before a parser or a model
     reads it (its type, then macros, PDF actions and malware as for every
     upload), and its text reaches the agent marked as data.
+  * Every tool call goes through the first wizard's tool guard
+    (`solution_wizard/agent_tool_guard.py`) before it runs, as in the
+    interactive runner: files are written only in the session's workspace and
+    read only there and in the wizard's own files, Bash runs only the wizard's
+    scripts, and every other tool is refused. Without the guard no session
+    starts.
   * The agent's process does not inherit the API's other credentials
-    (`_agent_env`). That is not a boundary: the agent runs as the same user in
-    the same container as the API, so the per-user grant is what limits who
-    drives it.
+    (`_agent_env`). That is not a boundary on its own: the agent runs as the
+    same user in the same container as the API, so the guard and the per-user
+    grant are what limit it.
 """
 
 from __future__ import annotations
@@ -39,6 +45,7 @@ from __future__ import annotations
 import asyncio
 import base64
 import csv
+import importlib.util
 import logging
 import math
 import os
@@ -77,6 +84,7 @@ from claude_agent_sdk import (
     AssistantMessage,
     ClaudeAgentOptions,
     ClaudeSDKClient,
+    HookMatcher,
     ResultMessage,
     TextBlock,
     ToolUseBlock,
@@ -120,6 +128,27 @@ def _resolve_wizard_dir() -> Path | None:
 
 
 WIZARD_DIR = _resolve_wizard_dir()
+
+
+def _load_tool_guard():
+    """The first wizard's tool guard module, loaded from WIZARD_DIR, or None."""
+    path = WIZARD_DIR / "agent_tool_guard.py" if WIZARD_DIR else None
+    if path is None or not path.is_file():
+        return None
+    try:
+        spec = importlib.util.spec_from_file_location("solution_wizard_agent_tool_guard", path)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+    except Exception:  # noqa: BLE001 - no guard means no session, logged below
+        logger.exception("Solution Wizard tool guard could not be loaded from %s", path)
+        return None
+    return module
+
+
+#: The tools the wizard uses (as in run_wizard_interactive.py); the guard
+#: refuses every other tool too.
+AGENT_TOOLS = ["Read", "Grep", "Glob", "Write", "Edit", "Bash", "TodoWrite"]
+_TOOL_GUARD = _load_tool_guard()
 WORKSPACES_DIR = Path(
     os.getenv("WIZARD_WORKSPACES_DIR", "").strip() or _HERE.parents[1] / ".wizard_workspaces"
 )
@@ -432,6 +461,11 @@ def _agent_env() -> dict[str, str]:
     }
     env["API_TIMEOUT_MS"] = os.getenv("API_TIMEOUT_MS") or "600000"
     env["DISABLE_TELEMETRY"] = os.getenv("DISABLE_TELEMETRY") or "1"
+    # Nothing but the model calls: no update checks, error reports or other
+    # traffic to the CLI vendor.
+    env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = (
+        os.getenv("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC") or "1"
+    )
     return env
 
 
@@ -450,6 +484,10 @@ def _cli_home(session_id: str) -> Path:
 
 
 def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
+    if _TOOL_GUARD is None:
+        logger.error("Solution Wizard is not configured: no agent_tool_guard.py in WIZARD_DIR")
+        raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+    guard = _TOOL_GUARD.ToolGuard(WIZARD_DIR, output_dir)
     return ClaudeAgentOptions(
         cwd=str(WIZARD_DIR),
         add_dirs=[str(output_dir)],
@@ -457,9 +495,17 @@ def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
         # directory per session lets the session's end remove that too.
         env={**_agent_env(), "CLAUDE_CONFIG_DIR": str(cli_home)},
         model=_model(),
-        allowed_tools=["Read", "Grep", "Glob", "Write", "Edit", "Bash"],
+        tools=AGENT_TOOLS,
+        allowed_tools=AGENT_TOOLS,
+        # bypassPermissions lets every tool run; the guard's hook is what limits
+        # them to the workspace and the wizard's own scripts. A hook runs before
+        # the CLI's own approval, so it also decides the calls the CLI would
+        # approve by itself.
         permission_mode="bypassPermissions",
+        hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook])]},
         setting_sources=[],
+        # Only the MCP servers given here, which is none.
+        strict_mcp_config=True,
         max_budget_usd=_agent_budget_usd(),
         include_partial_messages=True,  # token-level streaming
     )
@@ -741,6 +787,9 @@ async def start_session(
     """
     if WIZARD_DIR is None or not (WIZARD_DIR / "SKILL.md").is_file():
         logger.error("Solution Wizard is not configured: no SKILL.md in WIZARD_DIR")
+        raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
+    if _TOOL_GUARD is None:
+        logger.error("Solution Wizard is not configured: no agent_tool_guard.py in WIZARD_DIR")
         raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
     _agent_env()  # validate creds before creating anything
 
