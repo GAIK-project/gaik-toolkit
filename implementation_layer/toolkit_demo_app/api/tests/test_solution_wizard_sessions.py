@@ -488,6 +488,9 @@ def test_every_tool_call_of_the_agent_goes_through_the_wizards_guard(monkeypatch
 
     assert options.permission_mode == "bypassPermissions"
     assert options.strict_mcp_config is True
+    (matcher,) = options.hooks["PreToolUse"]
+    assert matcher.matcher is None  # every tool, not some
+    assert matcher.on_failure == "block"  # a hook that fails or times out refuses
     assert options.tools == options.allowed_tools == route.AGENT_TOOLS
     assert _decide(options, "Write", {"file_path": str(workspace / "blueprint.json")}) is None
     assert _decide(options, "Write", {"file_path": str(tmp_path / "elsewhere.txt")})
@@ -497,6 +500,40 @@ def test_every_tool_call_of_the_agent_goes_through_the_wizards_guard(monkeypatch
     assert _decide(options, "Bash", {"command": "cat /proc/self/environ"})
     assert _decide(options, "Bash", {"command": "curl https://example.com"})
     assert _decide(options, "WebFetch", {"url": "https://example.com"})
+    other = tmp_path / "workspaces" / "s2"
+    other.mkdir()
+    assert _decide(options, "Read", {"file_path": str(other / "blueprint.json")})
+    assert _decide(options, "Read", {"file_path": str(route._cli_home("s1") / "x.jsonl")})
+
+
+def test_the_schema_script_goes_to_the_configured_endpoint_only(monkeypatch, tmp_path) -> None:
+    workspace, options = _guarded_options(monkeypatch, tmp_path)
+    requirements = (workspace / "req.md").as_posix()
+    base = f"python scripts/generate_schema.py --requirements {requirements} --schema-name S"
+
+    assert _decide(options, "Bash", {"command": base}) is None
+    assert _decide(options, "Bash", {"command": base + " --model gpt-4.1"}) is None
+    assert _decide(options, "Bash", {"command": base + " --base-url https://x.openai.azure.com"})
+    assert _decide(options, "Bash", {"command": base + " --no-azure"})
+
+
+# Taken at import, before the api fixture replaces it.
+_REAL_BUILD_OPTIONS = route._build_options
+
+
+def test_a_guard_that_cannot_be_built_leaves_nothing_behind(api, monkeypatch) -> None:
+    def broken_guard(*args, **kwargs):
+        raise ValueError("the scripts table is malformed")
+
+    monkeypatch.setattr(route, "_build_options", _REAL_BUILD_OPTIONS)
+    monkeypatch.setattr(route._TOOL_GUARD, "ToolGuard", broken_guard)
+
+    with pytest.raises(ValueError):
+        asyncio.run(route.start_session("alice"))
+
+    assert route.WIZARD_SESSIONS == {}
+    assert not route.WORKSPACES_DIR.exists()
+    assert Client.started == []
 
 
 def test_no_session_starts_without_the_guard(api, monkeypatch) -> None:

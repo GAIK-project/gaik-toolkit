@@ -149,6 +149,21 @@ def _load_tool_guard():
 #: refuses every other tool too.
 AGENT_TOOLS = ["Read", "Grep", "Glob", "Write", "Edit", "Bash", "TodoWrite"]
 _TOOL_GUARD = _load_tool_guard()
+#: Options the demo's agent may not pass to the wizard's scripts: the schema
+#: script calls a model with the deployment's Azure key, so it goes to the
+#: configured AZURE_ENDPOINT only, not to an address the agent names.
+_DEMO_LEFT_OUT_OPTIONS = {"generate_schema.py": ("--base-url", "--no-azure")}
+
+
+def _demo_scripts() -> dict[str, dict[str, str]]:
+    """The guard's script table, less the options the demo leaves out."""
+    scripts = _TOOL_GUARD.load_scripts()
+    for script, options in _DEMO_LEFT_OUT_OPTIONS.items():
+        for option in options:
+            scripts.get(script, {}).pop(option, None)
+    return scripts
+
+
 WORKSPACES_DIR = Path(
     os.getenv("WIZARD_WORKSPACES_DIR", "").strip() or _HERE.parents[1] / ".wizard_workspaces"
 )
@@ -487,7 +502,7 @@ def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
     if _TOOL_GUARD is None:
         logger.error("Solution Wizard is not configured: no agent_tool_guard.py in WIZARD_DIR")
         raise HTTPException(status_code=503, detail=NOT_CONFIGURED)
-    guard = _TOOL_GUARD.ToolGuard(WIZARD_DIR, output_dir)
+    guard = _TOOL_GUARD.ToolGuard(WIZARD_DIR, output_dir, scripts=_demo_scripts())
     return ClaudeAgentOptions(
         cwd=str(WIZARD_DIR),
         add_dirs=[str(output_dir)],
@@ -502,7 +517,8 @@ def _build_options(output_dir: Path, cli_home: Path) -> ClaudeAgentOptions:
         # the CLI's own approval, so it also decides the calls the CLI would
         # approve by itself.
         permission_mode="bypassPermissions",
-        hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook])]},
+        # A hook that fails or times out refuses the call instead of letting it run.
+        hooks={"PreToolUse": [HookMatcher(hooks=[guard.hook], on_failure="block")]},
         setting_sources=[],
         # Only the MCP servers given here, which is none.
         strict_mcp_config=True,
@@ -810,10 +826,13 @@ async def start_session(
         session_id = uuid.uuid4().hex
         output_dir = WORKSPACES_DIR / session_id
         cli_home = _cli_home(session_id)
+        # The options, and the guard with them, before anything is created: a
+        # guard that cannot be built leaves nothing behind.
+        options = _build_options(output_dir, cli_home)
         output_dir.mkdir(parents=True, exist_ok=True)
         cli_home.mkdir(parents=True, exist_ok=True)
 
-        client = ClaudeSDKClient(options=_build_options(output_dir, cli_home))
+        client = ClaudeSDKClient(options=options)
         try:
             await client.connect()
         except Exception as exc:  # noqa: BLE001
