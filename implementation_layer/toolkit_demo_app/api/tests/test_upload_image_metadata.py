@@ -196,3 +196,18 @@ def test_every_image_the_parser_route_takes_reaches_the_parser_cleaned(suffix, m
 
     assert response.status_code == 200, response.text
     assert HIDDEN_TEXT not in received["bytes"]
+
+
+def test_a_webp_with_no_image_chunks_is_refused_with_422():
+    from fastapi import HTTPException
+
+    exif = Image.Exif()
+    exif[0x0112] = 6
+    payload = exif.tobytes()[6:]
+    chunk = b"EXIF" + len(payload).to_bytes(4, "little") + payload + b"\x00" * (len(payload) & 1)
+    body = b"WEBP" + chunk
+    data = b"RIFF" + len(body).to_bytes(4, "little") + body
+
+    with pytest.raises(HTTPException) as refused:
+        asyncio.run(without_image_metadata(".webp", data))
+    assert refused.value.status_code == 422
