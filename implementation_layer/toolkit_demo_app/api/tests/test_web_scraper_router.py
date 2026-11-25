@@ -11,6 +11,12 @@ from fastapi.testclient import TestClient
 from pydantic import BaseModel, create_model
 
 
+@pytest.fixture(autouse=True)
+def allowed(monkeypatch):
+    """The two sites a deployment lists; without them the scraper is off."""
+    monkeypatch.setattr(route, "ALLOWED_DOMAINS", ("gaik.ai", "haaga-helia.fi"))
+
+
 @pytest.fixture
 def client() -> TestClient:
     app = FastAPI()
@@ -261,3 +267,24 @@ def test_pages_only_keeps_every_offset_and_a_document_without_blocks():
         assert text.index(kept) == document.index(kept)
     markdown = "# A\n\nSource: https://gaik.ai/\n\ntext a\n"
     assert route._pages_only(markdown) == markdown
+
+
+def test_without_listed_domains_the_scraper_is_off(client, monkeypatch):
+    monkeypatch.setattr(route, "ALLOWED_DOMAINS", ())
+
+    sites = client.get("/web-scraper/sites").json()
+    run = client.post("/web-scraper/run", json={"url": "https://gaik.ai/"})
+
+    assert sites["allowed_domains"] == [] and sites["sites"] == []
+    assert run.status_code == 503
+    assert run.json()["detail"] == route.OFF_MESSAGE
+
+
+def test_the_default_lists_no_domain(monkeypatch):
+    import importlib
+
+    monkeypatch.delenv("WEB_SCRAPER_ALLOWED_DOMAINS", raising=False)
+    try:
+        assert importlib.reload(route).ALLOWED_DOMAINS == ()
+    finally:
+        importlib.reload(route)
