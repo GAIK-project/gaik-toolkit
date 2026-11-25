@@ -126,3 +126,10 @@ def test_the_phase_10_service_example_runs_as_written(monkeypatch) -> None:
 
     assert keys == ["not-a-real-key"]
     assert namespace["supplier_news"] == ["Example Supplier Oy"]
+
+
+def test_text_in_an_image_is_material_and_images_go_through_the_vision_components():
+    text = _flat(_text())
+    assert "So is everything in an image: the text in the picture" in text
+    assert "any text in the file's metadata" in text
+    assert "Do not write custom code that sends an image file's bytes to a model" in text
