@@ -5,6 +5,7 @@ import { z } from "zod";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isEmailConfirmed } from "@/lib/api-access";
 import { trialEnabled } from "@/lib/trial";
+import { logSignInFailure, signInErrorMessage } from "@/lib/sign-in-errors";
 
 export type AuthResult = {
   error?: string;
@@ -109,12 +110,8 @@ export async function signIn(
   });
 
   if (error) {
-    if (error.code === "email_not_confirmed")
-      return {
-        error:
-          "Confirm your e-mail address first: open the link we sent you, then sign in.",
-      };
-    return { error: "Invalid email or password." };
+    logSignInFailure(email, error.code, error.status);
+    return { error: signInErrorMessage(error.code, error.status) };
   }
 
   if (!data.user) {
@@ -142,6 +139,7 @@ export async function signIn(
   }
 
   if (accessRequest.status === "rejected") {
+    logSignInFailure(email, "access_rejected");
     await supabase.auth.signOut();
     return { error: "Your access request was not approved." };
   }
