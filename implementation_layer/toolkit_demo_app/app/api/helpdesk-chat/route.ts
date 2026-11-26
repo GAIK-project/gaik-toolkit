@@ -112,7 +112,11 @@ export async function POST(request: NextRequest) {
     },
     agent: createHelpdeskAgent(
       knowledge,
-      isModelStaff(access.email, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+      isModelStaff(
+        access.email,
+        request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+        access.approved,
+      ),
     ),
     uiMessages: conversation,
     abortSignal: request.signal,

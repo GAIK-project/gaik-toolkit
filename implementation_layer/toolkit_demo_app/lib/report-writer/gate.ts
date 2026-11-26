@@ -68,7 +68,7 @@ export async function gateReportWriter(
     return {
       userId: null,
       // As in the proxy: without a session only the admin cookie counts.
-      staff: isModelStaff(null, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+      staff: isModelStaff(null, request.cookies.get(ADMIN_COOKIE_NAME)?.value, false),
     };
 
   const supabase = await createClient();
@@ -120,6 +120,7 @@ export async function gateReportWriter(
   const staff = isModelStaff(
     user.email?.toLowerCase() ?? null,
     request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+    row?.status === "approved",
   );
   return { userId: user.id, staff };
 }

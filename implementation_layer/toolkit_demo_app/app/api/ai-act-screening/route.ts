@@ -94,7 +94,11 @@ export async function POST(request: NextRequest) {
     },
     agent: createScreeningAgent(
       userTexts,
-      isModelStaff(access.email, request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+      isModelStaff(
+        access.email,
+        request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+        access.approved,
+      ),
     ),
     uiMessages: messages,
     abortSignal: request.signal,
