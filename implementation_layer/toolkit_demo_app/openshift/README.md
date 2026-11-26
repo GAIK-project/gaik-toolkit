@@ -237,8 +237,8 @@ manifests for it: the live deployment carries env vars they lack. Each
 | Variable | Value |
 | -------- | ----- |
 | `DEMO_MAINTENANCE` | `planned`: nothing is refused, every page shows a banner about the coming break. `on`: every page answers with the maintenance page (Finnish first, English below) and every API call, the report runs included, with `503`, `Retry-After` and `x-demo-maintenance: on`; an open page reloads into the maintenance page on its next call. Unset or anything else: off |
-| `DEMO_MAINTENANCE_START` | Optional, ISO 8601 (`2026-12-04T16:00:00Z`): when a planned break begins, for the banner |
-| `DEMO_MAINTENANCE_UNTIL` | Optional, ISO 8601: when the break is expected to end, for the page, the banner and `Retry-After` (5 minutes without it) |
+| `DEMO_MAINTENANCE_START` | Optional, ISO 8601 with `Z` or an offset (`2026-12-04T16:00:00Z`, `2026-12-04T18:00+02:00`): when a planned break begins, for the banner. A time without an offset is ignored, since the pod runs in UTC |
+| `DEMO_MAINTENANCE_UNTIL` | Optional, ISO 8601 with `Z` or an offset: when the break is expected to end, for the page, the banner and `Retry-After` (5 minutes without it) |
 | `DEMO_MAINTENANCE_MESSAGE` | Optional: one line of your own on the page and the banner, plain text, at most 500 characters |
 
 While the mode is on, an admin session (`/admin`) still gets in, to check the

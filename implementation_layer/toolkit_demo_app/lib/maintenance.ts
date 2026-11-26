@@ -7,10 +7,11 @@
 //                             "planned": nothing is refused, every page shows
 //                             a banner about the coming break; anything else
 //                             (or unset): off.
-//   DEMO_MAINTENANCE_START    when a planned break begins (ISO 8601), for the
-//                             banner. Optional.
-//   DEMO_MAINTENANCE_UNTIL    when the break is expected to end (ISO 8601), for
-//                             the page, the banner and Retry-After. Optional.
+//   DEMO_MAINTENANCE_START    when a planned break begins (ISO 8601 with Z or
+//                             an offset), for the banner. Optional.
+//   DEMO_MAINTENANCE_UNTIL    when the break is expected to end (ISO 8601 with
+//                             Z or an offset), for the page, the banner and
+//                             Retry-After. Optional.
 //   DEMO_MAINTENANCE_MESSAGE  a line of the operator's own, shown as plain
 //                             text. Optional.
 //
@@ -41,9 +42,14 @@ export const DEFAULT_RETRY_AFTER_S = 300;
 const MAX_MESSAGE_CHARS = 500;
 const TIME_ZONE = "Europe/Helsinki";
 
+// A time must say its offset (Z or +02:00): without one, Date reads it in the
+// pod's own time zone, UTC, and the page would show the wrong hour.
+const HAS_OFFSET = /(?:Z|[+-]\d{2}:?\d{2})$/i;
+
 function parseTime(value: string | undefined): Date | null {
-  if (!value?.trim()) return null;
-  const date = new Date(value.trim());
+  const text = value?.trim();
+  if (!text || !HAS_OFFSET.test(text)) return null;
+  const date = new Date(text);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

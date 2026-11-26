@@ -44,7 +44,16 @@ export function MaintenanceNotice({
         role="status"
         className="mx-auto flex max-w-6xl items-start gap-3 px-6 py-2 text-sm sm:px-8"
       >
-        <p className="flex-1 whitespace-pre-line">{bannerText}</p>
+        {/* Finnish line, English line, then the operator's own message
+            (lib/maintenance.ts, plannedBannerText); each in its language so a
+            screen reader reads it with the right voice. */}
+        <div className="flex-1">
+          {bannerText.split("\n").map((line, i) => (
+            <p key={i} lang={i === 0 ? "fi" : i === 1 ? "en" : undefined}>
+              {line}
+            </p>
+          ))}
+        </div>
         <button
           type="button"
           className="shrink-0 rounded px-1 font-medium underline-offset-2 hover:underline"

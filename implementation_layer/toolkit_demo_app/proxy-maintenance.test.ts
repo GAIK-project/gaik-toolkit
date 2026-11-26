@@ -68,16 +68,12 @@ test("the health check answers without the backend", async () => {
 });
 
 test("an admin session gets past the break", async () => {
-  const res = await call("/api/health", {
-    cookie: `admin_session=${createAdminSessionValue()}`,
-  });
-  // The admin is not stopped by the mode; the health check still is answered
-  // here, so the pod stays up either way.
-  expect(res.status).toBe(200);
+  // The same page refuses a visitor without the cookie (the tests above).
   const page = await call("/extract", {
     cookie: `admin_session=${createAdminSessionValue()}`,
   });
   expect(page.status).not.toBe(503);
+  expect(page.headers.get("x-demo-maintenance")).toBeNull();
 });
 
 test("a forged admin cookie does not", async () => {

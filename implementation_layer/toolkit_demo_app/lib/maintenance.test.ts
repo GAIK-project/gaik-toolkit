@@ -29,6 +29,13 @@ describe("maintenance settings", () => {
 
   test("drops a time it cannot read and keeps the message short", () => {
     expect(on({ DEMO_MAINTENANCE_UNTIL: "soon" }).until).toBeNull();
+    // No offset: the pod would read it as UTC, so it is dropped.
+    expect(on({ DEMO_MAINTENANCE_UNTIL: "2026-12-04T18:00" }).until).toBeNull();
+    expect(
+      on({
+        DEMO_MAINTENANCE_UNTIL: "2026-12-04T18:00+02:00",
+      }).until?.toISOString(),
+    ).toBe("2026-12-04T16:00:00.000Z");
     expect(
       on({ DEMO_MAINTENANCE_MESSAGE: "x".repeat(2000) }).message,
     ).toHaveLength(500);
