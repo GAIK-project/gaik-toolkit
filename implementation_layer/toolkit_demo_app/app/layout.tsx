@@ -1,3 +1,4 @@
+import { MaintenanceNotice } from "@/components/maintenance-notice";
 import { OnboardingProvider } from "@/components/onboarding/onboarding-provider";
 import { PostHogProvider } from "@/components/providers/posthog-provider";
 import { Toaster } from "@/components/ui/toaster";
@@ -5,6 +6,7 @@ import type { Metadata } from "next";
 import { connection } from "next/server";
 import { Fraunces, JetBrains_Mono, Sora } from "next/font/google";
 import Script from "next/script";
+import { maintenanceSettings, plannedBannerText } from "@/lib/maintenance";
 import "./globals.css";
 
 const sora = Sora({
@@ -67,11 +69,14 @@ export default async function RootLayout({
   // Every page renders per request, so Next can stamp the request's CSP nonce
   // on its scripts (lib/csp.ts); a prerendered page would carry none.
   await connection();
+  // Read at run time: the operator sets it with `oc set env` (lib/maintenance.ts).
+  const bannerText = plannedBannerText(maintenanceSettings());
   return (
     <html lang="en">
       <body
         className={`${sora.variable} ${fraunces.variable} ${jetBrainsMono.variable} antialiased`}
       >
+        <MaintenanceNotice bannerText={bannerText} />
         <PostHogProvider>
           <OnboardingProvider>{children}</OnboardingProvider>
           <Toaster />

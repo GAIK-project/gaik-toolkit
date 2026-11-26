@@ -226,6 +226,42 @@ Set it on the frontend first, or both in one go: an API with the token refuses r
 from a frontend without it. Until it is set the API logs a warning once and accepts
 runs as before.
 
+## Maintenance break
+
+The frontend can close the demo for a break and show a maintenance page
+(`lib/maintenance.ts`). It is switched with `oc set env` on the **frontend**
+deployment only (`gaik-demo`, or `gaik-demo-staging`). Never `oc apply` the
+manifests for it: the live deployment carries env vars they lack. Each
+`oc set env` rolls out a new frontend pod.
+
+| Variable | Value |
+| -------- | ----- |
+| `DEMO_MAINTENANCE` | `planned`: nothing is refused, every page shows a banner about the coming break. `on`: every page answers with the maintenance page (Finnish first, English below) and every API call, the report runs included, with `503`, `Retry-After` and `x-demo-maintenance: on`; an open page reloads into the maintenance page on its next call. Unset or anything else: off |
+| `DEMO_MAINTENANCE_START` | Optional, ISO 8601 with `Z` or an offset (`2026-12-04T16:00:00Z`, `2026-12-04T18:00+02:00`): when a planned break begins, for the banner. A time without an offset is ignored, since the pod runs in UTC |
+| `DEMO_MAINTENANCE_UNTIL` | Optional, ISO 8601 with `Z` or an offset: when the break is expected to end, for the page, the banner and `Retry-After` (5 minutes without it) |
+| `DEMO_MAINTENANCE_MESSAGE` | Optional: one line of your own on the page and the banner, plain text, at most 500 characters |
+
+While the mode is on, an admin session (`/admin`) still gets in, to check the
+demo before it opens; `/admin`, its API and `/privacy` stay open for that. The
+frontend answers `/api/health` itself (`{"status": "maintenance"}`), so its
+probes pass while the API is down for the break and the maintenance page stays
+up. A run already streaming through the frontend ends when the frontend pod is
+replaced, so switch the mode on before the work starts, not during a run.
+
+```bash
+# Some hours before: the banner.
+oc set env deployment/gaik-demo -n gaik DEMO_MAINTENANCE=planned \
+  DEMO_MAINTENANCE_START=2026-12-04T16:00:00Z DEMO_MAINTENANCE_UNTIL=2026-12-04T18:00:00Z
+# At the start: close. Sign in at /admin to check the demo during the break.
+oc set env deployment/gaik-demo -n gaik DEMO_MAINTENANCE=on
+# Open again.
+oc set env deployment/gaik-demo -n gaik DEMO_MAINTENANCE- \
+  DEMO_MAINTENANCE_START- DEMO_MAINTENANCE_UNTIL- DEMO_MAINTENANCE_MESSAGE-
+```
+
+What the mode cannot cover: while the frontend pod itself is down or being
+replaced, nothing answers, and the Rahti router shows its own error page.
+
 ## Environment Variables
 
 ### Frontend (gaik-demo)
@@ -244,6 +280,7 @@ runs as before.
 | `SMTP_HOST`, `SMTP_PORT`               | Optional. The approval e-mail's relay, default `smtp.pouta.csc.fi:25` (no login; Rahti's egress addresses only) | `oc set env` |
 | `TRIAL_RUNS_PER_DAY`, `TRIAL_RUNS_PER_DAY_TOTAL`, `TRIAL_REPORTS`, `TRIAL_HOURS` | Optional. A pending user's runs per day (30), all pending users' runs per day together (300), reports (1) and the hours after sign-up the trial lasts (72; 0 = until approval); needs Upstash Redis | `oc set env` |
 | `REPORT_WRITER_MAX_REPORTS`            | Reports per approved user (default 5; `1000000` is no limit, as on the live demo since 26.11.2026) | `oc set env` |
+| `DEMO_MAINTENANCE`, `DEMO_MAINTENANCE_START`, `DEMO_MAINTENANCE_UNTIL`, `DEMO_MAINTENANCE_MESSAGE` | Optional, off unless set. Maintenance mode, see "Maintenance break" | `oc set env` |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
 
 `WIZARD_ACCESS_SECRET` is no longer read: `/api/wizard` is gated by the per-user
