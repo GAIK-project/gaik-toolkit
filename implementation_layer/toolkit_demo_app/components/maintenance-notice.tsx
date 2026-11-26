@@ -37,12 +37,14 @@ export function MaintenanceNotice({
 
   if (!bannerText || closedNow || closedText === bannerText) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 top-2 z-50 flex justify-center px-4">
+    // In the page's flow, above the site's sticky header: it pushes the page
+    // down instead of covering a control, and scrolls away with it.
+    <div className="border-b border-amber-300 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100">
       <div
         role="status"
-        className="pointer-events-auto flex max-w-2xl items-start gap-3 rounded-md border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900 shadow-sm dark:border-amber-800 dark:bg-amber-950 dark:text-amber-100"
+        className="mx-auto flex max-w-6xl items-start gap-3 px-6 py-2 text-sm sm:px-8"
       >
-        <p className="whitespace-pre-line">{bannerText}</p>
+        <p className="flex-1 whitespace-pre-line">{bannerText}</p>
         <button
           type="button"
           className="shrink-0 rounded px-1 font-medium underline-offset-2 hover:underline"
