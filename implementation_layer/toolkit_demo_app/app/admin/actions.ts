@@ -129,29 +129,23 @@ export async function updateAccessStatus(
 
   const supabase = createServiceClient();
 
-  const { data: before } = await supabase
-    .from("access_requests")
-    .select("status, email")
-    .eq("user_id", result.data.userId)
-    .single();
-
-  const { error } = await supabase
+  // The update changes only a row that is not yet in the new status and returns
+  // it, so two admins approving at once send one e-mail, not two.
+  const { data: changed, error } = await supabase
     .from("access_requests")
     .update({ status: result.data.status })
-    .eq("user_id", result.data.userId);
+    .eq("user_id", result.data.userId)
+    .neq("status", result.data.status)
+    .select("email");
 
   if (error) {
     console.error("Failed to update access status:", error);
     return { error: "Failed to update status." };
   }
 
-  // Only a newly approved user is told; approving twice sends nothing.
-  if (
-    result.data.status === "approved" &&
-    before?.status !== "approved" &&
-    before?.email
-  ) {
-    const email = await sendApprovalEmail(before.email);
+  const to = changed?.[0]?.email;
+  if (result.data.status === "approved" && to) {
+    const email = await sendApprovalEmail(to);
     console.info(`[admin] approval e-mail user=${result.data.userId} ${email}`);
     return { success: true, email };
   }

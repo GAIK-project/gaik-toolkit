@@ -229,9 +229,12 @@ function WizardAccessButton({
 
 function AccessRequestRow({
   request,
+  emailOn,
   onUpdate,
 }: {
   request: AccessRequest;
+  /** Approval e-mails are configured (MAIL_FROM set). */
+  emailOn: boolean;
   onUpdate: () => void;
 }) {
   const [isPending, startTransition] = useTransition();
@@ -313,6 +316,27 @@ function AccessRequestRow({
               )}
             </Button>
           </div>
+        )}
+        {request.status === "approved" && emailOn && !email && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              if (
+                window.confirm(`Send the welcome e-mail to ${request.email}?`)
+              )
+                resend();
+            }}
+            disabled={isPending}
+            title="Send the welcome e-mail again"
+            aria-label={`Send the welcome e-mail to ${request.email}`}
+          >
+            {isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Mail className="h-4 w-4" />
+            )}
+          </Button>
         )}
         {email && (
           <p
@@ -717,6 +741,7 @@ function Dashboard() {
                         <AccessRequestRow
                           key={request.id}
                           request={request}
+                          emailOn={emailOn === true}
                           onUpdate={loadRequests}
                         />
                       ))}

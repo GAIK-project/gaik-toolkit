@@ -1,4 +1,4 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
 import {
   addressOf,
   approvalEmail,
@@ -15,8 +15,17 @@ const VARS = [
   "SMTP_HOST",
   "SMTP_PORT",
 ];
-afterEach(() => {
+// Each test starts without the caller's mail settings and gives them back after.
+let saved: Record<string, string | undefined> = {};
+beforeEach(() => {
+  saved = Object.fromEntries(VARS.map((v) => [v, process.env[v]]));
   for (const v of VARS) delete process.env[v];
+});
+afterEach(() => {
+  for (const v of VARS) {
+    if (saved[v] === undefined) delete process.env[v];
+    else process.env[v] = saved[v];
+  }
 });
 
 const CONFIG: MailConfig = {
@@ -75,6 +84,39 @@ test("the message links the demo and carries the configured Sender", async () =>
     subject: approvalEmail().subject,
   });
   expect(String(sent[0].text)).toContain(DEMO_URL);
+});
+
+test("SMTP MAIL FROM is the Sender mailbox, not the visible From", async () => {
+  const sent: Record<string, unknown>[] = [];
+  await sendApprovalEmail(
+    "user@example.com",
+    { ...CONFIG, sender: "bounces@example.org" },
+    async (m) => {
+      sent.push(m as Record<string, unknown>);
+    },
+  );
+  expect(sent[0].envelope).toEqual({
+    from: "bounces@example.org",
+    to: "user@example.com",
+  });
+});
+
+test("a failed send logs the SMTP code, never the relay's reply", async () => {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (line: string) => lines.push(line);
+  try {
+    await sendApprovalEmail("user@example.com", CONFIG, async () => {
+      throw Object.assign(new Error("550 user@example.com: no such user"), {
+        code: "EENVELOPE",
+        responseCode: 550,
+      });
+    });
+  } finally {
+    console.error = original;
+  }
+  expect(lines.join("\n")).toContain("code=EENVELOPE status=550");
+  expect(lines.join("\n")).not.toContain("user@example.com");
 });
 
 test("a relay error is reported as failed, not thrown", async () => {

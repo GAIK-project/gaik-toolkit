@@ -40,15 +40,15 @@ export function getMailConfig(): MailConfig | null {
 
 export function approvalEmail(): { subject: string; text: string } {
   return {
-    subject: "Your GAIK Toolkit account is now active",
+    subject: "Your GAIK Toolkit access is approved",
     text: `Hello,
 
-Your GAIK Toolkit account is now active.
+Your access to the GAIK Toolkit demo has been approved.
 
 Access the demo here:
 ${DEMO_URL}
 
-Log in with your registered credentials.
+Log in with your registered credentials. If you have not confirmed your e-mail address yet, open the confirmation link we sent you first.
 
 We'd love your feedback: use the "Rate this" section on each demo page or contact us by email.
 
@@ -96,11 +96,19 @@ export async function sendApprovalEmail(
       to,
       subject,
       text,
+      // Nodemailer takes SMTP MAIL FROM from `from`, not `sender`: set it, so
+      // bounces and the relay's SPF check use the sender mailbox.
+      envelope: { from: config.sender, to },
     });
     return "sent";
   } catch (error) {
+    // The relay's reply can echo the recipient, so log its code and status only.
+    const { code, responseCode } = (error ?? {}) as {
+      code?: string;
+      responseCode?: number;
+    };
     console.error(
-      `[mail] approval e-mail failed: ${error instanceof Error ? error.message : String(error)}`,
+      `[mail] approval e-mail failed: code=${code ?? "unknown"} status=${responseCode ?? "-"}`,
     );
     return "failed";
   }
