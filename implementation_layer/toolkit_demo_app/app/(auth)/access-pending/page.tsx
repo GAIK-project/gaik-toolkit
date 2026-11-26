@@ -1,19 +1,27 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/(auth)/actions";
-import { getAccessStatus } from "@/data/auth";
 import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { AccessPolling } from "../components/access-polling";
-import { getTrialLimits, trialEnabled } from "@/lib/trial";
+import { getTrialLimits } from "@/lib/trial";
+import { getUserAccessStatus } from "@/lib/queries/access";
 
 const SuccessAnimation = dynamic(() =>
   import("../components/success-animation").then((mod) => mod.SuccessAnimation),
 );
 
 export default async function AccessPendingPage() {
-  const { isLoggedIn, status, email } = await getAccessStatus();
+  // One lookup for the redirects, the address and the trial: AccessPolling
+  // re-renders this page every few seconds.
+  const {
+    user,
+    requestStatus: status,
+    isTrial: trial,
+  } = await getUserAccessStatus();
+  const isLoggedIn = !!user;
+  const email = user?.email ?? null;
 
   // Redirect to sign-in if not logged in
   if (!isLoggedIn) {
@@ -25,7 +33,7 @@ export default async function AccessPendingPage() {
     redirect("/");
   }
 
-  const trial = trialEnabled();
+  const { runsPerDay, hours } = getTrialLimits();
 
   return (
     <AuthShell
@@ -46,19 +54,25 @@ export default async function AccessPendingPage() {
         {trial ? (
           <>
             <p className="text-muted-foreground text-sm">
-              You can run the demos now, up to {getTrialLimits().runsPerDay}{" "}
-              runs a day. Full access opens when your request is approved, and
-              we&apos;ll email you then.
+              You can run the demos now, up to {runsPerDay} runs a day
+              {hours > 0 ? ` for ${hours} hours after you signed up` : ""}. Full
+              access opens when your request is approved, and we&apos;ll email
+              you then.
             </p>
             <Button asChild className="w-full">
               <Link href="/">Start testing</Link>
             </Button>
           </>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            Your request will be reviewed shortly. We&apos;ll send you an email
-            when your access has been approved.
-          </p>
+          <>
+            <p className="text-muted-foreground text-sm">
+              Your request will be reviewed shortly. We&apos;ll send you an
+              email when your access has been approved.
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/">Browse demos</Link>
+            </Button>
+          </>
         )}
 
         <form action={signOut}>

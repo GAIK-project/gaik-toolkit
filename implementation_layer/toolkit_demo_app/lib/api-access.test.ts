@@ -4,6 +4,7 @@ import {
   type GateState,
   PENDING_DENIAL,
   SHARED_DATA_DENIAL,
+  TRIAL_ENDED,
   accessRefusal,
   handsOutStorageLink,
   isEmailConfirmed,
@@ -252,7 +253,6 @@ test("an e-mail address counts as confirmed only with a confirmation time", () =
   expect(isEmailConfirmed(null)).toBe(false);
 });
 
-
 test("only runs and result downloads name their user", () => {
   expect(namesItsUser("POST", "/api/pipeline/document")).toBe(true);
   expect(namesItsUser("DELETE", "/api/tabular-agent/session/abc")).toBe(true);
@@ -262,7 +262,25 @@ test("only runs and result downloads name their user", () => {
   expect(namesItsUser("GET", "/api/dental-transcribe/srt/abc")).toBe(true);
   expect(namesItsUser("GET", "/api/dental-transcribe/vtt/abc")).toBe(true);
   expect(namesItsUser("GET", "/api/rag/status/abc")).toBe(true);
-  expect(namesItsUser("GET", "/api/video-search/videos/abc/thumbnail")).toBe(false);
+  expect(namesItsUser("GET", "/api/video-search/videos/abc/thumbnail")).toBe(
+    false,
+  );
   expect(namesItsUser("GET", "/api/tabular-agent/status")).toBe(false);
   expect(namesItsUser("GET", "/api/pipeline/pdf/abc/extra")).toBe(false);
+});
+
+test("a pending user past the trial's hours is refused before a trial run is spent", async () => {
+  let spent = false;
+  const take = async () => {
+    spent = true;
+    return { ok: true } as const;
+  };
+  const ended: GateState = { ...signedIn, pending: true, trialEnded: true };
+  expect(await accessRefusal(ended, take)).toEqual(TRIAL_ENDED);
+  expect(spent).toBe(false);
+  // Their own model key still runs, and an approved account is never on trial.
+  expect(await accessRefusal(ended, take, { ownModelKey: true })).toBeNull();
+  expect(
+    await accessRefusal({ ...ended, approved: true, pending: false }, take),
+  ).toBeNull();
 });

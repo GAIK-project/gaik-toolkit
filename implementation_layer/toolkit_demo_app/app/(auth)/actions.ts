@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
 import { isEmailConfirmed } from "@/lib/api-access";
-import { trialEnabled } from "@/lib/trial";
+import { trialEnabled, withinTrialWindow } from "@/lib/trial";
 import { logSignInFailure, signInErrorMessage } from "@/lib/sign-in-errors";
 
 export type AuthResult = {
@@ -134,7 +134,11 @@ export async function signIn(
     // On the trial allowance a pending user with a confirmed e-mail address
     // can start testing at once.
     redirect(
-      trialEnabled() && isEmailConfirmed(data.user) ? "/" : "/access-pending",
+      trialEnabled() &&
+        isEmailConfirmed(data.user) &&
+        withinTrialWindow(data.user.created_at)
+        ? "/"
+        : "/access-pending",
     );
   }
 

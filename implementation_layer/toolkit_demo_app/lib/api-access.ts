@@ -119,6 +119,8 @@ export interface GateState {
   pending: boolean;
   /** The sign-in e-mail address is confirmed; a pending user's runs need it. */
   emailConfirmed: boolean;
+  /** Pending, and the trial's hours since sign-up have passed (lib/trial.ts). */
+  trialEnded?: boolean;
   userId: string | null;
 }
 
@@ -135,6 +137,12 @@ export const PENDING_DENIAL: Refusal = {
 export const SHARED_DATA_DENIAL: Refusal = {
   status: 403,
   error: "Only an administrator can change the shared demo data.",
+};
+
+export const TRIAL_ENDED: Refusal = {
+  status: 403,
+  error:
+    "Your trial has ended. Running demos opens when your account is approved.",
 };
 
 export const EMAIL_UNCONFIRMED: Refusal = {
@@ -195,6 +203,7 @@ export async function accessRefusal(
   if (noTrialRun) return null;
   if (!state.emailConfirmed) return EMAIL_UNCONFIRMED;
   if (ownModelKey) return null;
+  if (state.trialEnded) return TRIAL_ENDED;
   const trial = await takeTrialRun(state.userId);
   return trial.ok ? null : { status: trial.status, error: trial.error };
 }

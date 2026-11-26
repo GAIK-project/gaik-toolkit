@@ -957,6 +957,7 @@ export function AccessNotice({
   ownKeyRuns = false,
   emailUnconfirmed = false,
   trialRunsPerDay = null,
+  trialHours = 0,
 }: {
   loggedIn: boolean;
   unlocked: boolean;
@@ -966,6 +967,8 @@ export function AccessNotice({
   emailUnconfirmed?: boolean;
   /** Set when the user is pending approval and on the trial allowance. */
   trialRunsPerDay?: number | null;
+  /** Hours the trial lasts after sign-up; 0 when it lasts until approval. */
+  trialHours?: number;
 }) {
   const settings = useModelSettings();
   const pathname = usePathname();
@@ -982,7 +985,9 @@ export function AccessNotice({
       >
         <p>
           <strong>Trial access.</strong> You can run demos now, up to{" "}
-          {trialRunsPerDay} runs a day, while your account is reviewed.
+          {trialRunsPerDay} runs a day
+          {trialHours > 0 ? ` for ${trialHours} hours after you signed up` : ""}
+          , while your account is reviewed.
         </p>
       </div>
     );

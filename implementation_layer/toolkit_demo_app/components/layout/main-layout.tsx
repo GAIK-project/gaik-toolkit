@@ -58,6 +58,7 @@ export async function MainLayout({
             trialRunsPerDay={
               access.isTrial ? getTrialLimits().runsPerDay : null
             }
+            trialHours={getTrialLimits().hours}
           />
         )}
         {accessNotice && (

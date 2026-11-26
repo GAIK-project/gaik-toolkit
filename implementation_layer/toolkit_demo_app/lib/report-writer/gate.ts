@@ -1,7 +1,11 @@
 import { USER_HEADER } from "@/lib/api-access";
 import { NextRequest, NextResponse } from "next/server";
 import { createClient, createServiceClient } from "@/lib/supabase/server";
-import { EMAIL_UNCONFIRMED, isEmailConfirmed } from "@/lib/api-access";
+import {
+  EMAIL_UNCONFIRMED,
+  TRIAL_ENDED,
+  isEmailConfirmed,
+} from "@/lib/api-access";
 import { clientIp } from "@/lib/client-ip";
 import { ADMIN_COOKIE_NAME, MODEL_TIER_HEADER, isModelStaff } from "@/lib/model-tier";
 import { checkRateLimit, ratelimit } from "@/lib/rate-limit";
@@ -10,7 +14,12 @@ import {
   type ReportUsageInfo,
 } from "@/lib/report-writer/usage";
 import { parseSSEEvents } from "@/lib/sse";
-import { getTrialLimits, takeTrialRun, trialEnabled } from "@/lib/trial";
+import {
+  getTrialLimits,
+  takeTrialRun,
+  trialEnabled,
+  withinTrialWindow,
+} from "@/lib/trial";
 
 const BACKEND_URL = process.env.BACKEND_URL || "http://localhost:8000";
 const BYPASS_AUTH = process.env.BYPASS_AUTH === "true";
@@ -111,6 +120,11 @@ export async function gateReportWriter(
       return NextResponse.json(
         { error: EMAIL_UNCONFIRMED.error },
         { status: EMAIL_UNCONFIRMED.status },
+      );
+    if (!withinTrialWindow(user.created_at))
+      return NextResponse.json(
+        { error: TRIAL_ENDED.error },
+        { status: TRIAL_ENDED.status },
       );
     const trial = await takeTrialRun(user.id);
     if (!trial.ok)
