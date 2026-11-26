@@ -38,10 +38,10 @@ class PipelineResult:
     extracted_fields: list[dict[str, Any]]  # Structured data extracted
     schema: type  # The generated Pydantic schema
     requirements: ExtractionRequirements | CompositeExtractionRequirements
-    # How many times the audio was transcribed, and the required fields that
-    # were still empty in the result returned (see ``transcription_retries``).
+    # How many times the audio was transcribed, and the fields named in
+    # ``retry_when_empty`` that are still empty in the result returned.
     transcription_attempts: int = 1
-    missing_required_fields: list[str] = field(default_factory=list)
+    empty_fields: list[str] = field(default_factory=list)
 
 
 def _is_empty(value: Any, spec: Any) -> bool:
@@ -60,28 +60,46 @@ def _is_empty(value: Any, spec: Any) -> bool:
     return value == _resolve_fallback(spec)
 
 
-def _missing_required_fields(
-    extracted: Sequence[Any],
-    requirements: Any,
-) -> list[str]:
-    """Names of required fields left empty in any extracted record.
+def _watched_specs(requirements: Any, names: Sequence[str]) -> list[Any]:
+    """The field specs for ``names``, in that order.
 
-    A field is required when it must appear in the output and may not be null
-    (``FieldSpec.required``). For a parent with child collections only the
-    parent's fields are checked. Requirements without field specs give ``[]``.
+    For a parent with child collections the names refer to the parent's own
+    fields. Raises :class:`ValueError` naming any field the schema lacks.
     """
     if isinstance(requirements, CompositeExtractionRequirements):
         requirements = requirements.parent_requirements
-    specs = [f for f in getattr(requirements, "fields", None) or [] if getattr(f, "required", False)]
-    missing: list[str] = []
-    for record in extracted or []:
-        if not isinstance(record, dict):
-            continue
-        for spec in specs:
-            name = spec.field_name
-            if name not in missing and _is_empty(record.get(name), spec):
-                missing.append(name)
-    return missing
+    by_name = {f.field_name: f for f in getattr(requirements, "fields", None) or []}
+    unknown = [n for n in names if n not in by_name]
+    if unknown:
+        raise ValueError(
+            f"retry_when_empty names fields the schema does not have: {unknown}; "
+            f"its fields are {sorted(by_name)}"
+        )
+    return [by_name[n] for n in names]
+
+
+def _empty_fields(extracted: Sequence[Any], specs: Sequence[Any]) -> list[str]:
+    """Names of the fields in ``specs`` left empty in any extracted record."""
+    records = [r for r in extracted or [] if isinstance(r, dict)]
+    if not records:
+        return [s.field_name for s in specs]
+    return [
+        s.field_name for s in specs if any(_is_empty(r.get(s.field_name), s) for r in records)
+    ]
+
+
+def _checked_retry_options(retry_when_empty: Any, transcription_retries: Any) -> list[str]:
+    if isinstance(transcription_retries, bool) or not isinstance(transcription_retries, int):
+        raise ValueError("transcription_retries must be a whole number of 0 or more")
+    if transcription_retries < 0:
+        raise ValueError("transcription_retries must be a whole number of 0 or more")
+    if retry_when_empty is None:
+        return []
+    if isinstance(retry_when_empty, str) or not all(
+        isinstance(n, str) and n for n in retry_when_empty
+    ):
+        raise ValueError("retry_when_empty must be a list of field names")
+    return list(dict.fromkeys(retry_when_empty))
 
 
 def _schema_file_stem(schema_name: str) -> str:
@@ -141,6 +159,7 @@ class AudioToStructuredData:
         extract_options: dict | None = None,
         schema: type | None = None,
         requirements: ExtractionRequirements | CompositeExtractionRequirements | None = None,
+        retry_when_empty: Sequence[str] | None = None,
         transcription_retries: int = 1,
     ) -> PipelineResult:
         """
@@ -156,13 +175,18 @@ class AudioToStructuredData:
             extract_options: Call-time args for DataExtractor.extract().
             schema: Optional pre-generated schema model to reuse.
             requirements: Optional ExtractionRequirements corresponding to the schema.
-            transcription_retries: How many more times to transcribe the same
-                audio when a required field comes back empty (default 1, ``0``
-                turns it off). Azure transcription sometimes leaves out speech,
-                such as the opening sentences, in a random call, and a retry of
-                the same audio usually recovers it. Each retry transcribes and
-                extracts again with the same schema; the run with the fewest
-                empty required fields is returned, the earliest on a tie.
+            retry_when_empty: Names of fields that the audio is expected to
+                state, such as a reporter's name or an asset ID. When one of
+                them comes back empty, the same audio is transcribed and
+                extracted again with the same schema. Azure transcription
+                sometimes leaves out speech, such as the opening sentences, in
+                a random call, and a retry of the same audio usually recovers
+                it. Nullable fields may be named. ``None`` (the default) never
+                retries. A name the schema lacks raises :class:`ValueError`
+                before anything is extracted.
+            transcription_retries: The most retries to make for
+                ``retry_when_empty`` (default 1). The run with the fewest empty
+                named fields is returned, the earliest on a tie.
 
         Every option name must be a parameter of the component it goes to.
         Stage configs (``config``, ``api_config``) come from the constructor
@@ -183,10 +207,9 @@ class AudioToStructuredData:
             what="extract_options",
             set_by_module=EXTRACT_SET_BY_MODULE,
         )
-        if isinstance(transcription_retries, bool) or not isinstance(transcription_retries, int):
-            raise ValueError("transcription_retries must be a whole number of 0 or more")
-        if transcription_retries < 0:
-            raise ValueError("transcription_retries must be a whole number of 0 or more")
+        watched = _checked_retry_options(retry_when_empty, transcription_retries)
+        if watched and requirements is not None:
+            _watched_specs(requirements, watched)  # refuse unknown names before transcribing
         transcriber_ctor.setdefault("enhanced_transcript", False)
         transcriber = Transcriber(api_config=self.transcription_config, **transcriber_ctor)
         transcription = transcriber.transcribe(
@@ -226,14 +249,15 @@ class AudioToStructuredData:
                 **extract_opts,
             )
 
+        specs = _watched_specs(requirements, watched) if watched else []
         extracted_fields = extract_from(transcription)
-        missing = _missing_required_fields(extracted_fields, requirements)
+        missing = _empty_fields(extracted_fields, specs)
         attempts = 1
         while missing and attempts <= transcription_retries:
             attempts += 1
             retry = transcriber.transcribe(file_path=file_path, **transcribe_options)
             retry_fields = extract_from(retry)
-            retry_missing = _missing_required_fields(retry_fields, requirements)
+            retry_missing = _empty_fields(retry_fields, specs)
             if len(retry_missing) < len(missing):
                 transcription, extracted_fields, missing = retry, retry_fields, retry_missing
 
@@ -243,7 +267,7 @@ class AudioToStructuredData:
             schema=schema,
             requirements=requirements,
             transcription_attempts=attempts,
-            missing_required_fields=missing,
+            empty_fields=missing,
         )
 
     # ------------------------------------------------------------------

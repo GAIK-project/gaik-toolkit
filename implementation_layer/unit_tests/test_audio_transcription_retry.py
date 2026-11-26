@@ -1,4 +1,4 @@
-"""AudioToStructuredData transcribes again when a required field comes back empty."""
+"""AudioToStructuredData transcribes again when a field named in retry_when_empty comes back empty."""
 
 from types import SimpleNamespace
 
@@ -11,8 +11,11 @@ CONFIG = {"provider": "openai", "api_key": "test-key", "model": "test-model"}
 REQUIREMENTS = ExtractionRequirements(
     use_case_name="fault_report",
     fields=[
-        FieldSpec(field_name="reporter", field_type="str", description="Reporter"),
-        FieldSpec(field_name="asset_id", field_type="str", description="Asset"),
+        # Nullable, as in a wizard schema that leaves unstated values null.
+        FieldSpec(field_name="reporter", field_type="str", description="Reporter", nullable=True),
+        FieldSpec(field_name="asset_id", field_type="str", description="Asset", nullable=True),
+        # Required but legitimately empty for this audio.
+        FieldSpec(field_name="decision", field_type="str", description="Reviewer decision"),
         FieldSpec(field_name="note", field_type="str", description="Note", nullable=True),
     ],
 )
@@ -39,8 +42,9 @@ def _install(monkeypatch, transcripts):
             found = text == FULL
             return [
                 {
-                    "reporter": "Test Person" if found else "",
-                    "asset_id": "A-1" if found else "",
+                    "reporter": "Test Person" if found else None,
+                    "asset_id": "A-1" if found else None,
+                    "decision": "",
                     "note": None,
                 }
             ]
@@ -50,7 +54,11 @@ def _install(monkeypatch, transcripts):
     return calls
 
 
+WATCH = ["reporter", "asset_id"]
+
+
 def _run(**kwargs):
+    kwargs.setdefault("retry_when_empty", WATCH)
     return module.AudioToStructuredData(api_config=CONFIG).run(
         file_path="synthetic.wav",
         user_requirements="reporter, asset id, note",
@@ -65,7 +73,7 @@ def test_complete_first_run_is_not_retried(monkeypatch):
     result = _run()
     assert calls["transcribe"] == 1
     assert result.transcription_attempts == 1
-    assert result.missing_required_fields == []
+    assert result.empty_fields == []
 
 
 def test_empty_required_field_triggers_one_retry(monkeypatch):
@@ -75,7 +83,7 @@ def test_empty_required_field_triggers_one_retry(monkeypatch):
     assert result.transcription.raw_transcript == FULL
     assert result.extracted_fields[0]["asset_id"] == "A-1"
     assert result.transcription_attempts == 2
-    assert result.missing_required_fields == []
+    assert result.empty_fields == []
 
 
 def test_worse_retry_keeps_the_first_run(monkeypatch):
@@ -84,21 +92,44 @@ def test_worse_retry_keeps_the_first_run(monkeypatch):
     assert calls["transcribe"] == 2
     assert result.transcription.raw_transcript == CUT
     assert result.transcription_attempts == 2
-    assert result.missing_required_fields == ["reporter", "asset_id"]
+    assert result.empty_fields == ["reporter", "asset_id"]
 
 
-def test_nullable_field_does_not_trigger_retry(monkeypatch):
-    # "note" is None in every run, but it may be null.
-    calls = _install(monkeypatch, [FULL, FULL])
-    _run()
+def test_no_watched_fields_never_retries(monkeypatch):
+    # The default: an empty required field ("decision") alone does not retry.
+    calls = _install(monkeypatch, [CUT, FULL])
+    result = _run(retry_when_empty=None)
     assert calls["transcribe"] == 1
+    assert result.transcription_attempts == 1
+    assert result.empty_fields == []
+
+
+def test_empty_unwatched_field_does_not_retry(monkeypatch):
+    calls = _install(monkeypatch, [FULL, FULL])
+    _run(retry_when_empty=["reporter"])
+    assert calls["transcribe"] == 1
+
+
+def test_unknown_field_name_is_refused_before_transcribing(monkeypatch):
+    calls = _install(monkeypatch, [FULL])
+    with pytest.raises(ValueError, match="asset_identifier"):
+        _run(retry_when_empty=["asset_identifier"])
+    assert calls["transcribe"] == 0
+
+
+@pytest.mark.parametrize("bad", ["reporter", [""], [1]])
+def test_retry_when_empty_must_be_a_list_of_names(monkeypatch, bad):
+    calls = _install(monkeypatch, [FULL])
+    with pytest.raises(ValueError, match="retry_when_empty"):
+        _run(retry_when_empty=bad)
+    assert calls["transcribe"] == 0
 
 
 def test_retries_can_be_turned_off(monkeypatch):
     calls = _install(monkeypatch, [CUT, FULL])
     result = _run(transcription_retries=0)
     assert calls["transcribe"] == 1
-    assert result.missing_required_fields == ["reporter", "asset_id"]
+    assert result.empty_fields == ["reporter", "asset_id"]
 
 
 def test_retry_count_is_honoured(monkeypatch):
@@ -106,7 +137,7 @@ def test_retry_count_is_honoured(monkeypatch):
     result = _run(transcription_retries=2)
     assert calls["transcribe"] == 3
     assert result.transcription_attempts == 3
-    assert result.missing_required_fields == []
+    assert result.empty_fields == []
 
 
 @pytest.mark.parametrize("bad", [-1, 1.5, True, "1"])
@@ -125,10 +156,10 @@ def test_explicit_default_counts_as_empty():
         default="unknown",
         has_explicit_default=True,
     )
-    reqs = ExtractionRequirements(use_case_name="x", fields=[spec])
-    assert module._missing_required_fields([{"site": "unknown"}], reqs) == ["site"]
-    assert module._missing_required_fields([{"site": "Plant 2"}], reqs) == []
+    assert module._empty_fields([{"site": "unknown"}], [spec]) == ["site"]
+    assert module._empty_fields([{"site": "Plant 2"}], [spec]) == []
 
 
-def test_requirements_without_fields_report_nothing():
-    assert module._missing_required_fields([{"value": ""}], object()) == []
+def test_no_records_counts_every_watched_field_as_empty():
+    spec = FieldSpec(field_name="site", field_type="str", description="Site")
+    assert module._empty_fields([], [spec]) == ["site"]
