@@ -32,6 +32,7 @@ from gaik.software_components.extractor.schema import (
     _resolve_fallback,
     print_pydantic_schema,
 )
+from gaik.software_components.llm.retries import is_transient_error
 from gaik.software_components.transcriber import Transcriber, TranscriptionResult
 from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
 
@@ -127,37 +128,6 @@ def _empty_fields(
                 empty.append(spec.field_name)
                 break
     return empty
-
-
-#: HTTP statuses after which the same call may well succeed on the next try.
-_TRANSIENT_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504})
-
-
-def _is_transient(exc: BaseException) -> bool:
-    """Whether a retry's error is one the next try may not repeat.
-
-    Rate limits, timeouts, dropped connections and server errors pass; a
-    refusal such as a content filter, or a bad request, would come back the
-    same on every try.
-    """
-    if isinstance(exc, (TimeoutError, ConnectionError)):
-        return True
-    try:
-        import openai
-    except ImportError:  # pragma: no cover - openai comes with the transcriber
-        openai = None
-    if openai is not None and isinstance(
-        exc,
-        (
-            openai.RateLimitError,
-            openai.APITimeoutError,
-            openai.APIConnectionError,
-            openai.InternalServerError,
-        ),
-    ):
-        return True
-    status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
-    return isinstance(status, int) and status in _TRANSIENT_STATUSES
 
 
 def _checked_retry_options(retry_when_empty: Any, transcription_retries: Any) -> list[str]:
@@ -354,7 +324,7 @@ class AudioToStructuredData:
             except Exception as exc:
                 # The best result so far stands. A transient error uses up this
                 # try only; any other would come back on every try.
-                if _is_transient(exc):
+                if is_transient_error(exc):
                     logger.warning(
                         "retry %d of the transcription failed (%s); trying again",
                         attempts - 1,
