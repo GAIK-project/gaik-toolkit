@@ -6,10 +6,12 @@ This document describes the authentication and access control system for the GAI
 
 The demo uses a two-step access model:
 
-1. **User Registration** - Users sign up and request access
-2. **Admin Approval** - Admins manually approve or reject requests
+1. **User Registration** - Users sign up and request access. While the request
+   is pending they can try the demos on a small trial allowance.
+2. **Admin Approval** - An admin approves or rejects the request in `/admin`.
+   Approving it e-mails the user that their access is approved.
 
-This ensures only authorized users can access the demo features.
+Anyone can browse the pages; running a demo needs an account.
 
 ## User Registration Flow
 
@@ -25,7 +27,8 @@ This ensures only authorized users can access the demo features.
    - An `access_requests` record is created with status `pending`
    - User is redirected to `/access-pending`
 
-3. User receives confirmation that their request is under review
+3. `/access-pending` says the request is under review and, with the trial on,
+   that they can start testing at once (see "Trial allowance" below)
 
 ## Sign In Flow
 
@@ -33,21 +36,46 @@ This ensures only authorized users can access the demo features.
 
 2. On successful authentication:
    - If access status is `approved`: redirect to `/` (home)
-   - If access status is `pending`: redirect to `/access-pending`
+   - If access status is `pending`: redirect to `/` when the trial is on and the
+     e-mail address is confirmed, otherwise to `/access-pending`
    - If access status is `rejected`: sign out and show error
 
-## Protected Routes
+3. A failed sign-in says why when it is not a wrong password
+   (`lib/sign-in-errors.ts`): an unconfirmed address, an expired or disabled
+   account (Supabase `user_banned`), too many attempts, or the sign-in service
+   not answering. Each failure is logged as
+   `[auth] sign-in failed: <code> (<status>) for ga***@example.com`, with the
+   address masked.
 
-The following routes require authentication AND approved access:
+## Running demos
 
-- `/classifier` - Document classifier demo
-- `/extractor` - Data extractor demo
-- `/incident-report` - Incident report demo
-- `/parser` - Document parser demo
-- `/rag` - RAG (Retrieval-Augmented Generation) demo
-- `/transcriber` - Audio transcription demo
+Pages are open to read. `proxy.ts` is the only auth layer in front of the
+FastAPI backend: every state-changing request needs a signed-in, approved user
+(`lib/api-access.ts`), or a pending one within the trial allowance. Report
+Writer, the helpdesk and the AI Act screening have their own route gates with
+the same rules.
 
-Middleware in `lib/supabase/proxy.ts` enforces these protections.
+### Trial allowance
+
+A pending user can run demos at once, counted in Upstash Redis on the server
+(`lib/trial.ts`; without Redis the trial is off and pending users wait):
+
+| Variable | Default | What it limits |
+| --- | --- | --- |
+| `TRIAL_RUNS_PER_DAY` | 30 | Runs one pending user may make per day |
+| `TRIAL_RUNS_PER_DAY_TOTAL` | 300 | Runs all pending users together may make per day, the ceiling on what open sign-up can cost |
+| `TRIAL_REPORTS` | 1 | Finished reports a pending user may write |
+
+Pending users get the open models only (`lib/model-tier.ts`). A demo page tells
+them they are on trial access and how many runs a day they have.
+
+### Temporary accounts
+
+Workshop accounts carry `temp_account` and `temp_expires_at` in
+`app_metadata`. A pg_cron job runs `public.expire_temp_accounts()` every 15
+minutes: an expired account is banned and its request set to `rejected`. Its
+next sign-in says the account has expired. To reopen one, clear
+`banned_until`, move `temp_expires_at` and set the request back to `approved`.
 
 ## Admin Dashboard
 
@@ -59,10 +87,32 @@ Middleware in `lib/supabase/proxy.ts` enforces these protections.
 
 ### Features
 
-- View all access requests (pending, approved, rejected)
-- Approve pending requests (user can then access demos)
-- Reject pending requests (user cannot access demos)
+- View all access requests, pending first
+- Approve a pending request: the user can run demos, and gets the approval
+  e-mail when `MAIL_FROM` is set (below)
+- Reject a pending request (user cannot run demos)
+- Send the approval e-mail again to an approved user
+- Report Writer usage per user: reset a counter, or set a user's own limit
+- The first wizard's grant (`wizard_access`): its agent has shell tools on the
+  demo API server, so grant it only to people you trust
 - Logout to end admin session
+
+### Approval e-mail
+
+`lib/mail/approval-email.ts` sends it through CSC's relay
+`smtp.pouta.csc.fi:25`, which takes no login and admits Rahti's egress
+addresses only, so it cannot be tested from a workstation. It is off while
+`MAIL_FROM` is unset, and the Access Requests card says so.
+
+- `MAIL_FROM`: the visible sender, for example `GAIK Toolkit <someone@haaga-helia.fi>`.
+- `MAIL_SENDER`: the mailbox the relay checks, which gets the bounces; it
+  defaults to `MAIL_FROM`'s address. It must be a real mailbox in a domain whose
+  SPF allows CSC: haaga-helia.fi does, gaik.ai does not.
+- `MAIL_REPLY_TO`, `SMTP_HOST`, `SMTP_PORT`: optional.
+
+Approving someone already approved sends nothing. A failed send keeps the
+approval, the row offers "Send again", and the log has the SMTP code and status
+only, never the relay's reply.
 
 ### Security
 
