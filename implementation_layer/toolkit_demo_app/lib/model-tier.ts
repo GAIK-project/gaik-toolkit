@@ -35,16 +35,21 @@ export function deploymentFor(configured: string, staff: boolean): string {
 
 /**
  * The GAIK team may run every server model; everyone else the open ones
- * (openModels). The team: the admin, the shared demo account (DEMO_USER_NAME),
- * haaga-helia.fi addresses and anyone listed in MODEL_STAFF_EMAILS
- * (comma-separated, set on the deployment, not in the repo).
+ * (openModels). The team: the admin, and among approved accounts the shared demo
+ * account (DEMO_USER_NAME), haaga-helia.fi addresses and anyone listed in
+ * MODEL_STAFF_EMAILS (comma-separated, set on the deployment, not in the repo).
+ *
+ * `approved` is the account's access request. Sign-up does not confirm the
+ * address, so anyone can register as someone@haaga-helia.fi: until an admin
+ * approves the account it runs on the trial allowance with the open models.
  */
 export function isModelStaff(
   email: string | null,
   adminCookie: string | undefined,
+  approved: boolean,
 ): boolean {
   if (verifyAdminSessionValue(adminCookie)) return true;
-  if (!email) return false;
+  if (!email || !approved) return false;
   const demoUser = process.env.DEMO_USER_NAME?.trim().toLowerCase();
   if (demoUser && email === demoUser) return true;
   const listed = (process.env.MODEL_STAFF_EMAILS ?? "")

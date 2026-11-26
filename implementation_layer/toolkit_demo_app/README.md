@@ -115,8 +115,10 @@ lists them, and the API checks the `x-gaik-server-model` header against that lis
 Everyone signed in may run the open models: GPT-6 Luna, Claude Haiku 5.5 and the CSC Aitta
 models (Gemma 4 31B, gpt-oss 120B), which CSC hosts at no cost. Every other model (GPT-6 Sol,
 GPT-6.1 and 6.2 Sol, GPT-6 Astra, Claude Sonnet 5.5 and Opus 5.5, the Gemini models) is
-for the GAIK team only: the admin, the `DEMO_USER_NAME` account, `haaga-helia.fi`
-addresses and anyone in `MODEL_STAFF_EMAILS`. `DEMO_OPEN_MODELS` (comma-separated, default
+for the GAIK team only: the admin, and among approved accounts the `DEMO_USER_NAME`
+account, `haaga-helia.fi` addresses and anyone in `MODEL_STAFF_EMAILS`. Sign-up does not
+confirm the address, so an account waiting for approval gets the open models whatever its
+address. `DEMO_OPEN_MODELS` (comma-separated, default
 `gpt-6-luna,claude-haiku-5-5`) replaces the GPT, Claude and Gemini models in the open list;
 set it on both deployments, since the Next.js demos read it too. The server default
 (`DEMO_LLM_MODEL`, GPT-6 Sol on Rahti) runs for the team; outside the team a request with

@@ -307,8 +307,14 @@ async function route(request: NextRequest): Promise<NextResponse> {
       backendPath === "/model-settings/server" ||
       backendPath === "/extract-vision/models"
     ) {
-      const { email } = await accessState();
-      if (isModelStaff(email, request.cookies.get(ADMIN_COOKIE_NAME)?.value))
+      const { email, approved } = await accessState();
+      if (
+        isModelStaff(
+          email,
+          request.cookies.get(ADMIN_COOKIE_NAME)?.value,
+          approved,
+        )
+      )
         headers.set(MODEL_TIER_HEADER, "staff");
     }
 
