@@ -42,6 +42,7 @@ import {
 import { takeTrialRun } from "@/lib/trial";
 import { recordWizardUse, wizardUseKind } from "@/lib/wizard-usage";
 import { attachCsp, isPagePath, setCsp } from "@/lib/csp";
+import { maintenanceGate, maintenanceSettings } from "@/lib/maintenance";
 import {
   type BodyLimit,
   bodyLimitFor,
@@ -95,6 +96,19 @@ async function route(request: NextRequest): Promise<NextResponse> {
     const headers = new Headers(request.headers);
     headers.delete("cookie");
     return NextResponse.next({ request: { headers } });
+  }
+
+  // Maintenance mode (lib/maintenance.ts), before every other check, so it
+  // covers the routes that forward their requests themselves as well. An admin
+  // session still gets in, to check the demo before it opens.
+  const maintenance = maintenanceSettings();
+  if (maintenance.state === "on") {
+    const closed = maintenanceGate(
+      pathname,
+      verifyAdminSessionValue(request.cookies.get(ADMIN_COOKIE_NAME)?.value),
+      maintenance,
+    );
+    if (closed) return closed;
   }
 
   // Read at most once per request, by the API gates. Reading it can refresh the
