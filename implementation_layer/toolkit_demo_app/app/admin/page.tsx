@@ -268,22 +268,10 @@ function AccessRequestRow({
     <tr className="border-border/50 border-b">
       <td className="px-4 py-3 text-sm">{request.email}</td>
       <td className="px-4 py-3 text-sm">{request.full_name}</td>
-      <td className="px-4 py-3 text-sm">{request.company || "-"}</td>
-      <td
-        className="max-w-xs truncate px-4 py-3 text-sm"
-        title={request.use_case ?? undefined}
-      >
-        {request.use_case || "-"}
-      </td>
       <td className="px-4 py-3">
         <StatusBadge status={request.status} />
       </td>
-      <td className="px-4 py-3">
-        <WizardAccessButton request={request} onUpdate={onUpdate} />
-      </td>
-      <td className="text-muted-foreground px-4 py-3 text-sm">
-        {new Date(request.created_at).toLocaleDateString()}
-      </td>
+      {/* The decision sits next to the status, so it stays in view when the table scrolls. */}
       <td className="px-4 py-3">
         {request.status === "pending" && (
           <div className="flex gap-2">
@@ -357,6 +345,19 @@ function AccessRequestRow({
           </p>
         )}
         {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
+      </td>
+      <td className="px-4 py-3 text-sm">{request.company || "-"}</td>
+      <td
+        className="max-w-xs truncate px-4 py-3 text-sm"
+        title={request.use_case ?? undefined}
+      >
+        {request.use_case || "-"}
+      </td>
+      <td className="px-4 py-3">
+        <WizardAccessButton request={request} onUpdate={onUpdate} />
+      </td>
+      <td className="text-muted-foreground px-4 py-3 text-sm">
+        {new Date(request.created_at).toLocaleDateString()}
       </td>
     </tr>
   );
@@ -723,9 +724,10 @@ function Dashboard() {
                       <tr className="border-b">
                         <th className={TH}>Email</th>
                         <th className={TH}>Name</th>
+                        <th className={TH}>Status</th>
+                        <th className={TH}>Actions</th>
                         <th className={TH}>Company</th>
                         <th className={TH}>Use Case</th>
-                        <th className={TH}>Status</th>
                         <th
                           className={TH}
                           title="Runs the first Solution Wizard in the browser. Its agent has shell tools on the demo API server."
@@ -733,7 +735,6 @@ function Dashboard() {
                           First wizard
                         </th>
                         <th className={TH}>Created</th>
-                        <th className={TH}>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
