@@ -191,12 +191,14 @@ async function route(request: NextRequest): Promise<NextResponse> {
       supportsModelSettings(pathname, request.method);
     if (needsApprovedUser(request.method)) {
       const state = await accessState();
-      // Starting Aitta's idle models is no demo run, and neither is ending a
-      // wizard session: they spend no trial run.
+      // Starting Aitta's idle models is no demo run, and neither is a DELETE,
+      // which clears the user's own data (a RAG collection, a Tabular Agent
+      // session, a wizard session): they spend no trial run and still work
+      // after the trial has ended. The API checks ownership; shared data needs
+      // the admin session below.
       const noTrialRun =
         pathname === "/api/model-settings/aitta/warm" ||
-        (request.method === "DELETE" &&
-          pathname.startsWith("/api/wizard/end/"));
+        request.method === "DELETE";
       const sharedData = writesSharedData(request.method, pathname);
       const refusal = await accessRefusal(state, takeTrialRun, {
         ownModelKey,

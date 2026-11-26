@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { signOut } from "@/app/(auth)/actions";
-import { getAccessStatus } from "@/data/auth";
 import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
@@ -14,7 +13,15 @@ const SuccessAnimation = dynamic(() =>
 );
 
 export default async function AccessPendingPage() {
-  const { isLoggedIn, status, email } = await getAccessStatus();
+  // One lookup for the redirects, the address and the trial: AccessPolling
+  // re-renders this page every few seconds.
+  const {
+    user,
+    requestStatus: status,
+    isTrial: trial,
+  } = await getUserAccessStatus();
+  const isLoggedIn = !!user;
+  const email = user?.email ?? null;
 
   // Redirect to sign-in if not logged in
   if (!isLoggedIn) {
@@ -26,8 +33,6 @@ export default async function AccessPendingPage() {
     redirect("/");
   }
 
-  // On the trial: pending, the address confirmed and within the trial's hours.
-  const { isTrial: trial } = await getUserAccessStatus();
   const { runsPerDay, hours } = getTrialLimits();
 
   return (
@@ -59,10 +64,15 @@ export default async function AccessPendingPage() {
             </Button>
           </>
         ) : (
-          <p className="text-muted-foreground text-sm">
-            Your request will be reviewed shortly. We&apos;ll send you an email
-            when your access has been approved.
-          </p>
+          <>
+            <p className="text-muted-foreground text-sm">
+              Your request will be reviewed shortly. We&apos;ll send you an
+              email when your access has been approved.
+            </p>
+            <Button asChild variant="outline" className="w-full">
+              <Link href="/">Browse demos</Link>
+            </Button>
+          </>
         )}
 
         <form action={signOut}>

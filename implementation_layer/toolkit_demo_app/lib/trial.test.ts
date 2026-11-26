@@ -75,6 +75,15 @@ test("the trial lasts TRIAL_HOURS after sign-up, 72 by default", () => {
   expect(withinTrialWindow("2026-11-27T19:00:00Z", now)).toBe(false);
 });
 
+test("only a whole number of TRIAL_HOURS counts; a fraction does not turn the limit off", () => {
+  process.env.TRIAL_HOURS = "0.5";
+  expect(getTrialLimits().hours).toBe(72);
+  process.env.TRIAL_HOURS = "-3";
+  expect(getTrialLimits().hours).toBe(72);
+  process.env.TRIAL_HOURS = " 24 ";
+  expect(getTrialLimits().hours).toBe(24);
+});
+
 test("TRIAL_HOURS=0 keeps the trial until approval; an unknown sign-up time ends it", () => {
   process.env.TRIAL_HOURS = "0";
   expect(withinTrialWindow("2020-01-01T00:00:00Z")).toBe(true);

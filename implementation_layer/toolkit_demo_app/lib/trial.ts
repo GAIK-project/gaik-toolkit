@@ -19,6 +19,16 @@ function countEnv(name: string, def: number): number {
   return Number.isFinite(n) && n >= 0 ? n : def;
 }
 
+/**
+ * Whole hours from env. Only an explicit 0 turns the time limit off: a fraction
+ * such as 0.5, which parseInt would read as 0, falls back to the default.
+ */
+function hoursEnv(name: string, def: number): number {
+  const raw = process.env[name]?.trim();
+  if (!raw) return def;
+  return /^\d+$/.test(raw) ? Number(raw) : def;
+}
+
 export interface TrialLimits {
   /** Runs (state-changing API requests) a pending user may make per day. */
   runsPerDay: number;
@@ -36,7 +46,7 @@ export function getTrialLimits(): TrialLimits {
     runsPerDay: countEnv("TRIAL_RUNS_PER_DAY", 30),
     runsPerDayTotal: countEnv("TRIAL_RUNS_PER_DAY_TOTAL", 300),
     reports: countEnv("TRIAL_REPORTS", 1),
-    hours: countEnv("TRIAL_HOURS", 72),
+    hours: hoursEnv("TRIAL_HOURS", 72),
   };
 }
 
