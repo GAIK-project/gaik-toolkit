@@ -240,6 +240,10 @@ runs as before.
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase project URL | Secret: `gaik-demo-supabase`           |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase anon key    | Secret: `gaik-demo-supabase`           |
 | `SUPABASE_SECRET_KEY`                  | Supabase service key | Secret: `gaik-demo-supabase`           |
+| `MAIL_FROM`, `MAIL_SENDER`, `MAIL_REPLY_TO` | Optional, off unless `MAIL_FROM` is set. The approval e-mail's sender, the mailbox the relay checks (defaults to `MAIL_FROM`'s address; a real mailbox in a domain whose SPF allows CSC, such as haaga-helia.fi) and the reply address | `oc set env` |
+| `SMTP_HOST`, `SMTP_PORT`               | Optional. The approval e-mail's relay, default `smtp.pouta.csc.fi:25` (no login; Rahti's egress addresses only) | `oc set env` |
+| `TRIAL_RUNS_PER_DAY`, `TRIAL_RUNS_PER_DAY_TOTAL`, `TRIAL_REPORTS` | Optional. A pending user's runs per day (30), all pending users' runs per day together (300) and reports (1); needs Upstash Redis | `oc set env` |
+| `REPORT_WRITER_MAX_REPORTS`            | Reports per approved user (default 5; `1000000` is no limit, as on the live demo since 26.11.2026) | `oc set env` |
 | `WIZARD_V2_URL`                        | Optional. Wizard V2 address the `/solution-wizard` notice links to, read at run time | `oc set env` |
 
 `WIZARD_ACCESS_SECRET` is no longer read: `/api/wizard` is gated by the per-user
