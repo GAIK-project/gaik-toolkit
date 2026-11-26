@@ -14,11 +14,8 @@ import {
   LogOut,
   Wand2,
   RotateCcw,
-  Users,
-  Clock,
-  FileText,
-  Coins,
   Search,
+  Mail,
 } from "lucide-react";
 import {
   verifyAdminPassword,
@@ -28,6 +25,8 @@ import {
   resetReportUsage,
   setReportLimitOverride,
   getReportWriterMaxReports,
+  resendApprovalEmail,
+  approvalEmailEnabled,
   type AdminResult,
 } from "./actions";
 import { AuthShell } from "../(auth)/components/auth-shell";
@@ -159,29 +158,22 @@ function StatusBadge({ status }: { status: AccessRequest["status"] }) {
   return <Badge variant={variant}>{label}</Badge>;
 }
 
-function StatCard({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Users;
-  label: string;
-  value: string | number;
-}) {
+function Stat({ label, value }: { label: string; value: string | number }) {
   return (
-    <Card>
-      <CardContent className="flex items-center gap-3 p-4">
-        <div className="bg-muted rounded-md p-2">
-          <Icon className="text-muted-foreground h-5 w-5" />
-        </div>
-        <div>
-          <p className="text-2xl leading-none font-semibold">{value}</p>
-          <p className="text-muted-foreground mt-1 text-xs">{label}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <div className="px-4 py-3">
+      <p className="text-2xl leading-none font-semibold tabular-nums">
+        {value}
+      </p>
+      <p className="text-muted-foreground mt-1.5 text-xs">{label}</p>
+    </div>
   );
 }
+
+const EMAIL_NOTE: Record<NonNullable<AdminResult["email"]>, string> = {
+  sent: "Welcome e-mail sent.",
+  "not-configured": "No e-mail sent: MAIL_FROM is not set.",
+  failed: "The welcome e-mail failed.",
+};
 
 function WizardAccessButton({
   request,
@@ -244,6 +236,8 @@ function AccessRequestRow({
 }) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  // What happened to the welcome e-mail on this row's last approval.
+  const [email, setEmail] = useState<AdminResult["email"]>();
 
   function handleAction(status: "approved" | "rejected"): void {
     setError(null);
@@ -252,8 +246,18 @@ function AccessRequestRow({
       if (result.error) {
         setError(result.error);
       } else {
+        setEmail(result.email);
         onUpdate();
       }
+    });
+  }
+
+  function resend(): void {
+    setError(null);
+    startTransition(async () => {
+      const result = await resendApprovalEmail(request.user_id);
+      if (result.error) setError(result.error);
+      else setEmail(result.email);
     });
   }
 
@@ -262,7 +266,10 @@ function AccessRequestRow({
       <td className="px-4 py-3 text-sm">{request.email}</td>
       <td className="px-4 py-3 text-sm">{request.full_name}</td>
       <td className="px-4 py-3 text-sm">{request.company || "-"}</td>
-      <td className="max-w-xs truncate px-4 py-3 text-sm">
+      <td
+        className="max-w-xs truncate px-4 py-3 text-sm"
+        title={request.use_case ?? undefined}
+      >
         {request.use_case || "-"}
       </td>
       <td className="px-4 py-3">
@@ -283,6 +290,7 @@ function AccessRequestRow({
               onClick={() => handleAction("approved")}
               disabled={isPending}
               title="Approve"
+              aria-label={`Approve ${request.email}`}
             >
               {isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -296,6 +304,7 @@ function AccessRequestRow({
               onClick={() => handleAction("rejected")}
               disabled={isPending}
               title="Reject"
+              aria-label={`Reject ${request.email}`}
             >
               {isPending ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -304,6 +313,24 @@ function AccessRequestRow({
               )}
             </Button>
           </div>
+        )}
+        {email && (
+          <p
+            className={`mt-1 flex items-center gap-1.5 text-xs whitespace-nowrap ${email === "sent" ? "text-muted-foreground" : "text-destructive"}`}
+          >
+            <Mail className="h-3.5 w-3.5" aria-hidden />
+            {EMAIL_NOTE[email]}
+            {email === "failed" && (
+              <button
+                type="button"
+                className="underline underline-offset-2"
+                onClick={resend}
+                disabled={isPending}
+              >
+                Send again
+              </button>
+            )}
+          </p>
         )}
         {error && <p className="text-destructive mt-1 text-xs">{error}</p>}
       </td>
@@ -355,7 +382,9 @@ function LimitSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        <SelectItem value="default">Default ({maxReports})</SelectItem>
+        <SelectItem value="default">
+          Default ({maxReports >= UNLIMITED ? "∞" : maxReports})
+        </SelectItem>
         <SelectItem value="25">25</SelectItem>
         <SelectItem value="100">100</SelectItem>
         <SelectItem value="unlimited">Unlimited</SelectItem>
@@ -503,13 +532,14 @@ function TableSection({
 
 function Dashboard() {
   const [requests, setRequests] = useState<AccessRequest[]>([]);
+  // True until the first load only: a refresh after an action keeps the rows in place.
   const [loading, setLoading] = useState(true);
   const [maxReports, setMaxReports] = useState(5);
+  const [emailOn, setEmailOn] = useState<boolean | null>(null);
   const [query, setQuery] = useState("");
   const [loggingOut, startLogout] = useTransition();
 
   async function loadRequests(): Promise<void> {
-    setLoading(true);
     try {
       const data = await getAccessRequests();
       setRequests(data);
@@ -524,6 +554,7 @@ function Dashboard() {
 
   useEffect(() => {
     getReportWriterMaxReports().then(setMaxReports);
+    approvalEmailEnabled().then(setEmailOn);
   }, []);
 
   function handleLogout(): void {
@@ -551,6 +582,17 @@ function Dashboard() {
         (r.full_name || "").toLowerCase().includes(q),
     );
   }, [requests, query]);
+
+  // Requests waiting for a decision first, then the newest.
+  const byDecision = useMemo(
+    () =>
+      [...filtered].sort(
+        (a, b) =>
+          Number(b.status === "pending") - Number(a.status === "pending") ||
+          b.created_at.localeCompare(a.created_at),
+      ),
+    [filtered],
+  );
 
   // The users who hold the first wizard's grant, most recently active first.
   const wizardUsers = useMemo(
@@ -595,20 +637,15 @@ function Dashboard() {
 
       <main className="container mx-auto px-4 py-8">
         {/* Summary stats */}
-        <div className="mb-6 grid grid-cols-2 gap-4 md:grid-cols-4">
-          <StatCard icon={Users} label="Users" value={stats.total} />
-          <StatCard icon={Clock} label="Pending" value={stats.pending} />
-          <StatCard
-            icon={FileText}
-            label="Reports generated"
-            value={stats.reports}
-          />
-          <StatCard
-            icon={Coins}
-            label="Tokens used"
+        <Card className="mb-6 grid grid-cols-2 gap-0 divide-x divide-y py-0 md:grid-cols-4 md:divide-y-0">
+          <Stat label="Users" value={stats.total} />
+          <Stat label="Pending" value={stats.pending} />
+          <Stat label="Reports written" value={stats.reports} />
+          <Stat
+            label="Report tokens"
             value={stats.tokens.toLocaleString("en-US")}
           />
-        </div>
+        </Card>
 
         {/* Search */}
         <div className="relative mb-4 max-w-sm">
@@ -622,7 +659,7 @@ function Dashboard() {
         </div>
 
         <Tabs defaultValue="requests">
-          <TabsList className="mb-4">
+          <TabsList className="mb-4 max-w-full justify-start overflow-x-auto">
             <TabsTrigger value="requests">Access Requests</TabsTrigger>
             <TabsTrigger value="usage">Report Writer Usage</TabsTrigger>
             <TabsTrigger value="wizard">
@@ -639,8 +676,12 @@ function Dashboard() {
                 <CardTitle>Access Requests</CardTitle>
                 <CardDescription>
                   {stats.pending > 0
-                    ? `${stats.pending} pending request${stats.pending > 1 ? "s" : ""}`
-                    : "No pending requests"}
+                    ? `${stats.pending} pending request${stats.pending > 1 ? "s" : ""}.`
+                    : "No pending requests."}
+                  {emailOn === true &&
+                    " Approving a request e-mails the user that the account is active."}
+                  {emailOn === false &&
+                    " Approval e-mails are off: MAIL_FROM is not set."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -672,7 +713,7 @@ function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filtered.map((request) => (
+                      {byDecision.map((request) => (
                         <AccessRequestRow
                           key={request.id}
                           request={request}
@@ -691,9 +732,8 @@ function Dashboard() {
               <CardHeader>
                 <CardTitle>Report Writer Usage</CardTitle>
                 <CardDescription>
-                  Per-user report counts and token spend. Raise a user&apos;s
-                  Limit (e.g. for demo/team accounts) or Reset their counter to
-                  give the allowance back.
+                  Reports and tokens per user. Reset a counter to give reports
+                  back.
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -738,9 +778,8 @@ function Dashboard() {
               <CardHeader>
                 <CardTitle>First wizard</CardTitle>
                 <CardDescription>
-                  The accounts that may run the first Solution Wizard in the
-                  browser, and how much each has used it. Its agent has shell
-                  tools on the demo API server, so this list should stay short.
+                  Its agent has shell tools on the demo API server: grant it
+                  only to people you trust.
                   {wizardCounted
                     ? " Sessions and messages are counted from 16 Nov 2026."
                     : " Use is not counted: the counter store did not answer."}

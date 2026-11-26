@@ -13,10 +13,17 @@ import {
 } from "@/lib/admin/session";
 import { takeAdminSignInAttempt } from "@/lib/admin/sign-in-limit";
 import { clientIp } from "@/lib/client-ip";
+import {
+  getMailConfig,
+  sendApprovalEmail,
+  type ApprovalEmailResult,
+} from "@/lib/mail/approval-email";
 
 export type AdminResult = {
   error?: string;
   success?: boolean;
+  /** Set when the action approved someone: whether the approval e-mail went out. */
+  email?: ApprovalEmailResult;
 };
 
 /**
@@ -122,6 +129,12 @@ export async function updateAccessStatus(
 
   const supabase = createServiceClient();
 
+  const { data: before } = await supabase
+    .from("access_requests")
+    .select("status, email")
+    .eq("user_id", result.data.userId)
+    .single();
+
   const { error } = await supabase
     .from("access_requests")
     .update({ status: result.data.status })
@@ -132,7 +145,54 @@ export async function updateAccessStatus(
     return { error: "Failed to update status." };
   }
 
+  // Only a newly approved user is told; approving twice sends nothing.
+  if (
+    result.data.status === "approved" &&
+    before?.status !== "approved" &&
+    before?.email
+  ) {
+    const email = await sendApprovalEmail(before.email);
+    console.info(`[admin] approval e-mail user=${result.data.userId} ${email}`);
+    return { success: true, email };
+  }
+
   return { success: true };
+}
+
+const resendSchema = z.object({ userId: z.string().uuid("Invalid user ID.") });
+
+/** Send the approval e-mail again to an approved user. Admin-only. */
+export async function resendApprovalEmail(
+  userId: string,
+): Promise<AdminResult> {
+  const result = resendSchema.safeParse({ userId });
+  if (!result.success) {
+    return { error: result.error.issues[0].message };
+  }
+
+  const unauthorized = await requireAdmin(
+    "resend-approval-email",
+    result.data.userId,
+    "",
+  );
+  if (unauthorized) return unauthorized;
+
+  const { data } = await createServiceClient()
+    .from("access_requests")
+    .select("status, email")
+    .eq("user_id", result.data.userId)
+    .single();
+  if (!data?.email || data.status !== "approved")
+    return { error: "Only an approved user gets the e-mail." };
+
+  const email = await sendApprovalEmail(data.email);
+  console.info(`[admin] approval e-mail user=${result.data.userId} ${email}`);
+  return { success: true, email };
+}
+
+/** Whether approving someone sends them an e-mail (MAIL_FROM is set). */
+export async function approvalEmailEnabled(): Promise<boolean> {
+  return getMailConfig() !== null;
 }
 
 const wizardAccessSchema = z.object({
