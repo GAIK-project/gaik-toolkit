@@ -16,8 +16,9 @@ import { FirstWizardTerminal } from "./first-wizard-terminal";
 
 // Two wizards, side by side with the same three facts, so a visitor sees at once
 // which one fits and how to get in. Wizard V2 is its own service, where each
-// session's agent and its PoC runs are kept apart from other services, and it
-// needs an account from the GAIK team; the demo's sign-in does not open it. The
+// session's agent and its PoC runs are kept apart from other services. It reads
+// the demo's own accounts (WIZARD_SUPABASE_ACCESS=access_requests): an approved
+// demo account signs in there with the same e-mail and password. The
 // first version is a Claude Code skill: it runs on anyone's own computer in Claude
 // Code, and in this demo (/solution-wizard/first) for users an admin has granted
 // it (`wizard_access`).
@@ -125,14 +126,11 @@ export function SolutionWizardNotice({
                 label: "Access",
                 value: (
                   <p>
-                    An account from the GAIK team. Your sign-in to this demo
-                    does not open it.{" "}
-                    <a
-                      href={buildAccessRequestMailto("Wizard V2")}
-                      className={linkClassName}
-                    >
-                      Request an account
-                    </a>
+                    Your demo account, once the GAIK team has approved it: sign
+                    in there with the same e-mail and password.{" "}
+                    <Link href="/sign-up" className={linkClassName}>
+                      Create an account
+                    </Link>
                   </p>
                 ),
               },
