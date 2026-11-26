@@ -60,6 +60,7 @@ Google, Anthropic and optional LiteLLM text models can be selected through the s
   - `schema_name` (str): Base filename (no `.py`) for saving/loading schema; defaults to `schema`.
 - `schema`: Optional pre-generated schema model to reuse.
 - `requirements`: Optional `ExtractionRequirements` matching the schema.
+- `transcription_retries`: How many more times to transcribe the same audio when a required field comes back empty (default `1`; `0` turns it off). Azure transcription sometimes leaves out speech in a random call, for example the opening sentences, and a retry of the same audio usually recovers it. A field is required when it must appear in the output and may not be null; a field that may be null never triggers a retry, and for a parent with child collections only the parent's fields are checked. Each retry transcribes and extracts again with the same schema, and the run with the fewest empty required fields is returned (the earliest on a tie). A retry costs one more transcription and extraction call. `Transcriber` on its own has no fields to check and does not retry.
 - Every name in these dicts must be a parameter of the component it goes to, and stage configs (`config`, `api_config`, `openai_config`) are refused: pass them to the constructor (`api_config`, `transcription_config`, `extraction_config`). A `ValueError` names the option before anything is transcribed.
 
 ### Returns (`PipelineResult`)
@@ -67,6 +68,8 @@ Google, Anthropic and optional LiteLLM text models can be selected through the s
 - `extracted_fields`: List of dicts returned by the extractor.
 - `schema`: Generated or provided schema model.
 - `requirements`: Corresponding `ExtractionRequirements`.
+- `transcription_attempts`: How many times the audio was transcribed (`1` when no retry ran).
+- `missing_required_fields`: Required fields still empty in the returned result, so a caller can report them as missing.
 
 ## Schema Persistence (example pattern)
 - To reuse a schema, set `generate_schema=False` and `schema_name` to the desired base name; ensure `<name>_model.json` and `<name>_requirements.json` exist under `schema/`. `load_schema` rebuilds the model from `<name>_model.json` as data and never imports `<name>.py`, which is written only for reading. A folder from an older gaik without `<name>_model.json` is rebuilt from the requirements for a flat or parent-with-children schema; for a nested-list schema `load_schema` raises `SavedSchemaError`, naming the folder and how to convert it, instead of generating a new schema over the saved one. When a model cannot be saved as data, `save_schema` removes an older `<name>_model.json`, so the load rebuilds from the new requirements.

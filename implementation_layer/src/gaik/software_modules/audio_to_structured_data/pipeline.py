@@ -10,7 +10,7 @@ import io
 import json
 from collections.abc import Sequence
 from contextlib import redirect_stdout
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -25,7 +25,7 @@ from gaik.software_components.extractor.saved_schema import (
     load_saved_model,
     save_model_file,
 )
-from gaik.software_components.extractor.schema import print_pydantic_schema
+from gaik.software_components.extractor.schema import _resolve_fallback, print_pydantic_schema
 from gaik.software_components.transcriber import Transcriber, TranscriptionResult
 from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
 
@@ -38,6 +38,50 @@ class PipelineResult:
     extracted_fields: list[dict[str, Any]]  # Structured data extracted
     schema: type  # The generated Pydantic schema
     requirements: ExtractionRequirements | CompositeExtractionRequirements
+    # How many times the audio was transcribed, and the required fields that
+    # were still empty in the result returned (see ``transcription_retries``).
+    transcription_attempts: int = 1
+    missing_required_fields: list[str] = field(default_factory=list)
+
+
+def _is_empty(value: Any, spec: Any) -> bool:
+    """True when ``value`` is what the extractor writes for a value it did not find.
+
+    The extractor's field policies replace a missing non-nullable value with the
+    field's fallback: its explicit default, ``""`` for text and dates, or ``[]``
+    for lists.
+    """
+    if value is None:
+        return True
+    if isinstance(value, str) and not value.strip():
+        return True
+    if isinstance(value, (list, dict)) and not value:
+        return True
+    return value == _resolve_fallback(spec)
+
+
+def _missing_required_fields(
+    extracted: Sequence[Any],
+    requirements: Any,
+) -> list[str]:
+    """Names of required fields left empty in any extracted record.
+
+    A field is required when it must appear in the output and may not be null
+    (``FieldSpec.required``). For a parent with child collections only the
+    parent's fields are checked. Requirements without field specs give ``[]``.
+    """
+    if isinstance(requirements, CompositeExtractionRequirements):
+        requirements = requirements.parent_requirements
+    specs = [f for f in getattr(requirements, "fields", None) or [] if getattr(f, "required", False)]
+    missing: list[str] = []
+    for record in extracted or []:
+        if not isinstance(record, dict):
+            continue
+        for spec in specs:
+            name = spec.field_name
+            if name not in missing and _is_empty(record.get(name), spec):
+                missing.append(name)
+    return missing
 
 
 def _schema_file_stem(schema_name: str) -> str:
@@ -97,6 +141,7 @@ class AudioToStructuredData:
         extract_options: dict | None = None,
         schema: type | None = None,
         requirements: ExtractionRequirements | CompositeExtractionRequirements | None = None,
+        transcription_retries: int = 1,
     ) -> PipelineResult:
         """
         Execute the pipeline: transcribe then extract structured data.
@@ -111,6 +156,13 @@ class AudioToStructuredData:
             extract_options: Call-time args for DataExtractor.extract().
             schema: Optional pre-generated schema model to reuse.
             requirements: Optional ExtractionRequirements corresponding to the schema.
+            transcription_retries: How many more times to transcribe the same
+                audio when a required field comes back empty (default 1, ``0``
+                turns it off). Azure transcription sometimes leaves out speech,
+                such as the opening sentences, in a random call, and a retry of
+                the same audio usually recovers it. Each retry transcribes and
+                extracts again with the same schema; the run with the fewest
+                empty required fields is returned, the earliest on a tie.
 
         Every option name must be a parameter of the component it goes to.
         Stage configs (``config``, ``api_config``) come from the constructor
@@ -131,6 +183,10 @@ class AudioToStructuredData:
             what="extract_options",
             set_by_module=EXTRACT_SET_BY_MODULE,
         )
+        if isinstance(transcription_retries, bool) or not isinstance(transcription_retries, int):
+            raise ValueError("transcription_retries must be a whole number of 0 or more")
+        if transcription_retries < 0:
+            raise ValueError("transcription_retries must be a whole number of 0 or more")
         transcriber_ctor.setdefault("enhanced_transcript", False)
         transcriber = Transcriber(api_config=self.transcription_config, **transcriber_ctor)
         transcription = transcriber.transcribe(
@@ -151,10 +207,6 @@ class AudioToStructuredData:
         else:
             schema_generator = None
 
-        documents: Sequence[str] = [
-            transcription.enhanced_transcript or transcription.raw_transcript
-        ]
-
         data_extractor = DataExtractor(config=extractor_cfg, **extractor_ctor)
 
         extract_opts = {
@@ -164,19 +216,34 @@ class AudioToStructuredData:
         if extract_options:
             extract_opts.update(extract_options)
 
-        extracted_fields = data_extractor.extract(
-            extraction_model=schema,
-            requirements=requirements,
-            user_requirements=user_requirements,
-            documents=documents,
-            **extract_opts,
-        )
+        def extract_from(result: TranscriptionResult) -> list[dict[str, Any]]:
+            documents: Sequence[str] = [result.enhanced_transcript or result.raw_transcript]
+            return data_extractor.extract(
+                extraction_model=schema,
+                requirements=requirements,
+                user_requirements=user_requirements,
+                documents=documents,
+                **extract_opts,
+            )
+
+        extracted_fields = extract_from(transcription)
+        missing = _missing_required_fields(extracted_fields, requirements)
+        attempts = 1
+        while missing and attempts <= transcription_retries:
+            attempts += 1
+            retry = transcriber.transcribe(file_path=file_path, **transcribe_options)
+            retry_fields = extract_from(retry)
+            retry_missing = _missing_required_fields(retry_fields, requirements)
+            if len(retry_missing) < len(missing):
+                transcription, extracted_fields, missing = retry, retry_fields, retry_missing
 
         return PipelineResult(
             transcription=transcription,
             extracted_fields=extracted_fields,
             schema=schema,
             requirements=requirements,
+            transcription_attempts=attempts,
+            missing_required_fields=missing,
         )
 
     # ------------------------------------------------------------------
