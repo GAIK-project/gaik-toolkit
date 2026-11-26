@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import io
 import json
-from collections.abc import Sequence
+import logging
+from collections.abc import Iterable, Sequence
 from contextlib import redirect_stdout
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,14 +21,21 @@ from gaik.software_components.extractor import (
     DataExtractor,
     ExtractionRequirements,
     SchemaGenerator,
+    save_to_json,
 )
 from gaik.software_components.extractor.saved_schema import (
     load_saved_model,
     save_model_file,
 )
-from gaik.software_components.extractor.schema import _resolve_fallback, print_pydantic_schema
+from gaik.software_components.extractor.schema import (
+    _holds_items,
+    _resolve_fallback,
+    print_pydantic_schema,
+)
 from gaik.software_components.transcriber import Transcriber, TranscriptionResult
 from gaik.software_modules._options import EXTRACT_SET_BY_MODULE, checked_options
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -38,8 +46,8 @@ class PipelineResult:
     extracted_fields: list[dict[str, Any]]  # Structured data extracted
     schema: type  # The generated Pydantic schema
     requirements: ExtractionRequirements | CompositeExtractionRequirements
-    # How many times the audio was transcribed, and the fields named in
-    # ``retry_when_empty`` that are still empty in the result returned.
+    # How many times the audio was transcribed (failed retries included), and
+    # the fields named in ``retry_when_empty`` still empty in the result returned.
     transcription_attempts: int = 1
     empty_fields: list[str] = field(default_factory=list)
 
@@ -78,14 +86,78 @@ def _watched_specs(requirements: Any, names: Sequence[str]) -> list[Any]:
     return [by_name[n] for n in names]
 
 
-def _empty_fields(extracted: Sequence[Any], specs: Sequence[Any]) -> list[str]:
-    """Names of the fields in ``specs`` left empty in any extracted record."""
+def _item_lists(record: dict[str, Any], requirements: Any) -> list[list[Any]]:
+    """The item lists of a nested-list schema's record; empty for a flat record.
+
+    A nested-list schema's record is ``{"<container>": [item, ...]}`` with the
+    named fields inside the items. A parent with child collections keeps its
+    own fields on the record, so its child lists are not read as items.
+    """
+    if isinstance(requirements, CompositeExtractionRequirements):
+        return []
+    return [
+        value for key, value in record.items() if _holds_items(key, value, requirements, record)
+    ]
+
+
+def _empty_fields(
+    extracted: Sequence[Any], specs: Sequence[Any], requirements: Any = None
+) -> list[str]:
+    """Names of the fields in ``specs`` left empty in the extracted result.
+
+    A flat record counts a field as empty when it is empty in any record. For
+    a nested-list schema the fields live in the items: a field counts as empty
+    when no item has a value for it, which is what a dropped passage of the
+    audio leaves (an item that legitimately lacks a value is not a reason to
+    transcribe again). No records, or no items, leaves every field empty.
+    """
     records = [r for r in extracted or [] if isinstance(r, dict)]
     if not records:
         return [s.field_name for s in specs]
-    return [
-        s.field_name for s in specs if any(_is_empty(r.get(s.field_name), s) for r in records)
-    ]
+    empty: list[str] = []
+    for spec in specs:
+        for record in records:
+            lists = _item_lists(record, requirements) if requirements is not None else []
+            if lists:
+                items = [i for values in lists for i in values if isinstance(i, dict)]
+                if all(_is_empty(i.get(spec.field_name), spec) for i in items):
+                    empty.append(spec.field_name)
+                    break
+            elif _is_empty(record.get(spec.field_name), spec):
+                empty.append(spec.field_name)
+                break
+    return empty
+
+
+#: HTTP statuses after which the same call may well succeed on the next try.
+_TRANSIENT_STATUSES = frozenset({408, 409, 429, 500, 502, 503, 504})
+
+
+def _is_transient(exc: BaseException) -> bool:
+    """Whether a retry's error is one the next try may not repeat.
+
+    Rate limits, timeouts, dropped connections and server errors pass; a
+    refusal such as a content filter, or a bad request, would come back the
+    same on every try.
+    """
+    if isinstance(exc, (TimeoutError, ConnectionError)):
+        return True
+    try:
+        import openai
+    except ImportError:  # pragma: no cover - openai comes with the transcriber
+        openai = None
+    if openai is not None and isinstance(
+        exc,
+        (
+            openai.RateLimitError,
+            openai.APITimeoutError,
+            openai.APIConnectionError,
+            openai.InternalServerError,
+        ),
+    ):
+        return True
+    status = getattr(exc, "status_code", None) or getattr(exc, "status", None)
+    return isinstance(status, int) and status in _TRANSIENT_STATUSES
 
 
 def _checked_retry_options(retry_when_empty: Any, transcription_retries: Any) -> list[str]:
@@ -95,11 +167,14 @@ def _checked_retry_options(retry_when_empty: Any, transcription_retries: Any) ->
         raise ValueError("transcription_retries must be a whole number of 0 or more")
     if retry_when_empty is None:
         return []
-    if isinstance(retry_when_empty, str) or not all(
-        isinstance(n, str) and n for n in retry_when_empty
-    ):
+    # A list first: a generator would be used up by the check below, and a
+    # value that is no collection at all is the same mistake as a bad name.
+    if isinstance(retry_when_empty, (str, bytes)) or not isinstance(retry_when_empty, Iterable):
         raise ValueError("retry_when_empty must be a list of field names")
-    return list(dict.fromkeys(retry_when_empty))
+    names = list(retry_when_empty)
+    if not all(isinstance(n, str) and n for n in names):
+        raise ValueError("retry_when_empty must be a list of field names")
+    return list(dict.fromkeys(names))
 
 
 def _schema_file_stem(schema_name: str) -> str:
@@ -181,12 +256,18 @@ class AudioToStructuredData:
                 extracted again with the same schema. Azure transcription
                 sometimes leaves out speech, such as the opening sentences, in
                 a random call, and a retry of the same audio usually recovers
-                it. Nullable fields may be named. ``None`` (the default) never
-                retries. A name the schema lacks raises :class:`ValueError`
-                before anything is extracted.
+                it. Nullable fields may be named. For a nested-list schema the
+                names are the items' fields, and a field counts as empty when
+                no item has it. ``None`` (the default) never retries. A name the
+                schema lacks raises :class:`ValueError` before the audio is
+                transcribed; a schema to generate is generated first, so its
+                names are checked then.
             transcription_retries: The most retries to make for
                 ``retry_when_empty`` (default 2). The run with the fewest empty
-                named fields is returned, the earliest on a tie.
+                named fields is returned, the earliest on a tie. A retry that
+                fails on a rate limit, a timeout or a server error uses up that
+                try and the next one is made; any other error ends the retries.
+                Either way the best result so far is returned.
 
         Every option name must be a parameter of the component it goes to.
         Stage configs (``config``, ``api_config``) come from the constructor
@@ -208,8 +289,24 @@ class AudioToStructuredData:
             set_by_module=EXTRACT_SET_BY_MODULE,
         )
         watched = _checked_retry_options(retry_when_empty, transcription_retries)
-        if watched and requirements is not None:
-            _watched_specs(requirements, watched)  # refuse unknown names before transcribing
+
+        extractor_cfg = dict(self.extraction_config)
+        model_override = extractor_ctor.get("model")
+        if model_override:
+            extractor_cfg["model"] = model_override
+
+        # Generate schema/requirements if not provided. With retry_when_empty
+        # this runs before the audio is transcribed: it needs only the user's
+        # requirements, and the names are then checked against the generated
+        # fields before any transcription is paid for or lost. Without it the
+        # order stays as it was, so a failed transcription costs no schema call.
+        schema_generator = None
+        if watched and (schema is None or requirements is None):
+            schema_generator = SchemaGenerator(config=extractor_cfg)
+            schema = schema_generator.generate_schema(user_requirements=user_requirements)
+            requirements = schema_generator.item_requirements
+        specs = _watched_specs(requirements, watched) if watched else []
+
         transcriber_ctor.setdefault("enhanced_transcript", False)
         transcriber = Transcriber(api_config=self.transcription_config, **transcriber_ctor)
         transcription = transcriber.transcribe(
@@ -217,18 +314,10 @@ class AudioToStructuredData:
             **transcribe_options,
         )
 
-        extractor_cfg = dict(self.extraction_config)
-        model_override = extractor_ctor.get("model")
-        if model_override:
-            extractor_cfg["model"] = model_override
-
-        # Generate schema/requirements if not provided.
         if schema is None or requirements is None:
             schema_generator = SchemaGenerator(config=extractor_cfg)
             schema = schema_generator.generate_schema(user_requirements=user_requirements)
             requirements = schema_generator.item_requirements
-        else:
-            schema_generator = None
 
         data_extractor = DataExtractor(config=extractor_cfg, **extractor_ctor)
 
@@ -238,6 +327,10 @@ class AudioToStructuredData:
         }
         if extract_options:
             extract_opts.update(extract_options)
+        # Each attempt extracts without writing; the result returned is written
+        # once below, so the file and the return value are the same attempt.
+        save_json = bool(extract_opts.pop("save_json", False))
+        json_path = extract_opts.pop("json_path", "extraction_results.json")
 
         def extract_from(result: TranscriptionResult) -> list[dict[str, Any]]:
             documents: Sequence[str] = [result.enhanced_transcript or result.raw_transcript]
@@ -246,20 +339,40 @@ class AudioToStructuredData:
                 requirements=requirements,
                 user_requirements=user_requirements,
                 documents=documents,
+                save_json=False,
                 **extract_opts,
             )
 
-        specs = _watched_specs(requirements, watched) if watched else []
         extracted_fields = extract_from(transcription)
-        missing = _empty_fields(extracted_fields, specs)
+        missing = _empty_fields(extracted_fields, specs, requirements)
         attempts = 1
         while missing and attempts <= transcription_retries:
             attempts += 1
-            retry = transcriber.transcribe(file_path=file_path, **transcribe_options)
-            retry_fields = extract_from(retry)
-            retry_missing = _empty_fields(retry_fields, specs)
+            try:
+                retry = transcriber.transcribe(file_path=file_path, **transcribe_options)
+                retry_fields = extract_from(retry)
+            except Exception as exc:
+                # The best result so far stands. A transient error uses up this
+                # try only; any other would come back on every try.
+                if _is_transient(exc):
+                    logger.warning(
+                        "retry %d of the transcription failed (%s); trying again",
+                        attempts - 1,
+                        type(exc).__name__,
+                    )
+                    continue
+                logger.warning(
+                    "retry %d of the transcription failed (%s); keeping the best result so far",
+                    attempts - 1,
+                    type(exc).__name__,
+                )
+                break
+            retry_missing = _empty_fields(retry_fields, specs, requirements)
             if len(retry_missing) < len(missing):
                 transcription, extracted_fields, missing = retry, retry_fields, retry_missing
+
+        if save_json:
+            save_to_json(extracted_fields, json_path)
 
         return PipelineResult(
             transcription=transcription,
