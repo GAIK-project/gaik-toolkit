@@ -110,8 +110,8 @@ export async function signIn(
   });
 
   if (error) {
-    logSignInFailure(email, error.code);
-    return { error: signInErrorMessage(error.code) };
+    logSignInFailure(email, error.code, error.status);
+    return { error: signInErrorMessage(error.code, error.status) };
   }
 
   if (!data.user) {
