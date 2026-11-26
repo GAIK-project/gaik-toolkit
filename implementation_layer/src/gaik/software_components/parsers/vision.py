@@ -27,6 +27,7 @@ from gaik.software_components._log_names import file_tag
 from gaik.software_components.endpoints import check_openai_endpoint
 from gaik.software_components.env_file import load_env_file
 from gaik.software_components.file_type import IMAGE_TYPES, MIME_TYPES, check_file_type
+from gaik.software_components.image_metadata import strip_image_metadata
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.llm.base import ProviderClient, UsageCounter
 from gaik.software_components.llm.factory import create_llm_client
@@ -510,8 +511,8 @@ class VisionParser:
         return images
 
     def _image_to_base64(self, image_bytes: bytes) -> str:
-        """Convert PNG image bytes to base64 string."""
-        return base64.b64encode(image_bytes).decode("utf-8")
+        """Base64 of the image, without the text its file carries besides the pixels."""
+        return base64.b64encode(strip_image_metadata(image_bytes, strict=True)[0]).decode("utf-8")
 
     def _sampling_kwargs(self) -> dict[str, float | str]:
         """Return only sampling options explicitly configured by the caller."""

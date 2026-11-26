@@ -8,6 +8,7 @@ from pathlib import Path
 
 from gaik.software_components._ligatures import expand_ligatures
 from gaik.software_components.file_type import IMAGE_TYPES, MIME_TYPES, check_file_type
+from gaik.software_components.image_metadata import strip_image_metadata
 from gaik.software_components.input_limits import InputLimits
 from gaik.software_components.source_material import SourceMaterial, clean_label
 
@@ -104,5 +105,6 @@ def build_chat_document_content(
 
 
 def _image_part(data: bytes, mime: str) -> dict:
-    encoded = base64.b64encode(data).decode("ascii")
+    # Without the text the file carries besides the pixels (image_metadata).
+    encoded = base64.b64encode(strip_image_metadata(data, strict=True)[0]).decode("ascii")
     return {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{encoded}"}}

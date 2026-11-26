@@ -1,6 +1,7 @@
 """Shared-config multimodal components use canonical messages and validated outputs."""
 
 import base64
+import io
 import json
 from types import SimpleNamespace
 
@@ -15,6 +16,15 @@ from gaik.software_components.parsers.multimodal_parser.chat_content import (
 )
 from gaik.software_components.vision_extractor import VisionExtractor
 from pydantic import BaseModel
+
+
+def _tiny(fmt: str) -> bytes:
+    """A real 2x2 image: the metadata cleaner walks every part of what is sent."""
+    from PIL import Image
+
+    buffer = io.BytesIO()
+    Image.new("RGB", (2, 2), (1, 2, 3)).save(buffer, format=fmt)
+    return buffer.getvalue()
 
 
 class Name(BaseModel):
@@ -228,7 +238,7 @@ def test_webp_image_keeps_media_type_without_platform_mapping(monkeypatch, tmp_p
     # Python < 3.13 has no built-in .webp mapping.
     monkeypatch.setattr(mimetypes, "guess_type", lambda *args, **kwargs: (None, None))
     path = tmp_path / "scan.webp"
-    path.write_bytes(b"RIFF\x10\x00\x00\x00WEBPsynthetic")
+    path.write_bytes(_tiny("WEBP"))
     content = build_chat_document_content([path], "Read this image")
     assert content[-1]["image_url"]["url"].startswith("data:image/webp;base64,")
 
@@ -238,7 +248,7 @@ def test_vision_extractor_uses_shared_structured_output(monkeypatch, tmp_path, p
     from gaik.software_components import llm
 
     path = tmp_path / "input.png"
-    path.write_bytes(b"\x89PNG\r\n\x1a\nsynthetic")
+    path.write_bytes(_tiny("PNG"))
     client = _SharedClient()
     configs = []
     monkeypatch.setattr(llm, "create_llm_client", lambda config: configs.append(config) or client)
