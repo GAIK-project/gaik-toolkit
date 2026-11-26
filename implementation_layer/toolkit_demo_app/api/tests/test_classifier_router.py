@@ -7,6 +7,12 @@ from api.routers import classifier as route
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+# A real 1x1 PNG: the route cleans an image's metadata once its checks pass it.
+_PNG = bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de"
+    "0000000c4944415408d763f8ffff3f0005fe02fea7d6a5640000000049454e44ae426082"
+)
+
 
 @pytest.fixture
 def client(monkeypatch) -> TestClient:
@@ -39,7 +45,7 @@ def client(monkeypatch) -> TestClient:
 def test_parser_choice_reaches_the_classifier(client, parser, expected) -> None:
     response = client.post(
         "/classify",
-        files={"file": ("scan.png", b"\x89PNG\r\n\x1a\n", "image/png")},
+        files={"file": ("scan.png", _PNG, "image/png")},
         data={"classes": "invoice,receipt", "parser": parser},
     )
 

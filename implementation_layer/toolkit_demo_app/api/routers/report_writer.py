@@ -20,12 +20,12 @@ try:
     from utils import get_api_config, sse_event
     from utils.model_allow_list import chat_models, check_model, transcription_models
     from utils.report_runs import report_writer_limits, require_report_run_grant
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
     from api.utils import get_api_config, sse_event
     from api.utils.model_allow_list import chat_models, check_model, transcription_models
     from api.utils.report_runs import report_writer_limits, require_report_run_grant
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 try:
     from utils.errors import error_detail
@@ -321,6 +321,7 @@ async def generate_report(
         problem = await upload_problem(Path(name).suffix, data, check_type=False)
         if problem is not None:
             raise HTTPException(problem.status, f"{name}: {problem.message}")
+        data = await without_image_metadata(Path(name).suffix, data)
         return name, data
 
     try:

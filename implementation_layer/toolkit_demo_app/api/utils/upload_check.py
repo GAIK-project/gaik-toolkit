@@ -16,22 +16,29 @@ so it never holds the API's interpreter, and that process is stopped at a
 deadline.
 
 ``upload_problem`` returns what to answer, or None for a file the route may use.
+``without_image_metadata`` takes the text an image file carries besides its
+pixels out of an image upload before a route uses it.
 """
 
 from __future__ import annotations
 
 import asyncio
+import functools
 import io
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
+from fastapi import HTTPException
+
 try:
     from utils import malware_scan, pdf_content, pdf_process
     from utils.file_content import content_mismatch
+    from utils.image_metadata import UnreadableImageError, strip_image_metadata
 except ImportError:
     from api.utils import malware_scan, pdf_content, pdf_process
     from api.utils.file_content import content_mismatch
+    from api.utils.image_metadata import UnreadableImageError, strip_image_metadata
 
 _OFFICE = {".docx", ".xlsx", ".xlsm"}
 MACRO_MESSAGE = "Files with macros are not accepted. Save the document without macros."
@@ -112,3 +119,31 @@ async def upload_problem(
         text = malware_scan.UNAVAILABLE_MESSAGE
         return UploadProblem(503, text[:1].upper() + text[1:] + ".")
     return None
+
+
+UNREADABLE_IMAGE_MESSAGE = (
+    "The image could not be read to remove the text its file carries besides the "
+    "picture. Save it again as PNG or JPEG and upload it."
+)
+_IMAGE_SUFFIXES = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".tif", ".tiff", ".bmp"})
+
+
+async def without_image_metadata(suffix: str, data: bytes) -> bytes:
+    """An image upload without the text its file carries besides the pixels
+    (EXIF with the GPS position, XMP, IPTC, PNG text, comments, data after the
+    image), so neither a parser nor a model reads it; any other file as it is.
+    The pixels are kept (``image_metadata``). Call it after ``upload_problem``
+    has passed the file: a TIFF, or an image the cleaner cannot walk, is decoded
+    to be cleaned, in the checks' own pool, off the event loop. An image that
+    cannot be cleaned is refused with 422."""
+    if suffix.lower() not in _IMAGE_SUFFIXES:
+        return data
+    loop = asyncio.get_running_loop()
+    try:
+        cleaned, _ = await loop.run_in_executor(
+            _checks, functools.partial(strip_image_metadata, data, strict=True)
+        )
+    except UnreadableImageError as exc:
+        # Not passed on with text no one can see: the user gets the file back.
+        raise HTTPException(status_code=422, detail=UNREADABLE_IMAGE_MESSAGE) from exc
+    return cleaned

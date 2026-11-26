@@ -109,9 +109,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 try:
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 router = APIRouter()
 
@@ -364,6 +364,7 @@ async def audio_pipeline(
     content = await validate_audio_file_size(file)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
+    content = await without_image_metadata(suffix, content)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -562,6 +563,7 @@ async def document_pipeline(
     content = await validate_file_size(file)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
+    content = await without_image_metadata(suffix, content)
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
         tmp_path = tmp.name
@@ -900,6 +902,7 @@ async def audio_pipeline_stream(
             yield sse_event("error", {"message": problem.message})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
+    content = await without_image_metadata(suffix, content)
 
     # Save uploaded file
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
@@ -1390,6 +1393,7 @@ async def document_pipeline_stream(
             yield sse_event("error", {"message": problem.message})
 
         return StreamingResponse(error_gen(), media_type="text/event-stream")
+    content = await without_image_metadata(suffix, content)
 
     file_name = file.filename
 

@@ -49,9 +49,9 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 try:
-    from utils.upload_check import upload_problem
+    from utils.upload_check import upload_problem, without_image_metadata
 except ImportError:
-    from api.utils.upload_check import upload_problem
+    from api.utils.upload_check import upload_problem, without_image_metadata
 
 router = APIRouter()
 
@@ -145,6 +145,7 @@ async def diary_audio_pipeline_stream(
         raise HTTPException(status_code=413, detail=AUDIO_TOO_LARGE_DETAIL)
     if (problem := await upload_problem(suffix, content)) is not None:
         raise HTTPException(status_code=problem.status, detail=problem.message)
+    content = await without_image_metadata(suffix, content)
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
         tmp.write(content)
