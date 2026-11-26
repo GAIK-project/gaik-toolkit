@@ -295,3 +295,20 @@ def test_rag_collections_are_built_on_an_open_model_for_the_team_too(server_env,
 def test_claude_is_not_offered_without_claude_credentials(server_env, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_FOUNDRY_API_KEY")
     assert vision_extractor._offered_models("claude") == ()
+
+
+@pytest.mark.asyncio
+async def test_a_panel_takes_at_most_five_judges(server_env, monkeypatch):
+    def must_not_run(*args, **kwargs):
+        raise AssertionError("no judge may be built for a panel that is too large")
+
+    monkeypatch.setattr(llm_judge, "_make_judge", must_not_run)
+    app = _app((llm_judge, "/llm-judge"))
+    panel = {
+        "extracted_text": "a",
+        "expected_text": "b",
+        "judges": [{"provider": "openai", "model": "gpt-6-luna"}] * 6,
+    }
+    response = await _send(app, "POST", "/llm-judge/panel/text-pair", json=panel)
+    assert response.status_code == 400
+    assert "at most 5" in response.json()["detail"]

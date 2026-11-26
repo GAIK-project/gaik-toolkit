@@ -66,6 +66,9 @@ DEFAULT_PANEL_JUDGES: tuple[dict[str, str], ...] = (
     {"provider": "openai", "model": "gpt-6-sol"},
     {"provider": "openai", "model": "gpt-5.6-terra"},
 )
+# One panel request is one demo run, also on the trial allowance, so it calls a
+# bounded number of judges; the demo's own panel sends three.
+MAX_PANEL_JUDGES = 5
 JUDGE_NOT_AVAILABLE_DETAIL = (
     "LLMJudge requires gaik>=0.4.0. "
     "Provider extras (gaik[llm-anthropic] / gaik[llm-google]) are needed "
@@ -422,6 +425,11 @@ async def panel_text_pair(request: PanelTextPairRequest):
 
     if len(specs) < 2:
         raise HTTPException(status_code=400, detail="Panel needs at least 2 judges")
+    if len(specs) > MAX_PANEL_JUDGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"A panel takes at most {MAX_PANEL_JUDGES} judges",
+        )
     if not request.extracted_text and not request.expected_text:
         raise HTTPException(status_code=400, detail="Both inputs are empty")
 

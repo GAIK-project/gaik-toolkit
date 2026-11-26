@@ -65,7 +65,9 @@ text layer. It roughly triples the output tokens of an extraction.
 `/solution-wizard` is open to every visitor and offers two wizards.
 
 - **Wizard V2** runs as its own service, where each session's agent and PoC runs are
-  kept apart from other services. The page links to `WIZARD_V2_URL` when that is set;
+  kept apart from other services. It signs in with the demo's own accounts: an approved
+  account opens it with the same e-mail and password (on Rahti https://wizard-v2-web-gaik.2.rahtiapp.fi,
+  `WIZARD_SUPABASE_ACCESS=access_requests`). The page links to `WIZARD_V2_URL` when that is set;
   the server reads it at run time, so a deployment sets it with `oc set env` and needs
   no rebuild.
 - **The first wizard** runs in the browser at `/solution-wizard/first`, and on anyone's
