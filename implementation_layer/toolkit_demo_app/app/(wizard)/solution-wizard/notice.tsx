@@ -2,6 +2,7 @@
 
 import { DemoPageHeader } from "@/components/demo/demo-page-header";
 import { buttonVariants } from "@/components/ui/button";
+import { buildAccessRequestMailto } from "@/lib/onboarding/mailto";
 import { cn } from "@/lib/utils";
 import { ArrowRight, ArrowUpRight, BookOpen, Wand2 } from "lucide-react";
 import Image from "next/image";
@@ -171,7 +172,18 @@ export function SolutionWizardNotice({
               In the browser, keep the tab open: the session and its files end
               when you leave the page.
             </p>
-          ) : null}
+          ) : (
+            <p className="text-muted-foreground text-sm leading-6">
+              It also runs in this browser for accounts the GAIK team has opened
+              it for.{" "}
+              <a
+                href={buildAccessRequestMailto("first wizard in the browser")}
+                className={linkClassName}
+              >
+                Request access
+              </a>
+            </p>
+          )}
         </div>
         <FirstWizardTerminal />
       </section>
