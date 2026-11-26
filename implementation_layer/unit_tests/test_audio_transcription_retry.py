@@ -88,7 +88,7 @@ def test_empty_required_field_triggers_one_retry(monkeypatch):
 
 def test_worse_retry_keeps_the_first_run(monkeypatch):
     calls = _install(monkeypatch, [CUT, CUT])
-    result = _run()
+    result = _run(transcription_retries=1)
     assert calls["transcribe"] == 2
     assert result.transcription.raw_transcript == CUT
     assert result.transcription_attempts == 2
@@ -132,12 +132,19 @@ def test_retries_can_be_turned_off(monkeypatch):
     assert result.empty_fields == ["reporter", "asset_id"]
 
 
-def test_retry_count_is_honoured(monkeypatch):
+def test_default_makes_two_retries(monkeypatch):
     calls = _install(monkeypatch, [CUT, CUT, FULL])
-    result = _run(transcription_retries=2)
+    result = _run()
     assert calls["transcribe"] == 3
     assert result.transcription_attempts == 3
     assert result.empty_fields == []
+
+
+def test_retry_count_caps_the_retries(monkeypatch):
+    calls = _install(monkeypatch, [CUT, CUT, FULL])
+    result = _run(transcription_retries=1)
+    assert calls["transcribe"] == 2
+    assert result.empty_fields == ["reporter", "asset_id"]
 
 
 @pytest.mark.parametrize("bad", [-1, 1.5, True, "1"])

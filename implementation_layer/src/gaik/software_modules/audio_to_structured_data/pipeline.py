@@ -160,7 +160,7 @@ class AudioToStructuredData:
         schema: type | None = None,
         requirements: ExtractionRequirements | CompositeExtractionRequirements | None = None,
         retry_when_empty: Sequence[str] | None = None,
-        transcription_retries: int = 1,
+        transcription_retries: int = 2,
     ) -> PipelineResult:
         """
         Execute the pipeline: transcribe then extract structured data.
@@ -185,7 +185,7 @@ class AudioToStructuredData:
                 retries. A name the schema lacks raises :class:`ValueError`
                 before anything is extracted.
             transcription_retries: The most retries to make for
-                ``retry_when_empty`` (default 1). The run with the fewest empty
+                ``retry_when_empty`` (default 2). The run with the fewest empty
                 named fields is returned, the earliest on a tie.
 
         Every option name must be a parameter of the component it goes to.
