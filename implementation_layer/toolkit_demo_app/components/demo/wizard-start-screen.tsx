@@ -82,7 +82,7 @@ export function WizardStartScreen({
         };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center overflow-y-auto px-4 py-8">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-center-safe overflow-y-auto px-4 py-8">
       <div className="w-full max-w-2xl">
         <motion.div {...rise(0)} className="flex flex-col items-center text-center">
           <span className="bg-primary/10 text-primary flex h-11 w-11 items-center justify-center rounded-2xl">
