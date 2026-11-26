@@ -53,8 +53,10 @@ from gaik.observability import (
 # Import shared configuration
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.blocked import checked_openai
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import _accepts_effort_none, normalize_chat_kwargs
+from gaik.software_components.llm.retries import is_transient_error
 
 # -----------------------------------------------------------------------------
 # Setup
@@ -84,8 +86,9 @@ def _with_retries(call, tries: int = 4):
             invalid_outputs += 1
             if invalid_outputs > 1 or i == tries - 1:
                 raise
-        except (RateLimitError, APITimeoutError, APIError):
-            if i == tries - 1:
+        except (RateLimitError, APITimeoutError, APIError) as error:
+            # A refused request (a 400 such as a content filter) is refused again.
+            if i == tries - 1 or not is_transient_error(error):
                 raise
             time.sleep(2**i)  # backoff
 
@@ -200,7 +203,7 @@ def _parse_with(
     sampling = _sampling_kwargs(temperature, reasoning_effort)
     sampling = normalize_chat_kwargs(model, {"top_p": 1.0, **sampling}, config=config)
     return _with_retries(
-        lambda: client.beta.chat.completions.parse(
+        lambda: checked_openai(client).beta.chat.completions.parse(
             model=model,
             messages=messages,
             response_format=response_format,

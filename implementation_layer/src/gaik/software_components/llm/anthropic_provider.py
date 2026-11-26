@@ -35,6 +35,10 @@ from gaik.software_components.llm.base import (
     FitToBounds,
     UsageCounter,
 )
+from gaik.software_components.llm.blocked import (
+    blocked_request_error,
+    check_anthropic_response,
+)
 from gaik.software_components.llm.content import image_data
 
 logger = logging.getLogger(__name__)
@@ -407,6 +411,20 @@ class AnthropicProvider:
             options["max_tokens"] = options.pop(token_keys[0])
         return options
 
+    def _blocked(self, error: BaseException, params: dict[str, Any]) -> None:
+        """Raise ContentBlockedError for a content-filter refusal of the request
+        (Azure Foundry filters Claude too); return for any other error."""
+        blocked = blocked_request_error(error, provider=self.provider, model=str(params["model"]))
+        if blocked is not None:
+            raise blocked from error
+
+    def _create(self, params: dict[str, Any]) -> Any:
+        try:
+            return self.raw.messages.create(**params)
+        except Exception as error:
+            self._blocked(error, params)
+            raise
+
     def chat(self, messages: list[ChatMessage], **kwargs: Any) -> ChatResponse:
         kwargs = self._options(kwargs)
         system, rest = self._split_system(messages)
@@ -418,10 +436,11 @@ class AnthropicProvider:
         if system is not None:
             params["system"] = system
         params.update(kwargs)
-        response = self.raw.messages.create(**params)
+        response = self._create(params)
         text_blocks = [b.text for b in response.content if getattr(b, "type", None) == "text"]
         usage = _usage(response)
         self.usage.add(usage)
+        check_anthropic_response(response, provider=self.provider, model=str(params["model"]))
         return ChatResponse(
             text="".join(text_blocks),
             model=response.model,
@@ -473,14 +492,16 @@ class AnthropicProvider:
         try:
             response = self.raw.messages.create(**params)
         except anthropic.BadRequestError as error:
+            self._blocked(error, params)
             # A schema strict mode cannot express (an open dict field, say) is
             # still worth sending as a plain forced tool.
             if "strict" not in tool or not _is_schema_rejection(error):
                 raise
             tool.pop("strict")
             tool["input_schema"] = schema
-            response = self.raw.messages.create(**params)
+            response = self._create(params)
         self.usage.add(_usage(response))
+        check_anthropic_response(response, provider=self.provider, model=str(model))
         if getattr(response, "stop_reason", None) == "max_tokens":
             raise ValueError(
                 f"Anthropic response for '{tool_name}' was cut off at "
@@ -522,10 +543,17 @@ class AnthropicProvider:
         if system is not None:
             params["system"] = system
         params.update(kwargs)
-        with self.raw.messages.stream(**params) as stream:
-            for text in stream.text_stream:
-                if text:
-                    yield text
+        try:
+            with self.raw.messages.stream(**params) as stream:
+                for text in stream.text_stream:
+                    if text:
+                        yield text
+                check_anthropic_response(
+                    stream.get_final_message(), provider=self.provider, model=str(params["model"])
+                )
+        except Exception as error:
+            self._blocked(error, params)
+            raise
 
     def embed(self, texts: list[str], **kwargs: Any) -> list[list[float]]:
         raise NotImplementedError(

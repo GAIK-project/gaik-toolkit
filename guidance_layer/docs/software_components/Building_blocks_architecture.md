@@ -302,15 +302,30 @@ def convenience_function(input_path: str, **options) -> ResultModel:
 2. **Retry Logic**
    - Use `_with_retries()` wrapper for API calls
    - Handle: RateLimitError, APITimeoutError, APIError
+   - Retry only what may pass on another try (`llm.retries.is_transient_error`:
+     429, 5xx, a timeout, a lost connection); a refused request such as a 400 is
+     raised at once
    - Exponential backoff: 2^attempt seconds
    - Default 4 retry attempts
 
-3. **Pydantic Result Models**
+3. **Blocked or Refused Replies**
+   - When the provider's content filter blocks the request or the reply, or the
+     model declines to answer, the call raises
+     `gaik.software_components.llm.ContentBlockedError` (`reason` is
+     `"content_filter"` or `"refusal"`) instead of returning empty text. It is
+     not retried: the same request is blocked again
+   - A component that keeps the raw OpenAI/Azure client (`build_compat_client`)
+     calls it through `llm.blocked.checked_openai(client)` for the same checks
+   - Show the user a sentence of your own, for example "The content was blocked
+     by the model's safety filter"; the error's `refusal_text` can echo the
+     user's document and stays out of its message
+
+4. **Pydantic Result Models**
    - Use Pydantic for type-safe results
    - Include helper methods (save, export, etc.)
    - Provide clear field documentation
 
-4. **Convenience Functions**
+5. **Convenience Functions**
    - Provide simple one-shot functions for common use cases
    - Create config internally with defaults
    - Wrap main class instantiation

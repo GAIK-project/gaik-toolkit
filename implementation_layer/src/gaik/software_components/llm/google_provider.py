@@ -24,6 +24,7 @@ from gaik.software_components.llm.base import (
     ChatResponse,
     UsageCounter,
 )
+from gaik.software_components.llm.blocked import check_google_response
 from gaik.software_components.llm.content import image_data
 
 logger = logging.getLogger(__name__)
@@ -405,6 +406,7 @@ class GoogleProvider:
         )
         usage = _usage(response)
         self.usage.add(usage)
+        check_google_response(response, provider=self.provider, model=model)
         return ChatResponse(
             text=response.text or "",
             model=model,
@@ -480,6 +482,7 @@ class GoogleProvider:
             model,
         )
         self.usage.add(_usage(response))
+        check_google_response(response, provider=self.provider, model=model)
         if response.parsed is not None:
             if isinstance(response.parsed, response_format):
                 return response.parsed
@@ -504,6 +507,7 @@ class GoogleProvider:
 
         chunk, stream = self._in_location(first_chunk, model)
         while chunk is not None:
+            check_google_response(chunk, provider=self.provider, model=model)
             if chunk.text:
                 yield chunk.text
             chunk = next(stream, None)

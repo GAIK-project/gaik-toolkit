@@ -14,6 +14,7 @@ from pydantic import BaseModel
 
 from gaik.software_components.config import get_openai_config
 from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.blocked import checked_openai
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.providers import resolve_provider
@@ -564,7 +565,7 @@ class TranscriptEnhancer:
         # OpenAI's typed overloads can't match a ``**dict[str, Any]`` splat, so
         # ignore the spurious overload-mismatch warning. The runtime kwargs are
         # always valid (model name, messages, optional ``reasoning_effort``).
-        response = self.client.chat.completions.create(  # type: ignore[call-overload]
+        response = checked_openai(self.client).chat.completions.create(  # type: ignore[call-overload]
             model=self.model,
             messages=messages,
             **normalize_chat_kwargs(

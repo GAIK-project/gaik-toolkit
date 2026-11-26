@@ -10,6 +10,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.blocked import checked_openai
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
 from gaik.software_components.llm.retries import with_retries
@@ -264,7 +265,7 @@ class FormUnderstander:
                     response_format=LabelMapping,
                     temperature=0,
                 )
-            response = self.client.beta.chat.completions.parse(
+            response = checked_openai(self.client).beta.chat.completions.parse(
                 model=self.model,
                 messages=messages,
                 response_format=LabelMapping,

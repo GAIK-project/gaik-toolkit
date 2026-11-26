@@ -31,9 +31,11 @@ except ImportError as exc:
     ) from exc
 
 from gaik.software_components.llm.base import ProviderClient
+from gaik.software_components.llm.blocked import checked_openai
 from gaik.software_components.llm.config import get_llm_config
 from gaik.software_components.llm.factory import build_compat_client
 from gaik.software_components.llm.parameters import normalize_chat_kwargs
+from gaik.software_components.llm.retries import is_transient_error
 from gaik.software_components.source_material import (
     SourceMaterial,
     source_material_messages,
@@ -112,8 +114,9 @@ def _with_retries(call: Any, *, tries: int = 4) -> Any:
     for attempt in range(tries):
         try:
             return call()
-        except (RateLimitError, APITimeoutError, APIError):
-            if attempt == tries - 1:
+        except (RateLimitError, APITimeoutError, APIError) as error:
+            # A refused request (a 400 such as a content filter) is refused again.
+            if attempt == tries - 1 or not is_transient_error(error):
                 raise
             time.sleep(2**attempt)
     raise RuntimeError("_with_retries: loop terminated without return or raise")
@@ -310,7 +313,7 @@ class TabularAgent:
                 )
             )
         response = _with_retries(
-            lambda: client.beta.chat.completions.parse(
+            lambda: checked_openai(client).beta.chat.completions.parse(
                 model=self._model,
                 messages=messages,
                 response_format=schema,
@@ -552,7 +555,7 @@ class TabularAgent:
             return (response.text or "").strip() if response else ""
 
         response = _with_retries(
-            lambda: client.chat.completions.create(
+            lambda: checked_openai(client).chat.completions.create(
                 model=self._model, messages=messages, **self._openai_kwargs()
             )
         )
