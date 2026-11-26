@@ -20,6 +20,7 @@ import pytest
 WIZARD = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(WIZARD))
 sys.path.insert(0, str(WIZARD / "scripts"))
+sys.path.insert(0, str(WIZARD / "ai_act_screening" / "scripts"))
 sys.path.insert(0, str(WIZARD / "src"))
 
 import agent_tool_guard  # noqa: E402
@@ -421,32 +422,50 @@ def test_the_table_lists_every_option_each_script_takes(script):
             assert (TABLE["scripts"][script][long] != "flag") == takes_value, long
 
 
-def test_every_script_in_the_scripts_folder_is_listed_or_left_out():
-    scripts = {p.name for p in (WIZARD / "scripts").glob("*.py") if not p.name.startswith("_")}
+def test_every_script_in_the_scripts_folders_is_listed_or_left_out():
+    folders = {"scripts", *TABLE["folders"].values()}
+    scripts = {
+        p.name
+        for folder in folders
+        for p in (WIZARD / folder).glob("*.py")
+        if not p.name.startswith("_")
+    }
     listed = set(TABLE["scripts"]) | {k.split(" ", 1)[0] for k in TABLE["left_out"]}
     assert scripts == listed
+    for script, folder in TABLE["folders"].items():
+        assert (WIZARD / folder / script).is_file(), f"{script} is not in {folder}"
 
 
 def _skill_commands() -> list[str]:
-    """Every ``python scripts/...`` and ``python -c`` command SKILL.md gives the agent."""
+    """Every ``python scripts/...``, ``python <screening_dir>/scripts/...`` and
+    ``python -c`` command SKILL.md gives the agent."""
     text = (WIZARD / "SKILL.md").read_text(encoding="utf-8")
     text = re.sub(r"\\\n\s*", " ", text)  # line continuations
     found = re.findall(r"^\s*(python3? scripts/\S+(?: [^\n`]*)?)$", text, re.M)
-    found += re.findall(r"`(python3? (?:scripts/|-c )[^`]+)`", text)
+    # An inline command may wrap onto the next line of the paragraph.
+    found += [
+        " ".join(c.split())
+        for c in re.findall(r"`(python3? (?:(?:<screening_dir>/)?scripts/|-c )[^`]+)`", text)
+    ]
     # `python scripts/<name>.py` names the form of every command, not a command.
     return sorted({c.strip() for c in found if "scripts/<" not in c})
 
 
 def test_every_command_skill_md_gives_the_agent_passes_the_guard(guard):
     for script in TABLE["scripts"]:
-        (guard.cwd / "scripts" / script).write_text("")
+        folder = guard.cwd / TABLE["folders"].get(script, "scripts")
+        folder.mkdir(parents=True, exist_ok=True)
+        (folder / script).write_text("")
     bp = guard.session / "use_case.blueprint.json"
     _blueprint(bp)
     commands = _skill_commands()
     assert len(commands) >= 10
+    assert any("check_screening.py" in c for c in commands)
+    assert any("render_brief.py" in c for c in commands)
     refused = {}
     for command in commands:
         command = command.replace("<output_dir>", guard.session.as_posix())
+        command = command.replace("<screening_dir>", "ai_act_screening")
         command = command.replace("...", f"--blueprint {bp.as_posix()}")
         command = re.sub(r"<[^<>]+>", "Value", command)  # the other placeholders
         if "promote_template.py" in command:
@@ -799,3 +818,64 @@ def test_without_isjunction_other_systems_have_no_junctions_to_look_for(monkeypa
     monkeypatch.setattr(agent_tool_guard.os, "lstat", lstat)
 
     assert not agent_tool_guard._is_link("out")
+
+
+# --- the AI Act screening scripts ---------------------------------------------
+
+
+def test_the_ai_act_screening_scripts_run_from_their_own_folder(guard):
+    out = guard.session.as_posix()
+    run = "python ai_act_screening/scripts/"
+    for command in (
+        f"{run}check_screening.py --pack {out} --status",
+        f"{run}check_screening.py --pack {out} --hash",
+        f"{run}check_screening.py --pack {out} --transcript {out}/conversation.md",
+        f"{run}render_brief.py --pack {out} --outdated",
+        f"{run}render_brief.py --pack {out}",
+        f"python {(guard.cwd / 'ai_act_screening' / 'scripts').as_posix()}/render_brief.py "
+        f"--pack {out}",
+    ):
+        assert guard.check("Bash", {"command": command}) is None, command
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "python ai_act_screening/scripts/check_screening.py --pack {out} --status --force",
+        "python ai_act_screening/scripts/check_screening.py --pack {out} --stat",
+        "python ai_act_screening/scripts/render_brief.py --pack {out} --output x.md",
+        "python ai_act_screening/scripts/render_brief.py --pack /etc",
+        "python ai_act_screening/scripts/check_screening.py --pack {out} --screening /etc/x",
+        "python scripts/check_screening.py --pack {out} --status",
+        "python ai_act_screening/scripts/validate_blueprint.py --blueprint {out}/b.json",
+        "python ai_act_screening/scripts/check_screening.py --pack {out} --status # note",
+    ],
+)
+def test_the_ai_act_screening_scripts_take_only_their_listed_options(guard, command):
+    assert guard.check("Bash", {"command": command.format(out=guard.session.as_posix())})
+
+
+def test_a_screening_script_outside_its_folder_is_refused_with_where_it_is(guard):
+    command = f"python scripts/check_screening.py --pack {guard.session.as_posix()} --status"
+    reason = guard.check("Bash", {"command": command})
+    assert reason and "python ai_act_screening/scripts/check_screening.py" in reason
+
+
+def test_the_brief_is_not_written_through_a_link_in_the_pack(guard, tmp_path):
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    command = f"python ai_act_screening/scripts/render_brief.py --pack {guard.session.as_posix()}"
+    assert guard.check("Bash", {"command": command}) is None
+    link = guard.session / "docs"
+    _link_or_skip(link, elsewhere)
+    reason = guard.check("Bash", {"command": command})
+    assert reason and link.as_posix() in reason
+
+
+@pytest.mark.parametrize("folder", ["", "/abs/scripts", "../elsewhere", 3])
+def test_a_script_folder_outside_the_wizard_is_refused(tmp_path, folder):
+    table = {**TABLE, "folders": {"check_screening.py": folder}}
+    path = tmp_path / "agent_scripts.json"
+    path.write_text(json.dumps(table), encoding="utf-8")
+    with pytest.raises(ValueError, match="folder"):
+        agent_tool_guard.load_folders(path)

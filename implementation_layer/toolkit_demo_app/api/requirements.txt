@@ -12,7 +12,7 @@ openpyxl>=3.1.0
 gaik[all-cpu,multimodal-parser,postgres-agent,tabular-agent,multi-source-report-generator-agentic,multi-source-report-generator-docx]==0.12.0
 # The first Solution Wizard (routers/solution_wizard.py): one Claude Agent SDK
 # session per user. The wheel carries the claude CLI it runs.
-claude-agent-sdk>=0.2.97
+claude-agent-sdk>=0.2.177
 boto3>=1.35.0
 # CPU-only builds from the PyTorch index (README: "Pinned images and the API lock"); without
 # them gaik[all-cpu] would resolve the ~2GB CUDA build.

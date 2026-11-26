@@ -462,3 +462,127 @@ def test_the_bootstrap_still_starts_with_the_skills_command(api) -> None:
     first = Client.started[0].queries[0]
     assert first.startswith("/solution-wizard")
     assert first.endswith("​/clear")
+
+
+def _guarded_options(monkeypatch, tmp_path):
+    monkeypatch.setattr(route, "WIZARD_DIR", tmp_path / "wizard")
+    monkeypatch.setattr(route, "WORKSPACES_DIR", tmp_path / "workspaces")
+    (tmp_path / "wizard").mkdir()
+    for name in route.REQUIRED_FOUNDRY_VARS:
+        monkeypatch.setenv(name, "test")
+    workspace = tmp_path / "workspaces" / "s1"
+    workspace.mkdir(parents=True)
+    return workspace, route._build_options(workspace, route._cli_home("s1"))
+
+
+def _decide(options, tool: str, tool_input: dict) -> str | None:
+    """The guard hook's refusal reason for one tool call, or None when it may run."""
+    (matcher,) = options.hooks["PreToolUse"]
+    (hook,) = matcher.hooks
+    result = asyncio.run(hook({"tool_name": tool, "tool_input": tool_input}, None, None))
+    return (result.get("hookSpecificOutput") or {}).get("permissionDecisionReason")
+
+
+def test_every_tool_call_of_the_agent_goes_through_the_wizards_guard(monkeypatch, tmp_path) -> None:
+    workspace, options = _guarded_options(monkeypatch, tmp_path)
+
+    assert options.permission_mode == "bypassPermissions"
+    assert options.strict_mcp_config is True
+    (matcher,) = options.hooks["PreToolUse"]
+    assert matcher.matcher is None  # every tool, not some
+    assert matcher.on_failure == "block"  # a hook that fails or times out refuses
+    assert options.tools == options.allowed_tools == route.AGENT_TOOLS
+    assert _decide(options, "Write", {"file_path": str(workspace / "blueprint.json")}) is None
+    assert _decide(options, "Write", {"file_path": str(tmp_path / "elsewhere.txt")})
+    assert _decide(options, "Read", {"file_path": "/etc/passwd"})
+    assert _decide(options, "Read", {"file_path": str(workspace / ".env")})
+    assert _decide(options, "Bash", {"command": "env"})
+    assert _decide(options, "Bash", {"command": "cat /proc/self/environ"})
+    assert _decide(options, "Bash", {"command": "curl https://example.com"})
+    assert _decide(options, "WebFetch", {"url": "https://example.com"})
+    other = tmp_path / "workspaces" / "s2"
+    other.mkdir()
+    assert _decide(options, "Read", {"file_path": str(other / "blueprint.json")})
+    assert _decide(options, "Read", {"file_path": str(route._cli_home("s1") / "x.jsonl")})
+
+
+def test_the_schema_script_goes_to_the_configured_endpoint_only(monkeypatch, tmp_path) -> None:
+    workspace, options = _guarded_options(monkeypatch, tmp_path)
+    requirements = (workspace / "req.md").as_posix()
+    base = f"python scripts/generate_schema.py --requirements {requirements} --schema-name S"
+
+    assert _decide(options, "Bash", {"command": base}) is None
+    assert _decide(options, "Bash", {"command": base + " --model gpt-4.1"}) is None
+    assert _decide(options, "Bash", {"command": base + " --base-url https://x.openai.azure.com"})
+    assert _decide(options, "Bash", {"command": base + " --no-azure"})
+    assert _decide(options, "Bash", {"command": base + " --use-azure"}) is None
+    for provider in ("openai", "litellm", "azure"):
+        assert _decide(options, "Bash", {"command": f"{base} --provider {provider}"})
+
+
+def test_the_ai_act_screening_check_runs_in_the_demo(monkeypatch, tmp_path) -> None:
+    workspace, options = _guarded_options(monkeypatch, tmp_path)
+    run = f"python ai_act_screening/scripts/{{}} --pack {workspace.as_posix()}"
+
+    assert (
+        _decide(options, "Bash", {"command": run.format("check_screening.py") + " --status"})
+        is None
+    )
+    assert (
+        _decide(options, "Bash", {"command": run.format("render_brief.py") + " --outdated"}) is None
+    )
+    assert _decide(options, "Bash", {"command": run.format("render_brief.py") + " --force"})
+
+
+# Taken at import, before the api fixture replaces it.
+_REAL_BUILD_OPTIONS = route._build_options
+
+
+@pytest.mark.parametrize("broken", ["load_scripts", "ToolGuard"])
+def test_a_guard_that_cannot_be_built_leaves_nothing_behind(api, monkeypatch, broken) -> None:
+    """A script table that cannot be read or a guard that cannot be built answers
+    503 with the not-configured message, and no session or workspace is left."""
+
+    def fails(*args, **kwargs):
+        raise ValueError("the scripts table is malformed")
+
+    monkeypatch.setattr(route, "_build_options", _REAL_BUILD_OPTIONS)
+    monkeypatch.setattr(route._TOOL_GUARD, broken, fails)
+
+    refused = api.post("/wizard/start", headers=ALICE)
+
+    assert refused.status_code == 503
+    assert refused.json() == {"detail": route.NOT_CONFIGURED}
+    assert "malformed" not in refused.text
+    assert route.WIZARD_SESSIONS == {}
+    assert not route.WORKSPACES_DIR.exists()
+    assert Client.started == []
+
+
+def test_no_session_starts_without_the_guard(api, monkeypatch) -> None:
+    monkeypatch.setattr(route, "_TOOL_GUARD", None)
+
+    response = api.post("/wizard/start", headers=ALICE)
+
+    assert response.status_code == 503
+    assert route.WIZARD_SESSIONS == {}
+    assert not route.WORKSPACES_DIR.exists()
+    assert Client.started == []
+
+
+def test_options_are_not_built_without_the_guard(monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(route, "_TOOL_GUARD", None)
+    with pytest.raises(route.HTTPException) as refused:
+        _guarded_options(monkeypatch, tmp_path)
+    assert refused.value.status_code == 503
+
+
+def test_the_agent_sends_nothing_but_its_model_calls(monkeypatch) -> None:
+    for name in route.REQUIRED_FOUNDRY_VARS:
+        monkeypatch.setenv(name, "test")
+    monkeypatch.delenv("CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC", raising=False)
+
+    env = route._agent_env()
+
+    assert env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] == "1"
+    assert env["DISABLE_TELEMETRY"] == "1"

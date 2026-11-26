@@ -10,7 +10,8 @@ also sees the calls the CLI would approve by itself (``ls``, reading a file):
   wizard's own files (SKILL.md, references, templates, scripts);
 * ``.env`` files are not read or written, wherever they are: they hold keys
   (``.env.example`` is a template and may be);
-* Bash runs only the wizard's scripts, one plain command at a time, with the
+* Bash runs only the wizard's scripts (``scripts/`` and the AI Act screening's
+  ``ai_act_screening/scripts/``), one plain command at a time, with the
   options ``scripts/agent_scripts.json`` lists (or ``--help`` alone): no shell
   operators, redirection or variables, so nothing else can be chained on; a
   script does not run while a folder it writes into holds a link it would follow,
@@ -112,6 +113,29 @@ def load_writes(table: Path = SCRIPTS_TABLE) -> dict[str, list[str]]:
         if not isinstance(folders, list) or not all(isinstance(f, str) for f in folders):
             raise ValueError(f"{table.name}: 'writes' for {script} must be a list of folders")
     return writes
+
+
+#: Where a listed script is, relative to the wizard, when the table names no folder.
+_SCRIPTS_FOLDER = "scripts"
+
+
+def load_folders(table: Path = SCRIPTS_TABLE) -> dict[str, str]:
+    """The folder, relative to the wizard, of each listed script not in ``scripts/``."""
+    data = json.loads(table.read_text(encoding="utf-8"))
+    folders = data.get("folders", {})
+    if not isinstance(folders, dict):
+        raise ValueError(f"{table.name}: 'folders' must map a script to its folder")
+    for script, folder in folders.items():
+        if (
+            not isinstance(folder, str)
+            or not folder
+            or os.path.isabs(folder)
+            or ".." in PurePath(folder).parts
+        ):
+            raise ValueError(
+                f"{table.name}: the folder of {script} must be a folder inside the wizard"
+            )
+    return folders
 
 
 def endpoint_ok(value: str) -> bool:
@@ -357,6 +381,7 @@ class ToolGuard:
         extra_tools: frozenset[str] = frozenset(),
         protected: list[Path] | None = None,
         writes: dict[str, list[str]] | None = None,
+        folders: dict[str, str] | None = None,
     ) -> None:
         self.cwd = Path(os.path.realpath(wizard_dir))
         self.output = Path(os.path.realpath(output_dir))
@@ -373,6 +398,8 @@ class ToolGuard:
         self.left_out = left_out if left_out is not None else load_left_out()
         #: The folders each script writes into, checked for links before it runs.
         self.writes = writes if writes is not None else load_writes()
+        #: The folder of each script not in scripts/; a script runs only from its own.
+        self.folders = folders if folders is not None else load_folders()
         #: The caller's own tools (v2's in-process gate tools), which check
         #: their own input.
         self.extra_tools = extra_tools
@@ -469,14 +496,17 @@ class ToolGuard:
         name = Path(script).name
         if name in self.left_out and name not in self.scripts:
             return f"{name} is not run by the agent here: {self.left_out[name]}."
-        options = self.scripts.get(Path(script).name)
-        if options is None or not _inside(script, [self.cwd / "scripts"], self.cwd):
+        options = self.scripts.get(name)
+        if options is None:
             return allowed
+        folder = self.folders.get(name, _SCRIPTS_FOLDER)
+        if not _inside(script, [self.cwd / folder], self.cwd):
+            return f"{name} is run as `python {folder}/{name}`. " + allowed
         if argv[2:] == ["--help"]:
             return None  # argparse lists the options and exits before the script runs
         given = self._options(argv[2:], options)
         if isinstance(given, str):
-            return f"{given} {Path(script).name} takes {', '.join(options)}. " + allowed
+            return f"{given} {name} takes {', '.join(options)}. " + allowed
         for option, value in given.items():
             kind = options[option]
             if kind == _PATH and (self._env_file(value) or not self._writable(value)):
@@ -507,7 +537,7 @@ class ToolGuard:
         """The folders ``script`` writes into with these options (``writes`` in
         agent_scripts.json): under its --output-dir, or without one where it
         writes instead, the --blueprint's folder or, for the scaffolder, the
-        blueprint's package.output_dir."""
+        blueprint's package.output_dir; for the AI Act screening scripts, the --pack."""
         subfolders = self.writes[script]
         if "--output-dir" in given:
             base = _real(given["--output-dir"], self.cwd)
@@ -519,6 +549,8 @@ class ToolGuard:
                 # One outside the output folder is refused by _check_blueprint.
                 if isinstance(output_dir, str) and output_dir and self._writable(output_dir):
                     base = _real(output_dir, self.cwd)
+        elif "--pack" in given:
+            base = _real(given["--pack"], self.cwd)
         else:
             return []  # the script stops without them
         return [base if sub == "." else base / sub for sub in subfolders]

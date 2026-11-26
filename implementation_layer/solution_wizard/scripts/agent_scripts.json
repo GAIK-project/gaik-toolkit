@@ -1,13 +1,24 @@
 {
-  "about": "The scripts the wizard agent may run and every option each takes, read by agent_tool_guard.py. A path must be in the session's output folder, a url a known provider's https endpoint. Options are spelled out in full, because argparse accepts an abbreviation the guard would not recognise. test_agent_tool_guard.py fails when a script's argparse options differ from what is listed here and under left_out, or when SKILL.md runs a script that is not listed. \"writes\" lists the folders each script writes into, relative to its --output-dir (without one, the --blueprint's folder, or for scaffold_poc.py the blueprint's package.output_dir), and [] for a script that writes nothing: the guard refuses a run when one of them, or an entry directly in one, is a link the script would follow, and does not run a listed script without an entry here.",
+  "about": "The scripts the wizard agent may run and every option each takes, read by agent_tool_guard.py. A path must be in the session's output folder, a url a known provider's https endpoint. Options are spelled out in full, because argparse accepts an abbreviation the guard would not recognise. test_agent_tool_guard.py fails when a script's argparse options differ from what is listed here and under left_out, or when SKILL.md runs a script that is not listed. \"writes\" lists the folders each script writes into, relative to its --output-dir (without one, the --blueprint's folder, or for scaffold_poc.py the blueprint's package.output_dir; for the AI Act screening scripts, their --pack), and [] for a script that writes nothing: the guard refuses a run when one of them, or an entry directly in one, is a link the script would follow, and does not run a listed script without an entry here. \"folders\" names the folder, relative to the wizard, of each script that is not in scripts/; the guard runs a script only from its own folder.",
   "kinds": {
     "path": "a path in the session's output folder",
     "value": "any plain value",
     "url": "a known provider's own https endpoint",
     "flag": "an option without a value"
   },
+  "folders": {
+    "check_screening.py": "ai_act_screening/scripts",
+    "render_brief.py": "ai_act_screening/scripts"
+  },
   "scripts": {
     "check_requirements.py": {"--blueprint": "path"},
+    "check_screening.py": {
+      "--pack": "path",
+      "--screening": "path",
+      "--transcript": "path",
+      "--hash": "flag",
+      "--status": "flag"
+    },
     "generate_bpmn.py": {"--blueprint": "path", "--output-dir": "path", "--skip-validation": "flag"},
     "generate_docs.py": {"--blueprint": "path", "--output-dir": "path", "--skip-validation": "flag"},
     "generate_mermaid.py": {"--blueprint": "path", "--output-dir": "path", "--skip-validation": "flag"},
@@ -21,6 +32,7 @@
       "--model": "value",
       "--base-url": "url"
     },
+    "render_brief.py": {"--pack": "path", "--outdated": "flag"},
     "run_wizard.py": {"--blueprint": "path", "--output-dir": "path", "--show-registry": "flag"},
     "scaffold_poc.py": {
       "--blueprint": "path",
@@ -32,10 +44,12 @@
   },
   "writes": {
     "check_requirements.py": [],
+    "check_screening.py": [],
     "generate_bpmn.py": ["."],
     "generate_docs.py": [".", "docs"],
     "generate_mermaid.py": ["."],
     "generate_schema.py": [".", "schemas"],
+    "render_brief.py": [".", "docs"],
     "run_wizard.py": ["."],
     "scaffold_poc.py": [
       ".",
