@@ -4,9 +4,10 @@ import { PENDING_DENIAL } from "@/lib/api-access";
 import { LIMITER_RETRY } from "@/lib/rate-limit";
 
 // A signed-up user whose access request is still pending can try the demos at
-// once instead of waiting for an admin, within a daily allowance per user. Sign-up
-// is open, so a shared daily total also bounds what all pending accounts together
-// can spend. The counts live in Upstash Redis; without it the trial is off and
+// once instead of waiting for an admin, within a daily allowance per user, for the
+// first TRIAL_HOURS after sign-up (72 by default: an account made on a Friday
+// evening still has its trial when it is reviewed on Monday). Sign-up is open, so
+// a shared daily total also bounds what all pending accounts together can spend. The counts live in Upstash Redis; without it the trial is off and
 // pending users wait for approval as before. While the configured Redis does not
 // answer, trial runs are refused with a 503 until it answers again.
 
@@ -25,6 +26,8 @@ export interface TrialLimits {
   runsPerDayTotal: number;
   /** Finished reports a pending user may write (Report Writer family). */
   reports: number;
+  /** Hours after sign-up the trial lasts; 0 lets it last until approval. */
+  hours: number;
 }
 
 /** Read at call time so `oc set env` changes apply without a rebuild. */
@@ -33,7 +36,23 @@ export function getTrialLimits(): TrialLimits {
     runsPerDay: countEnv("TRIAL_RUNS_PER_DAY", 30),
     runsPerDayTotal: countEnv("TRIAL_RUNS_PER_DAY_TOTAL", 300),
     reports: countEnv("TRIAL_REPORTS", 1),
+    hours: countEnv("TRIAL_HOURS", 72),
   };
+}
+
+/**
+ * Whether an account that signed up at `signedUpAt` (Supabase's `created_at`) is
+ * still within the trial's hours. An unknown sign-up time counts as outside.
+ */
+export function withinTrialWindow(
+  signedUpAt: string | null | undefined,
+  now: number = Date.now(),
+): boolean {
+  const { hours } = getTrialLimits();
+  if (hours === 0) return true;
+  const start = Date.parse(signedUpAt ?? "");
+  if (!Number.isFinite(start)) return false;
+  return now - start < hours * 3_600_000;
 }
 
 let redis: Redis | null | undefined;

@@ -1,15 +1,15 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { isEmailConfirmed } from "@/lib/api-access";
-import { trialEnabled } from "@/lib/trial";
+import { trialEnabled, withinTrialWindow } from "@/lib/trial";
 import type { User } from "@supabase/supabase-js";
 
 export interface AccessStatus {
   user: User | null;
   isUnlocked: boolean;
   /**
-   * Pending approval with a confirmed e-mail address: may run demos on the daily
-   * trial allowance (lib/trial.ts).
+   * Pending approval with a confirmed e-mail address, within the trial's hours
+   * after sign-up: may run demos on the daily trial allowance (lib/trial.ts).
    */
   isTrial: boolean;
   /**
@@ -74,7 +74,8 @@ export const getUserAccessStatus = cache(async (): Promise<AccessStatus> => {
   return {
     user,
     isUnlocked: data?.status === "approved",
-    isTrial: pendingConfirmed && trialEnabled(),
+    isTrial:
+      pendingConfirmed && trialEnabled() && withinTrialWindow(user.created_at),
     ownKeyRuns: data?.status === "approved" || pendingConfirmed,
     emailUnconfirmed: pending && !pendingConfirmed,
     wizardAccess: data?.wizard_access === true,

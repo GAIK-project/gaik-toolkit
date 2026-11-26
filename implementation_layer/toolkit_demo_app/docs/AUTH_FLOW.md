@@ -65,9 +65,14 @@ A pending user can run demos at once, counted in Upstash Redis on the server
 | `TRIAL_RUNS_PER_DAY` | 30 | Runs one pending user may make per day |
 | `TRIAL_RUNS_PER_DAY_TOTAL` | 300 | Runs all pending users together may make per day, the ceiling on what open sign-up can cost |
 | `TRIAL_REPORTS` | 1 | Finished reports a pending user may write |
+| `TRIAL_HOURS` | 72 | Hours after sign-up the trial lasts; `0` keeps it until approval |
 
-Pending users get the open models only (`lib/model-tier.ts`). A demo page tells
-them they are on trial access and how many runs a day they have.
+Pending users get the open models only (`lib/model-tier.ts`), whatever their
+address: sign-up does not confirm it. A demo page tells them they are on trial
+access, how many runs a day they have and for how long. After `TRIAL_HOURS` a
+pending account's runs are refused with "Your trial has ended. Running demos
+opens when your account is approved." and the page shows view only until an
+admin approves it. The time counts from the Supabase account's `created_at`.
 
 ### Temporary accounts
 

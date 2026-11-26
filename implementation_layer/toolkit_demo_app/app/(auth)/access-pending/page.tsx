@@ -6,7 +6,8 @@ import { AuthShell } from "../components/auth-shell";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 import { AccessPolling } from "../components/access-polling";
-import { getTrialLimits, trialEnabled } from "@/lib/trial";
+import { getTrialLimits } from "@/lib/trial";
+import { getUserAccessStatus } from "@/lib/queries/access";
 
 const SuccessAnimation = dynamic(() =>
   import("../components/success-animation").then((mod) => mod.SuccessAnimation),
@@ -25,7 +26,9 @@ export default async function AccessPendingPage() {
     redirect("/");
   }
 
-  const trial = trialEnabled();
+  // On the trial: pending, the address confirmed and within the trial's hours.
+  const { isTrial: trial } = await getUserAccessStatus();
+  const { runsPerDay, hours } = getTrialLimits();
 
   return (
     <AuthShell
@@ -46,9 +49,10 @@ export default async function AccessPendingPage() {
         {trial ? (
           <>
             <p className="text-muted-foreground text-sm">
-              You can run the demos now, up to {getTrialLimits().runsPerDay}{" "}
-              runs a day. Full access opens when your request is approved, and
-              we&apos;ll email you then.
+              You can run the demos now, up to {runsPerDay} runs a day
+              {hours > 0 ? ` for ${hours} hours after you signed up` : ""}. Full
+              access opens when your request is approved, and we&apos;ll email
+              you then.
             </p>
             <Button asChild className="w-full">
               <Link href="/">Start testing</Link>
