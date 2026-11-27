@@ -2,6 +2,7 @@
     "title":  "Documentation",
     "pages":  [
                   "index",
+                  "agent-setup",
                   "strategy-layer",
                   "business-layer",
                   "toolkit",

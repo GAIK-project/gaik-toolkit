@@ -13,6 +13,14 @@ https://gaik-project.github.io/gaik-toolkit/
 
 **Live Demo:** https://gaik-demo.2.rahtiapp.fi/
 
+**Set up with your coding agent:** give Claude Code, Codex, Cursor or VS Code this line, and it adds gaik to your project, connects the GAIK MCP server and installs the GAIK agent skills:
+
+```text
+Set up GAIK for me. Fetch https://gaik-project.github.io/gaik-toolkit/agent-setup.md and follow it.
+```
+
+For agents, every documentation page is also markdown: [llms.txt](https://gaik-project.github.io/gaik-toolkit/llms.txt).
+
 **Desktop app (experimental):** [gaik-toolkit-desktop](https://github.com/GAIK-project/gaik-toolkit-desktop) runs extraction, parsing, classification and transcription on your own files, on your own computer. See the [Desktop App](https://gaik-project.github.io/gaik-toolkit/desktop-app/) page.
 
 ## Use different model providers

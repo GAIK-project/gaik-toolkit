@@ -8,6 +8,12 @@ pip install "gaik[mcp]"
 python mcp_client_example.py     # lists the tools, parses a text file, writes a Word file
 ```
 
+Without installing it, [uv](https://docs.astral.sh/uv/) runs the server from PyPI:
+`uvx --from "gaik[mcp]" gaik-mcp --root . --env-file .env`. In the configurations below, the
+command is then `uvx` and the arguments start with `--from`, `gaik[mcp]`, `gaik-mcp`.
+[Set up GAIK with your coding agent](https://gaik-project.github.io/gaik-toolkit/agent-setup/)
+has a prompt that has the agent register the server this way.
+
 Two ways to connect:
 
 - **stdio**: the agent starts `gaik-mcp` on your machine. Paths are limited to `--root`;

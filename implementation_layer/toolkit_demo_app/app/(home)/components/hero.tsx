@@ -1,5 +1,6 @@
 import { buttonVariants } from "@/components/ui/button";
 import { PageTransition } from "@/components/demo/page-transition";
+import { OnboardAgent } from "@/components/onboard-agent";
 import { cn } from "@/lib/utils";
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
@@ -22,16 +23,19 @@ export function Hero({ isAuthenticated }: { isAuthenticated: boolean }) {
             </p>
           </div>
 
-          <Link
-            href="/luvata-order"
-            className={cn(
-              buttonVariants({ size: "lg" }),
-              "h-auto min-h-11 max-w-full gap-2 px-5 py-2 whitespace-normal shadow-sm",
-            )}
-          >
-            Try purchase order processing
-            <ArrowRight className="size-4" />
-          </Link>
+          <div className="flex flex-wrap items-start gap-3">
+            <Link
+              href="/luvata-order"
+              className={cn(
+                buttonVariants({ size: "lg" }),
+                "h-auto min-h-11 max-w-full gap-2 px-5 py-2 whitespace-normal shadow-sm",
+              )}
+            >
+              Try purchase order processing
+              <ArrowRight className="size-4" />
+            </Link>
+            <OnboardAgent />
+          </div>
 
           {!isAuthenticated && (
             <p className="text-muted-foreground text-sm">

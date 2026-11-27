@@ -112,6 +112,10 @@ all read.
 | No plugin support | copy the directories under `skills/` into the agent's skills directory |
 | One skill only | download its `.zip` from the [demo app](https://gaik-demo.2.rahtiapp.fi/skills) and upload it in Claude: **Customize → Skills → Add → Upload skill** |
 
+A coding agent can do the install for you, together with the `gaik` package and the GAIK MCP
+server. Give it this line:
+`Set up GAIK for me. Fetch https://gaik-project.github.io/gaik-toolkit/agent-setup.md and follow it.`
+
 Claude Code 2.1.278 and Codex 0.149.1 were tested end to end (September 2026), and the
 Claude Desktop route on claude.ai in October 2026. The other rows follow those clients'
 documentation. Claude's **Sync automatically** option, on by default, keeps the plugin up to

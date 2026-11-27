@@ -47,8 +47,11 @@ Control page order with `meta.json` in each folder:
 ```
 guidance_layer/website/
 ├── app/[[...slug]]/page.tsx    # Dynamic page renderer
+├── app/llms.txt/, llms-full.txt/  # The docs for agents (llmstxt.org): an index, and every page in one file
+├── app/md/[...slug]/route.ts   # Each page as markdown, at /gaik-toolkit/md/<path>.md
+├── app/agent-setup.md/         # content/docs/agent-setup.mdx at /gaik-toolkit/agent-setup.md, the URL the demo's "Onboard your agent" prompt names
 ├── content/docs/               # MDX documentation files
-├── lib/source.ts               # Content loader config
+├── lib/source.ts               # Content loader config; the markdown for agents (getLLMText)
 ├── lib/layout.shared.tsx       # Header links (GitHub, PyPI, Toolkit Demo) and sidebar footer
 ├── public/                     # Static assets (logos, images)
 └── next.config.mjs             # Next.js config (static export)
