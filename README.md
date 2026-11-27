@@ -1,52 +1,153 @@
-﻿# GAIK – Generative AI Knowledge Management Toolkit
+﻿<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/guidance_layer/website/public/logos/SVG/gaik_logo_medium_dark.svg">
+    <img src="https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/guidance_layer/website/public/logos/SVG/gaik_logo_medium.svg" alt="GAIK – Generative AI-Enhanced Knowledge Management in Business" width="380">
+  </picture>
+</p>
 
-[![PyPI version](https://img.shields.io/pypi/v/gaik.svg)](https://pypi.org/project/gaik/)
-![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)
+<h1 align="center">GAIK Toolkit</h1>
 
-This is a generative AI toolkit of the GAIK project ([gaik.ai](https://gaik.ai)). It provides a complete set of components and guidance for building knowledge-centric GenAI solutions, from strategic directions to deployable implementations.
+<p align="center">
+  Components and guidance for building knowledge-centric generative AI solutions,<br>
+  from strategic direction to deployable code. Part of the <a href="https://gaik.ai">GAIK project</a>.
+</p>
 
-# Project Documentation
+<p align="center">
+  <a href="https://gaik-demo.2.rahtiapp.fi/"><img alt="Live demo" src="https://img.shields.io/badge/Live_demo-try_it-8b2287?style=for-the-badge&logo=rocket&logoColor=white"></a>
+  <a href="https://gaik-project.github.io/gaik-toolkit/"><img alt="Documentation" src="https://img.shields.io/badge/Docs-read-1a6bbf?style=for-the-badge&logo=readthedocs&logoColor=white"></a>
+  <a href="https://pypi.org/project/gaik/"><img alt="PyPI" src="https://img.shields.io/pypi/v/gaik?style=for-the-badge&logo=pypi&logoColor=white&label=PyPI&color=3775a9"></a>
+  <a href="https://discord.gg/sgEFy96vW3"><img alt="Discord" src="https://img.shields.io/badge/Discord-join-5865F2?style=for-the-badge&logo=discord&logoColor=white"></a>
+</p>
 
-Project documentation is available at:
+<p align="center">
+  <img alt="Python 3.11+" src="https://img.shields.io/badge/python-3.11%2B-3776ab?logo=python&logoColor=white">
+  <a href="https://github.com/GAIK-project/gaik-toolkit/blob/main/LICENSE"><img alt="MIT License" src="https://img.shields.io/badge/license-MIT-green"></a>
+</p>
 
-https://gaik-project.github.io/gaik-toolkit/
+<p align="center">
+  <a href="https://gaik-demo.2.rahtiapp.fi/">Live demo</a> ·
+  <a href="https://gaik-project.github.io/gaik-toolkit/">Documentation</a> ·
+  <a href="https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples">Examples</a> ·
+  <a href="https://github.com/GAIK-project/gaik-toolkit#-solution-configuration-wizard">Solution Wizard</a> ·
+  <a href="https://github.com/GAIK-project/gaik-toolkit-desktop">Desktop app</a>
+</p>
 
-**Live Demo:** https://gaik-demo.2.rahtiapp.fi/
+## 🚀 Get started
 
-**Set up with your coding agent:** give Claude Code, Codex, Cursor or VS Code this line, and it adds gaik to your project, connects the GAIK MCP server and installs the GAIK agent skills:
+```bash
+pip install "gaik[extract]"   # pick the extras you need, or "gaik[all-cpu]"
+```
+
+```python
+from gaik.software_components.extractor import DataExtractor
+from gaik.software_components.llm import get_llm_config
+
+extractor = DataExtractor(config=get_llm_config("azure"))
+```
+
+Each component has its own extra and guide: see [software components](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components/) and the
+[examples](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples).
+
+**🤖 Set up with your coding agent.** Give Claude Code, Codex, Cursor or VS Code this line. It adds gaik to your
+project, connects the GAIK MCP server and installs the GAIK agent skills:
 
 ```text
 Set up GAIK for me. Fetch https://gaik-project.github.io/gaik-toolkit/agent-setup.md and follow it.
 ```
 
-For agents, every documentation page is also markdown: [llms.txt](https://gaik-project.github.io/gaik-toolkit/llms.txt).
+Every documentation page is also available as markdown for agents: [llms.txt](https://gaik-project.github.io/gaik-toolkit/llms.txt).
 
-**Desktop app (experimental):** [gaik-toolkit-desktop](https://github.com/GAIK-project/gaik-toolkit-desktop) runs extraction, parsing, classification and transcription on your own files, on your own computer. See the [Desktop App](https://gaik-project.github.io/gaik-toolkit/desktop-app/) page.
+## 🧰 What's inside
 
-## Use different model providers
+| | Component | Extra |
+| --- | --- | --- |
+| 📄 | **Document parsing**: PDF, Word, scans, spreadsheets | `parser-cpu`, `parser`, `spreadsheet-parser` |
+| 🧾 | **Structured extraction** into a schema, with the quote each value rests on | `extract`, `source-tracing` |
+| 🎙️ | **Transcription** and transcript enhancement | `transcriber`, `enhance-transcript` |
+| 🔎 | **Search and RAG**: pgvector hybrid search, reranking, answers | `pg-vector-store`, `rag-workflow` |
+| 🏷️ | **Classification** with an LLM or TypeSafe Jev | `classifier`, `jev-classifier` |
+| 📝 | **Report writing** from mixed sources, every statement cited | `report-writer` |
+| 🗄️ | **Text-to-SQL agents** for PostgreSQL, CSV and Excel | `postgres-agent`, `tabular-agent` |
+| 🔊 | **Text-to-speech** | `text-to-speech` |
+| ✅ | **Evaluation**: LLM judges and evaluators for extraction, RAG and reports | `llm-judge`, `evaluators` |
 
-The Python toolkit provides one `ProviderClient` interface for OpenAI, Azure OpenAI,
-Google Gemini and Vertex AI, Anthropic (direct or on Microsoft Foundry), CSC Aitta, and
-other OpenAI-compatible servers.
-LiteLLM is available as an optional backend (`pip install "gaik[llm-litellm]"`,
-`get_llm_config("litellm", model="azure/...")`); the native adapters stay the default,
-and Aitta and other compatible servers reuse the OpenAI SDK. Configure the provider with
-`get_llm_config("azure")`, `get_llm_config("google")`, or `get_llm_config("aitta")` and
-pass that config to supported components. Google/Vertex and Anthropic need the
-`gaik[llm-google]` and `gaik[llm-anthropic]` extras. Capabilities such as structured
-output and embeddings depend on the selected model. Audio components remain OpenAI/Azure
-only.
+Full list in the [software components](https://gaik-project.github.io/gaik-toolkit/toolkit/software-components/) and
+[software modules](https://gaik-project.github.io/gaik-toolkit/toolkit/software-modules/) guides. The [live demo](https://gaik-demo.2.rahtiapp.fi/) runs them in the browser.
 
-Existing code keeps working: `get_openai_config(use_azure=...)` and
-`create_openai_client(config)` are unchanged. The default OpenAI/Azure model is now
-`gpt-6-luna` (0.7.x used `gpt-5.4`); to keep your previous model, set
-`AZURE_DEPLOYMENT` or `OPENAI_MODEL`, or pass `model=...` to `get_llm_config()` or
-the component.
+## 🔗 MCP server
 
-See [provider configuration and examples](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/README.md#configuration--environment-variables)
-and the [multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/).
+`gaik-mcp` gives an agent six tools: parse a document, transcribe a recording, generate fields, extract fields
+with evidence, classify a text and write the fields to Word.
 
-# Why the toolkit is needed
+```bash
+uvx --from "gaik[mcp]" gaik-mcp --root . --env-file .env
+```
+
+`--root` limits file access to one folder and `--env-file` keeps the keys out of the client config. Client
+configuration, the HTTP transport and the limits are in [Operations and MCP server](https://gaik-project.github.io/gaik-toolkit/toolkit/operations-and-mcp/).
+
+## 🧭 Solution Configuration Wizard
+
+The wizard turns a plain-language description of a business problem into a validated GenAI solution:
+
+| Output | What it is |
+| --- | --- |
+| `use_case.blueprint.json` | Source of truth: components, artifacts, workflow steps, schemas, model settings |
+| `workflow.bpmn`, `workflow.mmd` | BPMN 2.0 blueprint for stakeholders and a Mermaid flow for developers |
+| `poc/` | Runnable proof of concept: `run_poc.py`, requirements, schema, prompt, eval script |
+| `docs/` | GenAI product canvas, technical specification, user and developer guides, evaluation plan |
+
+Ways to run it:
+
+- **🌐 Wizard V2 (web):** [wizard-v2-web-gaik.2.rahtiapp.fi](https://wizard-v2-web-gaik.2.rahtiapp.fi), with an approved
+  account of the [GAIK demo](https://gaik-demo.2.rahtiapp.fi/). Request access on the demo's
+  [Solution Wizard page](https://gaik-demo.2.rahtiapp.fi/solution-wizard).
+- **💬 Claude Code or Claude Desktop:** type `/solution-wizard` in this repository.
+- **⌨️ Terminal:** `python run_wizard_interactive.py` in `implementation_layer/solution_wizard/` (needs
+  `gaik[wizard]` and the `claude` CLI).
+- **🛠️ Single steps:** `validate_blueprint.py`, `generate_bpmn.py` and `scaffold_poc.py` in
+  `implementation_layer/solution_wizard/scripts/`.
+
+Everything is written to a folder you choose. See the [wizard guide](https://gaik-project.github.io/gaik-toolkit/guidance-layer/solution-configuration-wizard/)
+and the [wizard README](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/solution_wizard/README.md).
+
+## 🖥️ Desktop app
+
+[gaik-toolkit-desktop](https://github.com/GAIK-project/gaik-toolkit-desktop) (experimental) runs extraction, parsing,
+classification and transcription on your own files, on your own computer. See the [Desktop App](https://gaik-project.github.io/gaik-toolkit/desktop-app/) page.
+
+## 🔌 Model providers
+
+Components take one provider config, so the same code runs on any supported provider.
+Azure OpenAI is the default.
+
+```python
+from gaik.software_components.llm import get_llm_config
+
+config = get_llm_config("google")  # or "azure", "anthropic", "aitta", ...
+# pass config to a component, e.g. DataExtractor(config=config)
+```
+
+| Provider | `get_llm_config(...)` | Install |
+| --- | --- | --- |
+| Azure OpenAI (default) | `"azure"` | `pip install gaik` |
+| OpenAI | `"openai"` | `pip install gaik` |
+| CSC Aitta, other OpenAI-compatible servers | `"aitta"`, `"openai_compatible"` | `pip install gaik` |
+| Google Gemini, Vertex AI | `"google"`, `"vertex"` | `pip install "gaik[llm-google]"` |
+| Anthropic, Anthropic on Microsoft Foundry | `"anthropic"`, `"anthropic_foundry"` | `pip install "gaik[llm-anthropic]"` |
+| Any LiteLLM model (optional backend) | `"litellm"`, e.g. `model="azure/..."` | `pip install "gaik[llm-litellm]"` |
+
+- Structured output and embeddings depend on the model you pick. Audio components run on OpenAI and Azure only.
+- The default OpenAI/Azure model is `gpt-6-luna` (0.7.x used `gpt-5.4`). To keep another model, set
+  `AZURE_DEPLOYMENT` or `OPENAI_MODEL`, or pass `model=...`.
+- Older code keeps working: `get_openai_config(use_azure=...)` and `create_openai_client(config)` are unchanged.
+
+More in the [multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolkit/multi-provider-llm/) and the
+[configuration reference](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/README.md#configuration--environment-variables).
+
+## 🎯 About the toolkit
+
+### 💡 Why the toolkit is needed
 
 **Generative AI has significant potential to increase the productivity of knowledge work** 
 - Example experiments: consultants using AI were significantly more productive – they completed 12.2% more tasks on average, and completed tasks 25.1% more quickly (Dell'Acqua, 2023) 
@@ -58,12 +159,12 @@ and the [multi-provider guide](https://gaik-project.github.io/gaik-toolkit/toolk
 
 Adopting Generative AI and creating value from **it is especially challenging for small and medium-sized enterprises (SMEs)**, which lack the technical expertise and capabilities to implement GenAI solutions effectively. The literature review of Oldemeyer et al. (2024) identified the following three most frequent challenges for SMEs in the AI implementation in the industrial sector: knowledge, costs, and the low maturity level in digitalization.
 
-# Overall approach
+### 🧩 Overall approach
 Companies can deal with GenAI challenges by combining reusable building blocks with clear guidelines.
 Instead of designing solutions from scratch, teams assemble existing components and follow proven ways of working. 
 This makes it easier to turn ideas into real results, while reducing implementation time, risk, and required resources, and improving overall solution quality.
 
-# Toolkit Focus
+### 🔭 Toolkit focus
 The knowledge management perspective for structuring GenAI development and implementation activities.
 
 The toolkit focuses on three core **knowledge processes** in organizations:
@@ -81,9 +182,8 @@ The following **generic use cases** are defined as the top priority at the momen
 | **Knowledge synthesis** | A. Sales proposal generation<br>B. Report preparation<br>C. … |
 
 
----
 
-## Layer-Based Architecture
+### 🏗️ Layer-based architecture
 
 The GAIK Toolkit is organized into a layer-based architecture that spans from strategic planning to implementation and security:
 
@@ -101,71 +201,6 @@ This architecture ensures that GenAI solutions are built with proper governance,
 
 ![GAIK Architecture](https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/images/Toolkit_layers.jpg)
 
-
-
----
-
-## Solution Configuration Wizard
-
-The **GAIK Solution Configuration Wizard** is the Guidance Layer in action. It takes a plain-language description of a business problem and guides you — through a structured, multi-turn conversation — all the way to a validated, deployable GenAI solution.
-
-### What the wizard produces
-
-| Deliverable | Description |
-|---|---|
-| `use_case.blueprint.json` | Executable source of truth — components, artifacts, workflow steps, schemas, model settings |
-| `workflow.bpmn` | BPMN 2.0 visual blueprint with swimlanes, gateways, and data objects for stakeholder review |
-| `workflow.mmd` | Mermaid diagram (quick developer flow view) |
-| `poc/` | Runnable proof of concept: `run_poc.py`, `requirements.txt`, schema, prompt, eval script |
-| `docs/` | Documentation suite: GenAI product canvas, technical specification, user guide, developer guide, evaluation plan |
-
-Everything is written to a directory you choose — nothing is written into the toolkit repository.
-
-### How to run it
-
-**Option 1 — Claude Code or Claude Desktop (recommended)**
-
-```
-/solution-wizard
-```
-
-Type this in a Claude Code session or Claude Desktop chat. The wizard guides you through the full workflow conversationally.
-
-**Option 2 — Web chat (demo website)**
-
-Open the live demo's [Solution Wizard page](https://gaik-demo.2.rahtiapp.fi/solution-wizard). It links to [Wizard V2](https://wizard-v2-web-gaik.2.rahtiapp.fi), which runs as its own service and opens with an approved demo account (the same e-mail and password), and runs this wizard as a web chat at `/solution-wizard/first` for a signed-in user an admin has granted it (**Request access** on the page). The chat streams token by token; generated files appear in the sidebar, downloadable as a `.zip`.
-
-To run the demo locally, install its dependencies and create `.env.local` as described in the [demo app README](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/toolkit_demo_app/README.md); set `BYPASS_AUTH=true` there to open the wizard without signing in:
-
-```bash
-cd implementation_layer/toolkit_demo_app
-bun dev:all   # starts Next.js frontend + FastAPI backend
-# open http://localhost:3000/solution-wizard/first
-```
-
-**Option 3 — Individual scripts (CLI)**
-
-The wizard's deterministic scripts can be run independently:
-
-```bash
-cd implementation_layer/solution_wizard
-
-# Validate an existing blueprint
-python scripts/validate_blueprint.py --blueprint ~/my-use-case/use_case.blueprint.json
-
-# Generate BPMN visual blueprint
-python scripts/generate_bpmn.py --blueprint ~/my-use-case/use_case.blueprint.json --output-dir ~/my-use-case
-
-# Scaffold a PoC from a validated blueprint
-python scripts/scaffold_poc.py --blueprint ~/my-use-case/use_case.blueprint.json
-```
-
-### Full documentation
-
-See [`implementation_layer/solution_wizard/README.md`](https://github.com/GAIK-project/gaik-toolkit/blob/main/implementation_layer/solution_wizard/README.md) for the complete walkthrough, output directory layout, component registry, validation rules, and test suite.
-
----
-
-## License
+## 📜 License
 
 This project is licensed under the MIT License – see [`LICENSE`](https://github.com/GAIK-project/gaik-toolkit/blob/main/LICENSE) for details.
