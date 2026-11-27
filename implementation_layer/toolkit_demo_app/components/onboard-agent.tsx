@@ -9,7 +9,12 @@ import { ONBOARD_PROMPT } from "@/lib/agent-setup";
 import { Bot, Check, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const marks = [ClaudeIcon, CodexIcon, CursorIcon];
+// Codex in its brand blue (devicon): the black mark reads as a blot at this size.
+const marks = [
+  { Mark: ClaudeIcon, className: "" },
+  { Mark: CodexIcon, className: "text-[#5061f7]" },
+  { Mark: CursorIcon, className: "" },
+];
 
 /**
  * Copies a one-line prompt that has a coding agent (Claude Code, Codex, Cursor,
@@ -55,12 +60,12 @@ export function OnboardAgent() {
           </span>
         ) : (
           <span className="flex -space-x-1.5" aria-hidden>
-            {marks.map((Mark, index) => (
+            {marks.map(({ Mark, className }, index) => (
               <span
                 key={index}
                 className="bg-background ring-background flex size-7 items-center justify-center rounded-full border ring-2"
               >
-                <Mark className="size-3.5" />
+                <Mark className={`size-4 ${className}`} />
               </span>
             ))}
           </span>
