@@ -15,7 +15,7 @@
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
-        "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
+        "Upload the skill .zip in Claude: Plugins → Upload a skill (formerly Customize → Skills)."
       ],
       "kit": true,
       "tryPrompt": "Use the incident-report-writing skill ({url}) to turn my audio recording into an incident report. I will attach the file next."
@@ -34,7 +34,7 @@
         "Windows only. Needs Python 3.11+ and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so the recording is transcribed with Whisper first. Already have a transcript? Use the matching prompt instead; it needs no key.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
-        "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
+        "Upload the skill .zip in Claude: Plugins → Upload a skill (formerly Customize → Skills)."
       ],
       "kit": true,
       "tryPrompt": "Use the construction-diary-creation skill ({url}) to create today's Työmaapäiväkirja from my site recording. I will attach the audio next."
@@ -51,7 +51,7 @@
       "needs": ["Filesystem MCP server"],
       "setup": [
         "Needs Node.js. Add the file access server to claude_desktop_config.json as shown in the setup guide, then restart Claude Desktop.",
-        "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
+        "Upload the skill .zip in Claude: Plugins → Upload a skill (formerly Customize → Skills)."
       ],
       "tryPrompt": "Use the purchase-order-processing skill ({url}) to turn the purchase order, its BOMs and the price list in my folder <folder path> into a priced sales order."
     },
@@ -69,7 +69,7 @@
         "Windows only. Needs Python 3.11+, Node.js and an OpenAI or Azure OpenAI key. Claude cannot listen to audio, so recordings are transcribed with Whisper first.",
         "Download the setup kit, unzip it and run setup.bat. It installs the transcriber in its own Python environment and the file access server from pinned, hash-checked packages, saves your key as a user environment variable, asks which folder Claude may work on and writes the Claude Desktop config.",
         "Copy the generated claude_desktop_config.json content into %APPDATA%\\Claude\\claude_desktop_config.json and restart Claude Desktop.",
-        "Upload the skill .zip in Claude: Customize → Skills → Add → Upload skill."
+        "Upload the skill .zip in Claude: Plugins → Upload a skill (formerly Customize → Skills)."
       ],
       "kit": true,
       "tryPrompt": "Use the report-writing skill ({url}) to write a report from the materials I am about to attach. Infer the sections from the content."

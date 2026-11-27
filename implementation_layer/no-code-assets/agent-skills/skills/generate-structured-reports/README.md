@@ -90,7 +90,8 @@ For **Running in Claude Desktop --> Claude Code**:
 1. Get a `.zip` of the skill: download `generate-structured-reports.zip` from the
    [demo app's skills page](https://gaik-demo.2.rahtiapp.fi/skills), or zip the
    `generate-structured-reports` folder yourself with `SKILL.md` directly inside it.
-2. Open **Customize → Skills → Add → Upload skill** and choose the `.zip`.
+2. Open **Plugins** in Claude's sidebar (formerly **Customize → Skills**), choose
+   **Upload a skill** and pick the `.zip`.
 
 For running with **Claude Code in VS Code, or CLI**, save the skill folder in ~/.claude/skills at user or project level. 
 

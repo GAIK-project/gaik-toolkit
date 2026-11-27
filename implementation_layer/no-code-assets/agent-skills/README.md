@@ -102,7 +102,7 @@ all read.
 
 | Client | Commands |
 |---|---|
-| Claude Desktop, claude.ai | **Customize → Plugins → Add → Add marketplace → Add from a repository**, enter `GAIK-project/gaik-toolkit`, **Sync**, then **Add** the plugin on the Discover tab |
+| Claude Desktop, claude.ai | **Plugins** in the sidebar (formerly **Customize → Plugins**) → **Add marketplace** → **Add from a repository**, enter `GAIK-project/gaik-toolkit`, **Sync**, then **Add** the plugin on the Discover tab |
 | Claude Code | `/plugin marketplace add GAIK-project/gaik-toolkit`, then `/plugin install gaik-toolkit@gaik-toolkit` |
 | Codex | `codex plugin marketplace add GAIK-project/gaik-toolkit`, then `codex plugin add gaik-toolkit@gaik-toolkit` |
 | Copilot CLI | `copilot plugin marketplace add GAIK-project/gaik-toolkit`, then `copilot plugin install gaik-toolkit@gaik-toolkit` |
@@ -110,7 +110,7 @@ all read.
 | ChatGPT workspace | an admin opens **Admin Console → Plugins → Add → Import marketplace** and enters `https://github.com/GAIK-project/gaik-toolkit` as the source |
 | Other Agent Plugins v1 clients | point the client at this directory |
 | No plugin support | copy the directories under `skills/` into the agent's skills directory |
-| One skill only | download its `.zip` from the [demo app](https://gaik-demo.2.rahtiapp.fi/skills) and upload it in Claude: **Customize → Skills → Add → Upload skill** |
+| One skill only | download its `.zip` from the [demo app](https://gaik-demo.2.rahtiapp.fi/skills) and upload it in Claude: **Plugins** → **Upload a skill** (formerly **Customize → Skills**) |
 
 A coding agent can do the install for you, together with the `gaik` package and the GAIK MCP
 server. Give it this line:

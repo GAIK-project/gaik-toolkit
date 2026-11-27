@@ -79,8 +79,8 @@ The script will create a configuration file. You need to copy it to Claude Deskt
 **Step 4: Install the Skill**
 
 1. Open Claude Desktop
-2. Open **Customize** → **Skills**
-3. Click **Add** → **Upload skill**
+2. Open **Plugins** in the sidebar (formerly **Customize** → **Skills**)
+3. Choose **Upload a skill**
 4. Select the `report-writing.zip` file (created by the setup script)
 
 ✅ **Setup complete!** You're ready to use the skill.
@@ -148,7 +148,7 @@ The folder must not be a whole drive, your whole user folder or a folder that ho
 **Step 4: Install the Skill**
 
 1. Zip `SKILL.md`, `EVALUATION.md` and the `reference` folder
-2. Open Claude Desktop → Customize → Skills → Add → Upload skill
+2. Open Claude Desktop → **Plugins** → **Upload a skill** (formerly **Customize** → **Skills**)
 3. Upload the zip file
 
 **Step 5: Restart Claude Desktop**
@@ -318,7 +318,7 @@ The skill automatically detects what sections to include based on your content:
 
 ### Claude doesn't recognize the skill
 
-- Go to Customize → Skills and verify the skill is listed
+- Open **Plugins**, filter the list to skills and check that the skill is listed
 - Try removing and re-adding the skill
 - Restart Claude Desktop
 

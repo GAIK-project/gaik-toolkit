@@ -68,7 +68,7 @@ Before setting up, please install:
 **Step 4: Install the Skill**
 
 1. Open Claude Desktop
-2. **Customize** → **Skills** → **Add** → **Upload skill**
+2. Open **Plugins** in the sidebar (formerly **Customize** → **Skills**) and choose **Upload a skill**
 3. Upload `incident-report-writing.zip` (created by setup script)
 
 ✅ **Setup complete!**
@@ -282,7 +282,7 @@ The folder must not be a whole drive, your whole user folder or a folder that ho
 
 **Install Skill:**
 1. Zip `SKILL.md`
-2. Upload to Claude Desktop: Customize → Skills → Add → Upload skill
+2. Upload it in Claude Desktop: **Plugins** → **Upload a skill** (formerly **Customize** → **Skills**)
 
 ---
 

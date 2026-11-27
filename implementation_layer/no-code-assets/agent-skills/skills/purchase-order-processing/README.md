@@ -90,8 +90,8 @@ Before setting up, please install:
 
 1. Zip `SKILL.md`, `EVALUATION.md` and the `reference` folder
 2. Open Claude Desktop
-3. Open **Customize** → **Skills**
-4. Click **Add** → **Upload skill**
+3. Open **Plugins** in the sidebar (formerly **Customize** → **Skills**)
+4. Choose **Upload a skill**
 5. Select the zip file you just created
 
 ✅ **Setup complete!** You're ready to use the skill.
@@ -278,7 +278,7 @@ Include these fields for accurate fee calculations:
 | **File not found** | Use full Windows path (C:\Orders\...), check files are in correct subfolders (customer_data/, price_list/) |
 | **Price not found** | Type/Part Designation in BOM must EXACTLY match Price List, check for typos |
 | **BOM not found** | Material_Number from PO must match BOM_ID in BOM, BOMs optional if PO has all details |
-| **Skill not recognized** | Customize → Skills, verify listed, mention "purchase-order-processing skill" in request |
+| **Skill not recognized** | Plugins, filter to skills, verify listed, mention "purchase-order-processing skill" in request |
 | **Wrong calculations** | Review `Calculation_Breakdown.txt`, verify fee fields are numeric, check discount tiers |
 | **PDF reading fails** | PDFs must be text-based (not scanned), not password-protected, use OCR if needed |
 

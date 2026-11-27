@@ -82,8 +82,8 @@ Before setting up, please install:
 
 1. Zip `SKILL.md`, `EVALUATION.md` and the `reference` folder
 2. Open Claude Desktop
-3. Open **Customize** → **Skills**
-4. Click **Add** → **Upload skill**
+3. Open **Plugins** in the sidebar (formerly **Customize** → **Skills**)
+4. Choose **Upload a skill**
 5. Select the zip file you just created
 
 ✅ **Setup complete!** You're ready to use the skill.
@@ -561,7 +561,7 @@ Cert Fee: $25.00
 
 ### Claude doesn't recognize the skill
 
-- Go to Customize → Skills and verify the skill is listed
+- Open **Plugins**, filter the list to skills and check that the skill is listed
 - Try removing and re-adding the skill
 - Make sure to mention "purchase-order-processing skill" in your request
 - Restart Claude Desktop
