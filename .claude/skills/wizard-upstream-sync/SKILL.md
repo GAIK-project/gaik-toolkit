@@ -18,8 +18,8 @@ or posted until the person running the sync has seen it and said go.
 |---|---|---|
 | `implementation_layer/src/gaik/`, `pyproject.toml` (extras) | upstream | release tag and PyPI; the fork merges the tag; both images install `gaik==ARG GAIK_VERSION` from PyPI |
 | `implementation_layer/solution_wizard/` (registry, cards, `SKILL.md`, `gaik_validated_version.txt`, PoC templates and code) | upstream, also edited by the fork | the merge; this is where conflicts land |
-| `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; to be delivered upstream later from `release/wizard-v2`, as the fork's open PR 20 describes |
-| `AGENTS.md`, `CLAUDE.md`, `.github/` templates and `CODEOWNERS`, `SECURITY.md` | upstream | the merge; the fork inherits them unless it drops them on purpose |
+| `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; delivered upstream by merging `release/wizard-v2`, never an open fork PR (the first delivery, upstream PR 324, still took open fork PRs 291 and 299); when upstream edits them anyway, AGENTS.md says when that is right and [references/conflicts.md](references/conflicts.md) how the sync resolves it |
+| `AGENTS.md`, `CLAUDE.md`, `.github/` templates and `CODEOWNERS`, `SECURITY.md` | upstream | the merge; the fork inherits them unless it drops them on purpose (`GITFLOW.md`, `dependabot.yml` and the CodeQL files each repository keeps its own: [references/conflicts.md](references/conflicts.md)) |
 | demo app, docs, evaluation, agent skills | upstream | ride along without effect on the wizard |
 
 Fixes the fork's team sends upstream come back with the next release and sync.
@@ -59,7 +59,9 @@ setuptools-scm in the fork needs those tags to give the in-repo gaik a version. 
   whether the gaik-sync audit is needed;
 - pins: the validated pin, both `ARG GAIK_VERSION`, the runner README, whether PyPI has the
   version, and `GAIK_EXTRAS` gaps;
-- a `git merge-tree` preview of conflicts and the files both sides changed;
+- a `git merge-tree` preview of conflicts, the files both sides changed, and the files where
+  the fork has its own version that the merge changes, deletes or adds back without a
+  conflict (fork changes a delivery did not take come back this way);
 - files the fork would inherit (code owners, templates, security policy, agent instructions);
 - the fork's own edits to upstream files, upstream commits not yet in a release, and open
   upstream PRs (with `gh`).
@@ -85,7 +87,8 @@ This creates a worktree on `chore/gaik-X.Y.Z` from `origin/develop` and merges t
 `--no-ff` as "Merge upstream gaik-toolkit vX.Y.Z into develop". The main checkout stays as
 it is, so work in progress there is not disturbed.
 
-On conflicts it stops with the merge in progress. Resolve each file as
+On conflicts, and when the merge changes fork files without a conflict (it lists them), it
+stops with the merge in progress. Resolve each file as
 [references/conflicts.md](references/conflicts.md) describes, then commit with a
 "Conflicts:" paragraph that names each file and the side kept. A conflict inside
 `implementation_layer/src/gaik/` changes the gaik library: describe it and ask first, since

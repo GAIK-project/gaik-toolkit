@@ -45,16 +45,20 @@ Mark every finding with one of these:
 
 - **Important**: the change gives a user a wrong result or wrong information, breaks
   something that worked, loses data, or is a security matter. Only these hold a merge,
-  until each is fixed or closed with a reason the author and the reviewer agree on.
+  until each is fixed or closed with a reason the change's owner agrees to. An agent can
+  raise an Important finding but cannot close one.
 - **Follow-up**: a real shortcoming that is none of the above. It does not hold the
   merge; it becomes an issue when the change is merged.
 - **Nit**: taste or tidiness. At most three, none about formatting (ruff owns it). The
   author may ignore them.
-- **Pre-existing**: it was there before this change. It never holds the merge; file an
-  issue if it matters.
+- **Pre-existing**: it was there before this change. It does not hold the merge unless
+  the change re-exposes it or builds on it; then it is Important. File an issue if it
+  matters.
 
 A review has at most two rounds. After the second, whatever is not Important goes to
-issues and the change is merged.
+issues and stops holding the merge. The merge itself stays the owner's decision, after
+reading the diff (`AGENTS.md`, who owns a change), and a change the pull request
+template calls high risk also needs a person's review, whatever the findings.
 
 ## Summary
 

@@ -804,11 +804,74 @@ def predict_conflicts(repo, base, target):
         check=False,
     )
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
-    if proc.returncode == 0:
-        return {"clean": True, "files": []}
-    if proc.returncode == 1:
-        return {"clean": False, "files": lines[1:]}
-    return {"clean": None, "files": [], "error": (proc.stderr or proc.stdout).strip()}
+    if proc.returncode not in (0, 1) or not lines:
+        return {
+            "clean": None,
+            "files": [],
+            "fork_versions": [],
+            "error": (proc.stderr or proc.stdout).strip(),
+        }
+    files = lines[1:]
+    result = {"clean": proc.returncode == 0, "files": files, "fork_versions": []}
+    # The first line is the merged tree, written even when files conflict.
+    try:
+        result["fork_taken"], result["fork_versions"] = fork_versions_changed(
+            repo, base, target, lines[0], set(files)
+        )
+    except RuntimeError as exc:
+        result["fork_versions_error"] = str(exc)
+    return result
+
+
+def _git_out(repo, *args):
+    proc = run(["git", "-C", repo, *args], check=False)
+    if proc.returncode != 0:
+        raise RuntimeError(f"git {args[0]} failed: {(proc.stderr or proc.stdout).strip()}")
+    return proc.stdout
+
+
+def _entries(repo, rev):
+    """{path: (mode, object id)} for every file in a tree."""
+    out = {}
+    for entry in _git_out(repo, "ls-tree", "-r", "-z", rev).split("\0"):
+        if entry:
+            meta, path = entry.split("\t", 1)
+            mode, _kind, oid = meta.split()
+            out[path] = (mode, oid)
+    return out
+
+
+def last_taken(repo, base, target):
+    """The newest commit on upstream's first-parent line that the fork already contains:
+    what the fork last took in from upstream."""
+    fork = set(_git_out(repo, "rev-list", base).split())
+    line = _git_out(repo, "rev-list", "--first-parent", target).split()
+    return next((c for c in line if c in fork), None)
+
+
+def fork_versions_changed(repo, base, target, tree, conflicted):
+    """Files where the fork has its own version, compared with what it last took in from
+    upstream, and the merge changes, deletes or adds back without a conflict. A delivery
+    that kept upstream's version of a fork change, or left a fork file out (GITFLOW.md,
+    the fork's CodeQL files and dependabot.yml after the v0.12.0 delivery), comes back
+    this way. Returns (that upstream commit, [[path, how], ...])."""
+    taken = last_taken(repo, base, target)
+    if taken is None:
+        raise RuntimeError("the fork contains no commit of upstream's first-parent line")
+    fork, merged, upstream = _entries(repo, base), _entries(repo, tree), _entries(repo, taken)
+    out = []
+    for path in sorted(set(fork) | set(merged)):
+        mine, result = fork.get(path), merged.get(path)
+        if (
+            mine == result  # the merge leaves the fork's file as it is
+            or path in conflicted  # the conflict list shows it already
+            or mine == upstream.get(path)  # the fork has upstream's version: a plain update
+            or path.startswith("graphify-out/")
+        ):
+            continue
+        how = "deleted" if result is None else "added back" if mine is None else "changed"
+        out.append([path, how])
+    return taken, out
 
 
 def recommend(plan):
@@ -868,6 +931,12 @@ def recommend(plan):
         )
     if plan["upstream_touched_fork_owned"]:
         rec["lines"].append("Upstream changed fork-owned paths: read those diffs before merging.")
+    changed_back = plan["conflicts"].get("fork_versions") or []
+    if changed_back or plan["conflicts"].get("fork_versions_error"):
+        rec["lines"].append(
+            f"The merge changes {len(changed_back)} fork files without a conflict (see Merge "
+            "preview): `prepare` stops before committing so each can be read first."
+        )
     inherits = [
         CLASS_LABEL[c] for c in ("repo-meta", "agent-instructions") if plan["classes"].get(c)
     ]
@@ -1022,6 +1091,20 @@ def render_plan(plan):
             add("`git merge-tree`: conflicts in " + ", ".join(f"`{f}`" for f in c["files"]) + ".")
         else:
             add(f"`git merge-tree` failed: {c.get('error')}")
+        if c.get("fork_versions"):
+            add(
+                f"Fork files the merge changes without a conflict ({len(c['fork_versions'])}; "
+                "the fork has its own version of each, against upstream "
+                f"{short(c['fork_taken'])} that it last took in): "
+                + ", ".join(f"`{f}` ({how})" for f, how in c["fork_versions"])
+                + ". Read each diff and keep the fork's lines it still wants "
+                "(references/conflicts.md)."
+            )
+        if c.get("fork_versions_error"):
+            add(
+                f"Could not check the fork files the merge changes: {c['fork_versions_error']}. "
+                "Compare the merge with `origin/develop` before committing it."
+            )
         if plan["both_changed"]:
             add("Changed on both sides: " + ", ".join(f"`{f}`" for f in plan["both_changed"]) + ".")
         if plan["upstream_touched_fork_owned"]:
@@ -1119,14 +1202,24 @@ def cmd_prepare(args):
     git(repo, "worktree", "add", "--quiet", "-b", branch, wt, args.base)
     print(f"worktree {wt} on {branch} from {args.base}")
     message = f"Merge upstream gaik-toolkit {label} into develop"
-    proc = run(["git", "-C", wt, "merge", "--no-ff", "-m", message, target_sha], check=False)
-    if proc.returncode == 0:
+    preview = predict_conflicts(repo, args.base, target_sha)
+    changed_back = preview.get("fork_versions") or []
+    hold = bool(changed_back or preview.get("fork_versions_error"))
+    merge = ["git", "-C", wt, "merge", "--no-ff", "-m", message]
+    proc = run([*merge, *(["--no-commit"] if hold else []), target_sha], check=False)
+    if proc.returncode == 0 and not hold:
         print(f"merged {args.target} cleanly: {git(wt, 'log', '-1', '--format=%h %s').strip()}")
         return 0
     conflicted = git(wt, "diff", "--name-only", "--diff-filter=U").split()
     print(f"merge of {args.target} stopped with {len(conflicted)} conflicted files:")
     for f in conflicted:
         print(f"  {f}  [{CLASS_LABEL[classify(f)]}]")
+    if changed_back:
+        print(f"and {len(changed_back)} fork files it changes without a conflict:")
+        for f, how in changed_back:
+            print(f"  {f}  ({how})")
+    if preview.get("fork_versions_error"):
+        print(f"and no check of the fork files it changes: {preview['fork_versions_error']}")
     print(
         "Resolve them by references/conflicts.md, then `git add` and `git commit` with a "
         "'Conflicts:' paragraph in the message."
@@ -1560,6 +1653,13 @@ def cmd_pr_body(args):
                 if len(para) == 2:
                     conflicts = ["- " + " ".join(para[1].split())]
                 break
+    changed_back = [f for f, _how in plan.get("conflicts", {}).get("fork_versions") or []]
+    if not conflicts and changed_back:
+        conflicts = [
+            "- [[fill: for each fork file the merge changed without a conflict ("
+            + ", ".join(changed_back)
+            + "), which of the fork's lines were kept and why]]"
+        ]
     if not conflicts:
         conflicts = (
             ["- None."]
