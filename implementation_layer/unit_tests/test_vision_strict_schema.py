@@ -69,7 +69,8 @@ def test_a_constrained_decimals_pattern_is_dropped_too(pattern):
 
 
 def test_the_installed_pydantics_decimal_schema_has_no_lookaround_either():
-    assert "(?!" not in json.dumps(ve._make_schema_strict(_Invoice.model_json_schema()))
+    text = json.dumps(ve._make_schema_strict(_Invoice.model_json_schema()))
+    assert not any(token in text for token in ("(?!", "(?=", "(?<=", "(?<!"))
 
 
 @pytest.mark.parametrize("pattern", [r"^(?!foo).*$", r"^[a-z(?=)]+$", r"^[A-Z]{2}-\d{4}$"])
@@ -89,6 +90,17 @@ def test_objects_inside_anyof_are_made_strict():
     branch = ve._make_schema_strict(schema)["anyOf"][0]
     assert branch["additionalProperties"] is False
     assert branch["required"] == ["a"]
+
+
+def test_allof_branches_are_left_as_they_were():
+    # Each object branch made strict on its own would forbid the other's properties.
+    schema = {
+        "allOf": [
+            {"type": "object", "properties": {"a": {"type": "string"}}},
+            {"type": "object", "properties": {"b": {"type": "integer"}}},
+        ]
+    }
+    assert ve._make_schema_strict(schema) == schema
 
 
 def test_a_ref_still_keeps_no_sibling_keywords():

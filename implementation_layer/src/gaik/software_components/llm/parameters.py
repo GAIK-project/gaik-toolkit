@@ -39,8 +39,8 @@ def accepts_reasoning(model: str, config: dict | None = None) -> bool:
     """False for an OpenAI family known to reject the ``reasoning`` parameter.
 
     GPT-4o, GPT-4.1, GPT-4 Turbo, ChatGPT-4o and GPT-3.5, also fine-tuned (``ft:...``),
-    by name, or by ``model_family`` when the config's ``model`` is the one called (a
-    family hint describes that model, not a per-call override). It is a denylist: every
+    by name, or by ``model_family`` when the config's ``model`` is the one called or
+    unset (a family hint describes that model, not a per-call override). It is a denylist: every
     other name keeps the parameter, as before, so a deployment alias for a reasoning
     model still gets the effort it was configured with. A config whose ``provider`` is
     not OpenAI or Azure (a compatible server, LiteLLM) keeps it too: such names are free.
@@ -48,7 +48,7 @@ def accepts_reasoning(model: str, config: dict | None = None) -> bool:
     config = config or {}
     if config.get("provider") is not None and not _is_openai_api(config):
         return True
-    hint = config.get("model_family") if model == config.get("model") else None
+    hint = config.get("model_family") if config.get("model") in (None, model) else None
     family = str(hint or model).rsplit("/", 1)[-1].lower().removeprefix("ft:")
     return not family.startswith(_NO_REASONING_PREFIXES)
 

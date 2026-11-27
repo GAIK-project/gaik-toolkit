@@ -413,7 +413,7 @@ def _make_schema_strict(schema: dict) -> dict:
     required and additionalProperties=false — replicating what
     client.beta.chat.completions.parse() does internally but for the
     Responses API which requires an explicit raw schema. It also goes into
-    anyOf/oneOf/allOf branches (an optional field is one), and drops the pattern
+    anyOf branches (an optional field is one), and drops the pattern
     older Pydantic puts on a Decimal (``_PYDANTIC_DECIMAL_PATTERN_START``).
     """
     schema = schema.copy()
@@ -432,12 +432,13 @@ def _make_schema_strict(schema: dict) -> dict:
         schema["$defs"] = {k: _make_schema_strict(v) for k, v in schema["$defs"].items()}
     if schema.get("type") == "array" and "items" in schema:
         schema["items"] = _make_schema_strict(schema["items"])
-    for combinator in ("anyOf", "oneOf", "allOf"):
-        if isinstance(schema.get(combinator), list):
-            schema[combinator] = [
-                _make_schema_strict(branch) if isinstance(branch, dict) else branch
-                for branch in schema[combinator]
-            ]
+    # Pydantic writes an optional field or a union as anyOf. allOf/oneOf stay as they
+    # were: making each allOf object branch strict on its own could forbid the others.
+    if isinstance(schema.get("anyOf"), list):
+        schema["anyOf"] = [
+            _make_schema_strict(branch) if isinstance(branch, dict) else branch
+            for branch in schema["anyOf"]
+        ]
     return schema
 
 
