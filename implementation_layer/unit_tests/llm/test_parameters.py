@@ -166,8 +166,15 @@ def test_explicit_none_is_still_validated_by_the_family_rule(model):
         ("GPT-4o-mini", None, False),
         ("azure/gpt-4.1", None, False),
         ("gpt-35-turbo", {"model_family": "gpt-3.5-turbo"}, False),
-        ("chat-prod", {"model_family": "gpt-4o"}, False),
-        ("chat-prod", {"model_family": "gpt-6-sol"}, True),
+        ("chat-prod", {"model": "chat-prod", "model_family": "gpt-4o"}, False),
+        ("chat-prod", {"model": "chat-prod", "model_family": "gpt-6-sol"}, True),
+        # The family hint describes the config's own model, not a per-call override.
+        ("o3", {"model": "chat-prod", "model_family": "gpt-4o"}, True),
+        ("gpt-4.1", {"model": "chat-prod", "model_family": "gpt-6-sol"}, False),
+        # A compatible server or LiteLLM names its models freely.
+        ("gpt-4-local", {"provider": "openai_compatible"}, True),
+        ("gpt-4.1", {"provider": "litellm"}, True),
+        ("gpt-4.1", {"provider": "azure"}, False),
     ],
 )
 def test_accepts_reasoning_is_a_denylist_of_non_reasoning_families(model, config, expected):
@@ -193,7 +200,9 @@ def test_chat_kwargs_drop_reasoning_effort_for_a_non_reasoning_model():
     }
     assert (
         normalize_chat_kwargs(
-            "chat-prod", {}, config={"model_family": "gpt-4o", "reasoning_effort": "low"}
+            "chat-prod",
+            {},
+            config={"model": "chat-prod", "model_family": "gpt-4o", "reasoning_effort": "low"},
         )
         == {}
     )

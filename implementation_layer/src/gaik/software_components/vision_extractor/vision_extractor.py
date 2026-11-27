@@ -397,12 +397,13 @@ def _combine_with_verification(data: dict, verification: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-#: The pattern Pydantic 2.12 and 2.13 put on a ``decimal.Decimal`` field's string branch.
-#: OpenAI's strict structured outputs reject it with 400 "Invalid JSON schema: regex
-#: lookaround is not supported", so a hand-written model with a Decimal field failed.
-#: Pydantic 2.14 emits no pattern there; dropping it gives older versions the same schema.
-#: A caller's own pattern is left alone: its 400 names the pattern to change.
-_PYDANTIC_DECIMAL_PATTERN = r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"
+#: How every pattern Pydantic 2.12 and 2.13 put on a ``decimal.Decimal`` field's string
+#: branch starts (with or without ``max_digits``/``decimal_places``). OpenAI's strict
+#: structured outputs reject it with 400 "Invalid JSON schema: regex lookaround is not
+#: supported", so a hand-written model with a Decimal field failed. Pydantic 2.14 emits
+#: no pattern there; dropping it gives older versions the same schema. A caller's own
+#: pattern is left alone: its 400 names the pattern to change.
+_PYDANTIC_DECIMAL_PATTERN_START = r"^(?!^[-+.]*$)[+-]?0*"
 
 
 def _make_schema_strict(schema: dict) -> dict:
@@ -413,10 +414,11 @@ def _make_schema_strict(schema: dict) -> dict:
     client.beta.chat.completions.parse() does internally but for the
     Responses API which requires an explicit raw schema. It also goes into
     anyOf/oneOf/allOf branches (an optional field is one), and drops the pattern
-    older Pydantic puts on a Decimal (``_PYDANTIC_DECIMAL_PATTERN``).
+    older Pydantic puts on a Decimal (``_PYDANTIC_DECIMAL_PATTERN_START``).
     """
     schema = schema.copy()
-    if schema.get("pattern") == _PYDANTIC_DECIMAL_PATTERN:
+    pattern = schema.get("pattern")
+    if isinstance(pattern, str) and pattern.startswith(_PYDANTIC_DECIMAL_PATTERN_START):
         del schema["pattern"]
     if "$ref" in schema:
         # OpenAI strict JSON schema rejects sibling keywords next to $ref
@@ -1241,9 +1243,7 @@ class VisionExtractor:
             },
             "max_output_tokens": 32768,
         }
-        # A config's model_family describes the config's model, not a model= override.
-        family_hint = self.config if self.model == self.config.get("model") else None
-        if accepts_reasoning(self.model, family_hint):
+        if accepts_reasoning(self.model, self.config):
             request["reasoning"] = {"effort": self.reasoning_effort}
         t0 = time.perf_counter()
         response = client.responses.create(**request)

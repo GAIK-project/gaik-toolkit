@@ -53,6 +53,21 @@ def test_pydantics_decimal_pattern_is_dropped_inside_anyof():
     ]
 
 
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        # Pydantic 2.12 for Decimal with decimal_places=2, with max_digits=10 and
+        # decimal_places=2, and with max_digits=8.
+        r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d{0,2}0*$",
+        r"^(?!^[-+.]*$)[+-]?0*(?:\d{0,8}|(?=[\d.]{1,11}0*$)\d{0,8}\.\d{0,2}0*$)",
+        r"^(?!^[-+.]*$)[+-]?0*(?:\d{0,8}|(?=[\d.]{1,9}0*$)\d*\.\d*0*$)",
+    ],
+)
+def test_a_constrained_decimals_pattern_is_dropped_too(pattern):
+    field = {"anyOf": [{"type": "number"}, {"type": "string", "pattern": pattern}]}
+    assert ve._make_schema_strict(field) == {"anyOf": [{"type": "number"}, {"type": "string"}]}
+
+
 def test_the_installed_pydantics_decimal_schema_has_no_lookaround_either():
     assert "(?!" not in json.dumps(ve._make_schema_strict(_Invoice.model_json_schema()))
 
