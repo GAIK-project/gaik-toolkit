@@ -121,8 +121,13 @@ jobs:
       run: uv pip install --system ".[all,dev,llm-all,wizard]"
 
     # The Word export tests (test_report_writer.py, test_report_synthesizer.py) skip without Pandoc.
+    # The runner image's packages.microsoft.com source answers 403 on Ubuntu 26.04 and fails
+    # apt-get update; Pandoc comes from Ubuntu's own archive, so that source is dropped first.
     - name: Install Pandoc
-      run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends pandoc
+      run: |
+        grep -l 'packages.microsoft.com' /etc/apt/sources.list.d/* 2>/dev/null | xargs -r sudo rm -f
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq --no-install-recommends pandoc
 
     - name: Smoke test basic import
       run: python -c "from gaik import __version__; print(f'gaik {__version__} OK')"
@@ -320,8 +325,12 @@ jobs:
       uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
 
     # The chunked transcription check exports its chunks with pydub, which needs ffmpeg.
+    # The packages.microsoft.com source is dropped first, as for Pandoc above.
     - name: Install ffmpeg
-      run: sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends ffmpeg
+      run: |
+        grep -l 'packages.microsoft.com' /etc/apt/sources.list.d/* 2>/dev/null | xargs -r sudo rm -f
+        sudo apt-get update -qq
+        sudo apt-get install -y -qq --no-install-recommends ffmpeg
 
     - name: Require tag and run complete release certification
       env:
