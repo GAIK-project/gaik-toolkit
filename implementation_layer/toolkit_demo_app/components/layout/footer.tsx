@@ -18,6 +18,7 @@ import {
   GlimpseDescription,
   GlimpseImage,
 } from "@/components/kibo-ui/glimpse";
+import { DiscordIcon } from "@/components/discord-icon";
 import { GitHubIcon } from "@/components/github-icon";
 import { useOnboarding } from "@/components/onboarding/onboarding-provider";
 import { GITHUB_REPO_URL, type LinkPreview } from "@/lib/link-previews";
@@ -25,6 +26,9 @@ import { useHasMounted } from "@/hooks/use-has-mounted";
 
 const DOCS_URL = "https://gaik-project.github.io/gaik-toolkit/" as const;
 const PYPI_URL = "https://pypi.org/project/gaik/" as const;
+// AAIF Helsinki Hackathon server; the invite never expires and gives the
+// Participant role.
+const DISCORD_URL = "https://discord.gg/sgEFy96vW3" as const;
 
 // Sections of the home page.
 const DEMO_LINKS = [
@@ -133,6 +137,15 @@ export function Footer({ githubPreview }: FooterProps) {
             >
               <Package className="h-3.5 w-3.5" />
               PyPI
+            </a>
+            <a
+              href={DISCORD_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={linkClassName}
+            >
+              <DiscordIcon className="h-3.5 w-3.5" />
+              Discord
             </a>
           </FooterColumn>
 
