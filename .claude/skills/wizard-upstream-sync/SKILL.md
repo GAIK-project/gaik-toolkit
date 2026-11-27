@@ -19,7 +19,7 @@ or posted until the person running the sync has seen it and said go.
 | `implementation_layer/src/gaik/`, `pyproject.toml` (extras) | upstream | release tag and PyPI; the fork merges the tag; both images install `gaik==ARG GAIK_VERSION` from PyPI |
 | `implementation_layer/solution_wizard/` (registry, cards, `SKILL.md`, `gaik_validated_version.txt`, PoC templates and code) | upstream, also edited by the fork | the merge; this is where conflicts land |
 | `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; delivered upstream by merging `release/wizard-v2`, never an open fork PR (the first delivery, upstream PR 324, still took open fork PRs 291 and 299); when upstream edits them anyway, AGENTS.md says when that is right and [references/conflicts.md](references/conflicts.md) how the sync resolves it |
-| `AGENTS.md`, `CLAUDE.md`, `.github/` templates and `CODEOWNERS`, `SECURITY.md` | upstream | the merge; the fork inherits them unless it drops them on purpose |
+| `AGENTS.md`, `CLAUDE.md`, `.github/` templates and `CODEOWNERS`, `SECURITY.md` | upstream | the merge; the fork inherits them unless it drops them on purpose (`GITFLOW.md`, `dependabot.yml` and the CodeQL files each repository keeps its own: [references/conflicts.md](references/conflicts.md)) |
 | demo app, docs, evaluation, agent skills | upstream | ride along without effect on the wizard |
 
 Fixes the fork's team sends upstream come back with the next release and sync.
