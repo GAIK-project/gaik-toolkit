@@ -174,3 +174,27 @@ def test_accepts_reasoning_is_a_denylist_of_non_reasoning_families(model, config
     from gaik.software_components.llm.parameters import accepts_reasoning
 
     assert accepts_reasoning(model, config) is expected
+
+
+@pytest.mark.parametrize(
+    "model", ["gpt-35-turbo", "chatgpt-4o-latest", "ft:gpt-4o-mini-2024-07-18:org::abc"]
+)
+def test_accepts_reasoning_knows_azure_chatgpt_and_fine_tuned_names(model):
+    from gaik.software_components.llm.parameters import accepts_reasoning
+
+    assert accepts_reasoning(model) is False
+
+
+def test_chat_kwargs_drop_reasoning_effort_for_a_non_reasoning_model():
+    # Chat Completions rejects reasoning_effort on GPT-4.x as the Responses API does.
+    options = {"max_tokens": 64, "reasoning_effort": "medium"}
+    assert normalize_chat_kwargs("gpt-4.1", options, config={"provider": "azure"}) == {
+        "max_tokens": 64
+    }
+    assert (
+        normalize_chat_kwargs(
+            "chat-prod", {}, config={"model_family": "gpt-4o", "reasoning_effort": "low"}
+        )
+        == {}
+    )
+    assert options == {"max_tokens": 64, "reasoning_effort": "medium"}

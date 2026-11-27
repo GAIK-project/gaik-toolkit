@@ -24,22 +24,43 @@ class _Invoice(BaseModel):
     total_amount: Decimal | None = None
 
 
-def test_a_decimal_field_leaves_no_lookaround_in_the_strict_schema():
-    strict = ve._make_schema_strict(_Invoice.model_json_schema())
-    text = json.dumps(strict)
-    assert "(?!" not in text and "(?=" not in text
-    branches = strict["properties"]["total_amount"]["anyOf"]
-    assert {b.get("type") for b in branches} == {"number", "string", "null"}
+# What Pydantic 2.12 and 2.13 emit for ``total_amount: Decimal | None`` (2.14 emits no
+# pattern). Written out, so the test checks the fix whichever Pydantic is installed.
+_PYDANTIC_212_INVOICE = {
+    "type": "object",
+    "title": "_Invoice",
+    "properties": {
+        "invoice_number": {"anyOf": [{"type": "string"}, {"type": "null"}], "default": None},
+        "total_amount": {
+            "anyOf": [
+                {"type": "number"},
+                {"type": "string", "pattern": r"^(?!^[-+.]*$)[+-]?0*\d*\.?\d*$"},
+                {"type": "null"},
+            ],
+            "default": None,
+        },
+    },
+}
 
 
-@pytest.mark.parametrize("pattern", [r"(?=x)", r"(?!x)", r"(?<=x)", r"(?<!x)"])
-def test_every_lookaround_pattern_is_dropped(pattern):
-    node = {"type": "string", "pattern": pattern, "description": "kept"}
-    assert ve._make_schema_strict(node) == {"type": "string", "description": "kept"}
+def test_pydantics_decimal_pattern_is_dropped_inside_anyof():
+    strict = ve._make_schema_strict(_PYDANTIC_212_INVOICE)
+    assert "(?!" not in json.dumps(strict)
+    assert strict["properties"]["total_amount"]["anyOf"] == [
+        {"type": "number"},
+        {"type": "string"},
+        {"type": "null"},
+    ]
 
 
-def test_an_ordinary_pattern_stays():
-    node = {"type": "string", "pattern": r"^[A-Z]{2}-\d{4}$"}
+def test_the_installed_pydantics_decimal_schema_has_no_lookaround_either():
+    assert "(?!" not in json.dumps(ve._make_schema_strict(_Invoice.model_json_schema()))
+
+
+@pytest.mark.parametrize("pattern", [r"^(?!foo).*$", r"^[a-z(?=)]+$", r"^[A-Z]{2}-\d{4}$"])
+def test_a_callers_own_pattern_stays(pattern):
+    # A lookaround the caller wrote gets OpenAI's 400 naming it; nothing is guessed away.
+    node = {"type": "string", "pattern": pattern}
     assert ve._make_schema_strict(node) == node
 
 
@@ -62,10 +83,9 @@ def test_a_ref_still_keeps_no_sibling_keywords():
 
 
 def test_the_callers_schema_is_not_changed():
-    schema = _Invoice.model_json_schema()
-    before = json.dumps(schema, sort_keys=True)
-    ve._make_schema_strict(schema)
-    assert json.dumps(schema, sort_keys=True) == before
+    before = json.dumps(_PYDANTIC_212_INVOICE, sort_keys=True)
+    ve._make_schema_strict(_PYDANTIC_212_INVOICE)
+    assert json.dumps(_PYDANTIC_212_INVOICE, sort_keys=True) == before
 
 
 class _Responses:
@@ -101,8 +121,32 @@ def test_vision_extractor_sends_reasoning_only_to_models_that_take_it(monkeypatc
     assert ("reasoning" in responses.kwargs) is sent
     if sent:
         assert responses.kwargs["reasoning"] == {"effort": extractor.reasoning_effort}
-    schema = json.dumps(responses.kwargs["text"]["format"]["schema"])
-    assert "(?!" not in schema
+
+
+@pytest.mark.parametrize(
+    ("family", "override", "sent"),
+    [("gpt-4o", "gpt-6-luna", True), ("gpt-6-luna", "gpt-4.1", False)],
+)
+def test_a_model_override_is_judged_by_its_own_name(monkeypatch, family, override, sent):
+    # model_family describes api_config's model, not the model= that replaces it.
+    config = {"api_key": "k", "model": "chat-prod", "model_family": family}
+    extractor = ve.VisionExtractor(api_config=config, model=override, reasoning_effort="high")
+    responses = _fake_client(monkeypatch, ve, '{"invoice_number": null, "total_amount": null}')
+
+    extractor._call_openai([], "system", "user", _Invoice)
+
+    assert responses.kwargs["model"] == override
+    assert ("reasoning" in responses.kwargs) is sent
+
+
+def test_the_config_family_decides_for_its_own_deployment(monkeypatch):
+    config = {"api_key": "k", "model": "chat-prod", "model_family": "gpt-4o"}
+    extractor = ve.VisionExtractor(api_config=config)
+    responses = _fake_client(monkeypatch, ve, '{"invoice_number": null, "total_amount": null}')
+
+    extractor._call_openai([], "system", "user", _Invoice)
+
+    assert "reasoning" not in responses.kwargs
 
 
 @pytest.mark.parametrize(("model", "sent"), [("gpt-6-luna", True), ("gpt-4o", False)])

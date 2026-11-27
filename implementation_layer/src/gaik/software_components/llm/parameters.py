@@ -31,17 +31,20 @@ def _accepts_effort_none(model: str, config: dict | None = None) -> bool:
 
 # OpenAI families without reasoning: the Responses API answers a ``reasoning`` parameter
 # with 400 "Unsupported parameter: 'reasoning.effort' is not supported with this model."
-_NO_REASONING_PREFIXES = ("gpt-4", "gpt-3.5")
+# "gpt-35" is Azure's model name for GPT-3.5 Turbo.
+_NO_REASONING_PREFIXES = ("gpt-4", "gpt-3.5", "gpt-35", "chatgpt-4")
 
 
 def accepts_reasoning(model: str, config: dict | None = None) -> bool:
     """False for an OpenAI family known to reject the ``reasoning`` parameter.
 
-    GPT-4o, GPT-4.1, GPT-4 Turbo and GPT-3.5, by name or ``model_family``. It is a
-    denylist: every other name keeps the parameter, as before, so a deployment alias for
-    a reasoning model still gets the effort it was configured with.
+    GPT-4o, GPT-4.1, GPT-4 Turbo, ChatGPT-4o and GPT-3.5, also fine-tuned (``ft:...``),
+    by name or ``model_family``. It is a denylist: every other name keeps the parameter,
+    as before, so a deployment alias for a reasoning model still gets the effort it was
+    configured with.
     """
-    return not _family(model, config or {}).startswith(_NO_REASONING_PREFIXES)
+    family = _family(model, config or {}).removeprefix("ft:")
+    return not family.startswith(_NO_REASONING_PREFIXES)
 
 
 def normalize_chat_kwargs(
@@ -57,12 +60,15 @@ def normalize_chat_kwargs(
     OpenAI and Azure OpenAI reasoning models (o-series, gpt-5.x) reject
     ``max_tokens`` and get ``max_completion_tokens``. Other models, custom
     deployment names without ``model_family``, compatible servers and LiteLLM keep
-    ``max_tokens`` as before, so older Azure API versions keep working.
+    ``max_tokens`` as before, so older Azure API versions keep working. GPT-4.x and
+    GPT-3.5 get no ``reasoning_effort``, which they reject (``accepts_reasoning``).
     """
     result = dict(kwargs)
     config = config or {}
     if "reasoning_effort" not in result and config.get("reasoning_effort") is not None:
         result["reasoning_effort"] = config["reasoning_effort"]
+    if not accepts_reasoning(model, config):
+        result.pop("reasoning_effort", None)
     family = _family(model, config)
     is_gpt6 = family.startswith(("gpt-6-", "gpt-6."))
     is_reasoning_family = is_gpt6 or family.startswith("gpt-5.6-")

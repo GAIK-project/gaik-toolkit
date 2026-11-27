@@ -423,7 +423,7 @@
           "high"
         ],
         "default": "medium",
-        "effect": "Legacy constructor setting accepts low/medium/high. On the shared api_config path, put the supported reasoning setting in api_config['reasoning_effort']; the legacy constructor default does not force reasoning on a shared provider. Do not send OpenAI reasoning names blindly to native Google or Anthropic.",
+        "effect": "Legacy constructor setting accepts low/medium/high. It is not sent to OpenAI GPT-4.x or GPT-3.5, which reject it. On the shared api_config path, put the supported reasoning setting in api_config['reasoning_effort']; the legacy constructor default does not force reasoning on a shared provider. Do not send OpenAI reasoning names blindly to native Google or Anthropic.",
         "selection_relevant": true,
         "infer_from": "For GPT-6 use the exact family rules in Phase 6; otherwise use the selected adapter/model options."
       },
@@ -490,7 +490,7 @@
           "high"
         ],
         "default": "low",
-        "effect": "Legacy constructor setting accepts low/medium/high. On the shared api_config path, put the supported reasoning setting in api_config['reasoning_effort']; the legacy constructor default does not force reasoning on a shared provider. Do not send OpenAI reasoning names blindly to native Google or Anthropic.",
+        "effect": "Legacy constructor setting accepts low/medium/high. It is not sent to OpenAI GPT-4.x or GPT-3.5, which reject it. On the shared api_config path, put the supported reasoning setting in api_config['reasoning_effort']; the legacy constructor default does not force reasoning on a shared provider. Do not send OpenAI reasoning names blindly to native Google or Anthropic.",
         "selection_relevant": true,
         "infer_from": "For GPT-6 use the exact family rules in Phase 6; otherwise use the selected adapter/model options."
       },
