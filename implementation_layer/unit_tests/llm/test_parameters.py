@@ -153,3 +153,24 @@ def test_explicit_none_is_still_validated_by_the_family_rule(model):
     assert normalize_chat_kwargs(model, {"reasoning_effort": "none"}) == {
         "reasoning_effort": "none"
     }
+
+
+@pytest.mark.parametrize(
+    ("model", "config", "expected"),
+    [
+        ("gpt-6-luna", None, True),
+        ("gpt-5.4-mini", None, True),
+        ("o4-mini", None, True),
+        ("my-deployment", None, True),  # a deployment alias keeps the parameter, as before
+        ("gpt-4.1", None, False),
+        ("GPT-4o-mini", None, False),
+        ("azure/gpt-4.1", None, False),
+        ("gpt-35-turbo", {"model_family": "gpt-3.5-turbo"}, False),
+        ("chat-prod", {"model_family": "gpt-4o"}, False),
+        ("chat-prod", {"model_family": "gpt-6-sol"}, True),
+    ],
+)
+def test_accepts_reasoning_is_a_denylist_of_non_reasoning_families(model, config, expected):
+    from gaik.software_components.llm.parameters import accepts_reasoning
+
+    assert accepts_reasoning(model, config) is expected

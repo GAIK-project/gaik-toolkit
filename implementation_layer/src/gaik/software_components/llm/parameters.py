@@ -29,6 +29,21 @@ def _accepts_effort_none(model: str, config: dict | None = None) -> bool:
     return _EFFORT_NONE_MODELS.fullmatch(_family(model, config or {})) is not None
 
 
+# OpenAI families without reasoning: the Responses API answers a ``reasoning`` parameter
+# with 400 "Unsupported parameter: 'reasoning.effort' is not supported with this model."
+_NO_REASONING_PREFIXES = ("gpt-4", "gpt-3.5")
+
+
+def accepts_reasoning(model: str, config: dict | None = None) -> bool:
+    """False for an OpenAI family known to reject the ``reasoning`` parameter.
+
+    GPT-4o, GPT-4.1, GPT-4 Turbo and GPT-3.5, by name or ``model_family``. It is a
+    denylist: every other name keeps the parameter, as before, so a deployment alias for
+    a reasoning model still gets the effort it was configured with.
+    """
+    return not _family(model, config or {}).startswith(_NO_REASONING_PREFIXES)
+
+
 def normalize_chat_kwargs(
     model: str, kwargs: dict[str, Any], *, config: dict | None = None
 ) -> dict[str, Any]:
