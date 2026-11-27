@@ -41,6 +41,7 @@ from gaik.software_components.extractor.schema import (
 )
 from gaik.software_components.image_metadata import strip_image_metadata
 from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.llm.parameters import accepts_reasoning
 from gaik.software_components.parsers.multimodal_parser.config import (
     create_claude_client,
     create_openai_client,
@@ -396,15 +397,29 @@ def _combine_with_verification(data: dict, verification: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
+#: How every pattern Pydantic 2.12 and 2.13 put on a ``decimal.Decimal`` field's string
+#: branch starts (with or without ``max_digits``/``decimal_places``). OpenAI's strict
+#: structured outputs reject it with 400 "Invalid JSON schema: regex lookaround is not
+#: supported", so a hand-written model with a Decimal field failed. Pydantic 2.14 emits
+#: no pattern there; dropping it gives older versions the same schema. A caller's own
+#: pattern is left alone: its 400 names the pattern to change.
+_PYDANTIC_DECIMAL_PATTERN_START = r"^(?!^[-+.]*$)[+-]?0*"
+
+
 def _make_schema_strict(schema: dict) -> dict:
     """Make a JSON schema compatible with OpenAI strict mode.
 
     Recursively ensures every object node has all its properties listed in
     required and additionalProperties=false — replicating what
     client.beta.chat.completions.parse() does internally but for the
-    Responses API which requires an explicit raw schema.
+    Responses API which requires an explicit raw schema. It also goes into
+    anyOf branches (an optional field is one), and drops the pattern
+    older Pydantic puts on a Decimal (``_PYDANTIC_DECIMAL_PATTERN_START``).
     """
     schema = schema.copy()
+    pattern = schema.get("pattern")
+    if isinstance(pattern, str) and pattern.startswith(_PYDANTIC_DECIMAL_PATTERN_START):
+        del schema["pattern"]
     if "$ref" in schema:
         # OpenAI strict JSON schema rejects sibling keywords next to $ref
         # (for example {"$ref": "...", "description": "..."}).
@@ -417,6 +432,13 @@ def _make_schema_strict(schema: dict) -> dict:
         schema["$defs"] = {k: _make_schema_strict(v) for k, v in schema["$defs"].items()}
     if schema.get("type") == "array" and "items" in schema:
         schema["items"] = _make_schema_strict(schema["items"])
+    # Pydantic writes an optional field or a union as anyOf. allOf/oneOf stay as they
+    # were: making each allOf object branch strict on its own could forbid the others.
+    if isinstance(schema.get("anyOf"), list):
+        schema["anyOf"] = [
+            _make_schema_strict(branch) if isinstance(branch, dict) else branch
+            for branch in schema["anyOf"]
+        ]
     return schema
 
 
@@ -1208,13 +1230,11 @@ class VisionExtractor:
                 content.append({"type": "input_image", "image_url": data_url})
         content.append({"type": "input_text", "text": user_prompt})
 
-        t0 = time.perf_counter()
-        response = client.responses.create(
-            model=self.model,
-            instructions=system_prompt,
-            input=[{"role": "user", "content": content}],
-            reasoning={"effort": self.reasoning_effort},
-            text={
+        request = {
+            "model": self.model,
+            "instructions": system_prompt,
+            "input": [{"role": "user", "content": content}],
+            "text": {
                 "format": {
                     "type": "json_schema",
                     "name": sanitize_model_name(extraction_model.__name__),
@@ -1222,8 +1242,12 @@ class VisionExtractor:
                     "strict": True,
                 }
             },
-            max_output_tokens=32768,
-        )
+            "max_output_tokens": 32768,
+        }
+        if accepts_reasoning(self.model, self.config):
+            request["reasoning"] = {"effort": self.reasoning_effort}
+        t0 = time.perf_counter()
+        response = client.responses.create(**request)
         elapsed = time.perf_counter() - t0
 
         result_dict = json.loads(response.output_text)

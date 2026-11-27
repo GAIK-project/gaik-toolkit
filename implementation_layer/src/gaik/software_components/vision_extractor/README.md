@@ -171,7 +171,7 @@ Constructor options:
 | `api_config` | `dict | None` | `None` | Shared `get_llm_config(...)` dictionary. Its explicit `provider` selects the common client and overrides the legacy provider flags. |
 | `model_provider` | `"openai" | "claude" | "google"` | `"openai"` | Provider used for the vision extraction API call. |
 | `model` | `str | None` | `None` | Model or deployment name. If `None`, uses the configured provider default. |
-| `reasoning_effort` | `"low" | "medium" | "high"` | `"medium"` | Provider reasoning/thinking effort. Used during layout understanding and extraction. |
+| `reasoning_effort` | `"low" | "medium" | "high"` | `"medium"` | Provider reasoning/thinking effort. Used during layout understanding and extraction. Not sent to OpenAI's GPT-4.x and GPT-3.5, which reject it. |
 | `merge_table` | `bool` | `False` | Adds an instruction to merge tables split across pages. |
 | `use_azure` | `bool` | `True` | For OpenAI, use Azure OpenAI. For Claude, use Anthropic Foundry. |
 | `vertex_ai` | `bool` | `True` | For Google, use Vertex AI instead of direct Gemini API. |

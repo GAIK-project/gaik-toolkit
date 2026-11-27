@@ -18,6 +18,7 @@ from gaik.software_components._log_names import file_tag
 from gaik.software_components.endpoints import check_endpoint
 from gaik.software_components.file_type import check_file_type
 from gaik.software_components.input_limits import InputLimits
+from gaik.software_components.llm.parameters import accepts_reasoning
 from gaik.software_components.source_material import with_source_material_instruction
 
 from .._cut_off import Reply, reply_cut_off
@@ -371,18 +372,20 @@ class MultimodalParser:
         self, pdf_path: Path, system_prompt: str, user_prompt: str
     ) -> tuple[str, dict[str, int]]:
         client = create_openai_client(self.config)
-        response = client.responses.create(
-            model=self.config["model"],
-            instructions=system_prompt,
-            input=[
+        request = {
+            "model": self.config["model"],
+            "instructions": system_prompt,
+            "input": [
                 {
                     "role": "user",
                     "content": _build_openai_content(pdf_path, user_prompt),
                 }
             ],
-            reasoning={"effort": self.reasoning_effort},
-            max_output_tokens=32768,
-        )
+            "max_output_tokens": 32768,
+        }
+        if accepts_reasoning(self.config["model"], self.config):
+            request["reasoning"] = {"effort": self.reasoning_effort}
+        response = client.responses.create(**request)
         text = response.output_text.strip()
         if not text:
             raise ValueError("The OpenAI response did not contain any text output.")

@@ -75,6 +75,7 @@ image messages; native PDF-upload support is not required.
 
 Set provider-specific request options, such as `reasoning_effort`, in the shared
 config. Legacy constructor reasoning defaults apply only to the legacy route.
+OpenAI's GPT-4.x and GPT-3.5 reject a reasoning setting, so none is sent to them.
 Install `gaik[llm-litellm]` to use `provider="litellm"` and a model with its
 LiteLLM provider prefix. Token usage is recorded when the provider returns it;
 unknown model prices remain zero in the local pricing table.

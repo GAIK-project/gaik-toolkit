@@ -153,3 +153,58 @@ def test_explicit_none_is_still_validated_by_the_family_rule(model):
     assert normalize_chat_kwargs(model, {"reasoning_effort": "none"}) == {
         "reasoning_effort": "none"
     }
+
+
+@pytest.mark.parametrize(
+    ("model", "config", "expected"),
+    [
+        ("gpt-6-luna", None, True),
+        ("gpt-5.4-mini", None, True),
+        ("o4-mini", None, True),
+        ("my-deployment", None, True),  # a deployment alias keeps the parameter, as before
+        ("gpt-4.1", None, False),
+        ("GPT-4o-mini", None, False),
+        ("azure/gpt-4.1", None, False),
+        # A family hint without a config model describes the model called.
+        ("chat-35", {"model_family": "gpt-3.5-turbo"}, False),
+        ("chat-prod", {"model": "chat-prod", "model_family": "gpt-4o"}, False),
+        ("chat-prod", {"model": "chat-prod", "model_family": "gpt-6-sol"}, True),
+        # The family hint describes the config's own model, not a per-call override.
+        ("o3", {"model": "chat-prod", "model_family": "gpt-4o"}, True),
+        ("gpt-4.1", {"model": "chat-prod", "model_family": "gpt-6-sol"}, False),
+        # A compatible server or LiteLLM names its models freely.
+        ("gpt-4-local", {"provider": "openai_compatible"}, True),
+        ("gpt-4.1", {"provider": "litellm"}, True),
+        ("gpt-4.1", {"provider": "azure"}, False),
+    ],
+)
+def test_accepts_reasoning_is_a_denylist_of_non_reasoning_families(model, config, expected):
+    from gaik.software_components.llm.parameters import accepts_reasoning
+
+    assert accepts_reasoning(model, config) is expected
+
+
+@pytest.mark.parametrize(
+    "model", ["gpt-35-turbo", "chatgpt-4o-latest", "ft:gpt-4o-mini-2024-07-18:org::abc"]
+)
+def test_accepts_reasoning_knows_azure_chatgpt_and_fine_tuned_names(model):
+    from gaik.software_components.llm.parameters import accepts_reasoning
+
+    assert accepts_reasoning(model) is False
+
+
+def test_chat_kwargs_drop_reasoning_effort_for_a_non_reasoning_model():
+    # Chat Completions rejects reasoning_effort on GPT-4.x as the Responses API does.
+    options = {"max_tokens": 64, "reasoning_effort": "medium"}
+    assert normalize_chat_kwargs("gpt-4.1", options, config={"provider": "azure"}) == {
+        "max_tokens": 64
+    }
+    assert (
+        normalize_chat_kwargs(
+            "chat-prod",
+            {},
+            config={"model": "chat-prod", "model_family": "gpt-4o", "reasoning_effort": "low"},
+        )
+        == {}
+    )
+    assert options == {"max_tokens": 64, "reasoning_effort": "medium"}
