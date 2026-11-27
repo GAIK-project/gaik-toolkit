@@ -328,8 +328,8 @@ echo STEP C: Install the Skill in Claude Desktop
 echo ----------------------------------------------------------------------------
 echo.
 echo    1. Open Claude Desktop
-echo    2. Go to Customize then Skills
-echo    3. Click Add then Upload skill
+echo    2. Open Plugins in the sidebar - formerly Customize, then Skills
+echo    3. Choose Upload a skill
 echo    4. Upload: %SCRIPT_DIR%incident-report-writing.zip
 echo.
 echo ----------------------------------------------------------------------------

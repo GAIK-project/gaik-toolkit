@@ -92,7 +92,7 @@ export const installTabs = [
     name: "Claude Desktop",
     lines: [plugin.marketplace],
     copyLabel: "Copy the repository name",
-    note: "Enter it under Customize → Plugins → Add → Add marketplace → Add from a repository. Sync, then add Gaik toolkit from the Discover tab.",
+    note: "Enter it under Plugins (formerly Customize) → Add marketplace → Add from a repository. Sync, then add Gaik toolkit from the Discover tab.",
   },
   {
     id: "claude-code",

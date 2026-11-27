@@ -63,7 +63,7 @@ export default function SkillsPage() {
               Claude Desktop
             </h2>
             <p className="text-muted-foreground mt-1 text-sm">
-              Upload the .zip in Customize → Skills.
+              Upload the .zip under Plugins → Upload a skill.
             </p>
           </div>
           <SkillList skills={noCodeSkills} variant="desktop" />
