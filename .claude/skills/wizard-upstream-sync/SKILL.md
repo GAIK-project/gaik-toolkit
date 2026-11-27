@@ -18,7 +18,7 @@ or posted until the person running the sync has seen it and said go.
 |---|---|---|
 | `implementation_layer/src/gaik/`, `pyproject.toml` (extras) | upstream | release tag and PyPI; the fork merges the tag; both images install `gaik==ARG GAIK_VERSION` from PyPI |
 | `implementation_layer/solution_wizard/` (registry, cards, `SKILL.md`, `gaik_validated_version.txt`, PoC templates and code) | upstream, also edited by the fork | the merge; this is where conflicts land |
-| `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; delivered upstream by merging `release/wizard-v2` (upstream PR 324 was the first), never an open fork PR; upstream edits them only to get a delivery through its checks or for a security update, which the fork should take too |
+| `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; delivered upstream by merging `release/wizard-v2` (upstream PR 324 was the first), never an open fork PR; when upstream edits them anyway, AGENTS.md says when that is right and [references/conflicts.md](references/conflicts.md) how the sync resolves it |
 | `AGENTS.md`, `CLAUDE.md`, `.github/` templates and `CODEOWNERS`, `SECURITY.md` | upstream | the merge; the fork inherits them unless it drops them on purpose |
 | demo app, docs, evaluation, agent skills | upstream | ride along without effect on the wizard |
 
@@ -59,7 +59,8 @@ setuptools-scm in the fork needs those tags to give the in-repo gaik a version. 
   whether the gaik-sync audit is needed;
 - pins: the validated pin, both `ARG GAIK_VERSION`, the runner README, whether PyPI has the
   version, and `GAIK_EXTRAS` gaps;
-- a `git merge-tree` preview of conflicts and the files both sides changed;
+- a `git merge-tree` preview of conflicts, the files both sides changed and the files the
+  merge would delete from the fork without a conflict;
 - files the fork would inherit (code owners, templates, security policy, agent instructions);
 - the fork's own edits to upstream files, upstream commits not yet in a release, and open
   upstream PRs (with `gh`).

@@ -27,6 +27,15 @@ and PoC-generation changes.
 
 A file one side deleted and the other changed: ask the user.
 
+A file upstream deleted and the fork left unchanged goes without a conflict; the plan's
+merge preview lists these. A delivery leaves the fork's own files out of upstream, so they
+come back as deletions: `GITFLOW.md`, `.github/workflows/codeql.yml` and
+`.github/codeql/codeql-config.yml` (upstream uses CodeQL's default setup), and
+`implementation_layer/unit_tests/test_vision_strict_schema.py` (the test of the fork's
+VisionExtractor edit). Restore each before committing the merge
+(`git checkout origin/develop -- <file>`) and name it in the "Conflicts:" paragraph. A
+deleted upstream file the fork never changed, such as a demo file, goes as upstream decided.
+
 A fork PR whose commits upstream already carries (a delivery took it while it was open)
 merges into `develop` with a merge commit, not a squash: the commits then stay shared and
 the sync has nothing to resolve there. For the sync after v0.12.0, `git merge-tree` found

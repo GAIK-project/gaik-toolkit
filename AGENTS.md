@@ -11,13 +11,16 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   scans, by design.
 - `implementation_layer/solution_wizard/`: the Solution Wizard, which mirrors gaik's API
   (see gaik-sync below); v1 and v2 share it.
-- Solution Wizard v2 (`implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`,
-  `gaik-aiops/`) is developed in the fork `NCF-public/gaik-toolkit-configuration-wizard-v2`
-  and arrives here as a merge of the fork's `release/wizard-v2`, never of an open fork pull
-  request. Change those folders (and the wizard's workflows) there, since an edit here
-  conflicts with the next delivery: a fix a delivery needs to pass the checks here goes
-  into the fork first, and a Dependabot pull request for them is redone in the fork and
-  closed here with a link. Running it locally: `implementation_layer/WIZARD-DEV.md`.
+- Solution Wizard v2 (`implementation_layer/solution_wizard_v2/`, `implementation_layer/wizard_api/`,
+  `implementation_layer/deploy/`, `gaik-aiops/` and the workflows `solution-wizard-v2.yml`,
+  `wizard-v2-*.yml` and `aiops.yml`) is developed in the fork
+  `NCF-public/gaik-toolkit-configuration-wizard-v2` and arrives here as a merge of the fork's
+  `release/wizard-v2`, never of an open fork pull request. Change it there, since an edit here
+  conflicts with the next delivery: a fix a delivery needs to pass the checks here goes into
+  the fork first, and a Dependabot pull request for it is redone in the fork and closed here
+  with a link. An upstream change that breaks it (a test fixture after a provider change) may
+  fix it in the same pull request; say so there, so the fork's next sync keeps the fix.
+  Running it locally: `implementation_layer/WIZARD-DEV.md`.
 - `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI
   backend in `api/`, deployed on Rahti.
 - `guidance_layer/website/`: the docs site.

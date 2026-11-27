@@ -804,11 +804,31 @@ def predict_conflicts(repo, base, target):
         check=False,
     )
     lines = [ln for ln in proc.stdout.splitlines() if ln.strip()]
+    if proc.returncode not in (0, 1) or not lines:
+        return {
+            "clean": None,
+            "files": [],
+            "deleted": [],
+            "error": (proc.stderr or proc.stdout).strip(),
+        }
+    # The first line is the merged tree, written even when files conflict.
+    deleted = deleted_by_merge(repo, base, lines[0])
     if proc.returncode == 0:
-        return {"clean": True, "files": []}
-    if proc.returncode == 1:
-        return {"clean": False, "files": lines[1:]}
-    return {"clean": None, "files": [], "error": (proc.stderr or proc.stdout).strip()}
+        return {"clean": True, "files": [], "deleted": deleted}
+    return {"clean": False, "files": lines[1:], "deleted": deleted}
+
+
+def deleted_by_merge(repo, base, tree):
+    """Files the fork has that the merged tree drops. Upstream deleting a file the fork
+    did not change since the merge base removes it without a conflict; a delivery that
+    leaves fork-only files out (GITFLOW.md, the fork's CodeQL workflow) does exactly that."""
+    proc = run(
+        ["git", "-C", repo, "diff", "--name-only", "--diff-filter=D", base, tree],
+        check=False,
+    )
+    if proc.returncode != 0:
+        return []
+    return [f for f in proc.stdout.splitlines() if f.strip() and not f.startswith("graphify-out/")]
 
 
 def recommend(plan):
@@ -1022,6 +1042,12 @@ def render_plan(plan):
             add("`git merge-tree`: conflicts in " + ", ".join(f"`{f}`" for f in c["files"]) + ".")
         else:
             add(f"`git merge-tree` failed: {c.get('error')}")
+        if c.get("deleted"):
+            add(
+                "The merge deletes from the fork, without a conflict: "
+                + ", ".join(f"`{f}`" for f in c["deleted"])
+                + ". Restore each file the fork keeps (references/conflicts.md)."
+            )
         if plan["both_changed"]:
             add("Changed on both sides: " + ", ".join(f"`{f}`" for f in plan["both_changed"]) + ".")
         if plan["upstream_touched_fork_owned"]:
