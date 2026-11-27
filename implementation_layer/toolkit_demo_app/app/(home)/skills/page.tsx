@@ -3,6 +3,7 @@ import { InstallPlugin } from "@/components/no-code/install-plugin";
 import { NoCodeHeader } from "@/components/no-code/no-code-header";
 import { ClaudeIcon } from "@/components/no-code/provider-icons";
 import { SkillList } from "@/components/no-code/skill-list";
+import { OnboardAgent } from "@/components/onboard-agent";
 import {
   developerSkills,
   installGuideUrl,
@@ -27,9 +28,13 @@ export default function SkillsPage() {
       />
 
       <section aria-labelledby="install-plugin" className="space-y-4">
-        <h2 id="install-plugin" className="font-serif text-2xl font-semibold">
-          Install the plugin
-        </h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 id="install-plugin" className="font-serif text-2xl font-semibold">
+            Install the plugin
+          </h2>
+          {/* One prompt installs the plugin, the gaik package and the MCP server. */}
+          <OnboardAgent />
+        </div>
         <InstallPlugin />
         <AgentLogos
           lead="Skills also work in"
