@@ -13,8 +13,11 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   (see gaik-sync below); v1 and v2 share it.
 - Solution Wizard v2 (`implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`,
   `gaik-aiops/`) is developed in the fork `NCF-public/gaik-toolkit-configuration-wizard-v2`
-  and arrives here as a merge of a fork branch; change those folders there, since an edit
-  here conflicts with the next delivery. Running it locally: `implementation_layer/WIZARD-DEV.md`.
+  and arrives here as a merge of the fork's `release/wizard-v2`, never of an open fork pull
+  request. Change those folders (and the wizard's workflows) there, since an edit here
+  conflicts with the next delivery: a fix a delivery needs to pass the checks here goes
+  into the fork first, and a Dependabot pull request for them is redone in the fork and
+  closed here with a link. Running it locally: `implementation_layer/WIZARD-DEV.md`.
 - `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI
   backend in `api/`, deployed on Rahti.
 - `guidance_layer/website/`: the docs site.

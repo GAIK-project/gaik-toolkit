@@ -18,7 +18,7 @@ or posted until the person running the sync has seen it and said go.
 |---|---|---|
 | `implementation_layer/src/gaik/`, `pyproject.toml` (extras) | upstream | release tag and PyPI; the fork merges the tag; both images install `gaik==ARG GAIK_VERSION` from PyPI |
 | `implementation_layer/solution_wizard/` (registry, cards, `SKILL.md`, `gaik_validated_version.txt`, PoC templates and code) | upstream, also edited by the fork | the merge; this is where conflicts land |
-| `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; to be delivered upstream later from `release/wizard-v2`, as the fork's open PR 20 describes |
+| `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | fork | fork PRs to `develop`; delivered upstream by merging `release/wizard-v2` (upstream PR 324 was the first), never an open fork PR; upstream edits them only to get a delivery through its checks or for a security update, which the fork should take too |
 | `AGENTS.md`, `CLAUDE.md`, `.github/` templates and `CODEOWNERS`, `SECURITY.md` | upstream | the merge; the fork inherits them unless it drops them on purpose |
 | demo app, docs, evaluation, agent skills | upstream | ride along without effect on the wizard |
 
