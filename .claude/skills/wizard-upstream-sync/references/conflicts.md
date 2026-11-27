@@ -22,6 +22,7 @@ and PoC-generation changes.
 | `implementation_layer/solution_wizard/src/`, `templates/poc/`, `scripts/scaffold_poc.py` | combine; the fork's BPMN and PoC-generation changes from sprints 1–4 are deliberate (for example "a generated PoC package actually runs"); then run the solution_wizard and wizard_api tests |
 | `implementation_layer/src/gaik/` (the fork edits `software_components/vision_extractor/vision_extractor.py`) | ask the user first. If upstream now carries the same fix, take upstream's; otherwise keep the fork's edit and note that it belongs upstream |
 | `implementation_layer/solution_wizard_v2/`, `wizard_api/`, `deploy/`, `gaik-aiops/`, the wizard workflows | the fork's. The plan marks upstream's commits there "wizard v2 (fork-owned)": keep each intent the fork still lacks (a CI guard, a formatting fix, a security bump), and take a lock file with the manifest it belongs to |
+| `GITFLOW.md`, `.github/dependabot.yml`, `.github/workflows/codeql.yml`, `.github/codeql/` | each repository keeps its own: the fork's branch model, its Dependabot updates to `develop`, and its CodeQL workflow (upstream uses CodeQL's default setup). The fork's in a sync, upstream's in a delivery |
 | `README.md`, `.gitignore` | both |
 | `graphify-out/` | upstream's: it is a generated graph |
 
