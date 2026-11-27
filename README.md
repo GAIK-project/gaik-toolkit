@@ -204,3 +204,7 @@ This architecture ensures that GenAI solutions are built with proper governance,
 ## 📜 License
 
 This project is licensed under the MIT License – see [`LICENSE`](https://github.com/GAIK-project/gaik-toolkit/blob/main/LICENSE) for details.
+
+<p>
+  <img src="https://raw.githubusercontent.com/GAIK-project/gaik-toolkit/main/guidance_layer/website/public/logos/eu_logo.png" alt="Co-funded by the European Union" width="240">
+</p>
