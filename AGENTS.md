@@ -17,8 +17,8 @@ This repo is public: never commit machine-local paths, usernames or secret-store
   `NCF-public/gaik-toolkit-configuration-wizard-v2` and arrives here as a merge of the fork's
   `release/wizard-v2`, never of an open fork pull request. Change it there, since an edit here
   conflicts with the next delivery: a fix a delivery needs to pass the checks here goes into
-  the fork first, and a Dependabot pull request for it is redone in the fork and closed here
-  with a link. An upstream change that breaks it (a test fixture after a provider change) may
+  the fork first, and a Dependabot pull request that touches only these paths is redone in
+  the fork and closed here with a link (one that also updates upstream's files stays). An upstream change that breaks it (a test fixture after a provider change) may
   fix it in the same pull request; say so there, so the fork's next sync keeps the fix.
   Running it locally: `implementation_layer/WIZARD-DEV.md`.
 - `implementation_layer/toolkit_demo_app/`: the demo, Next.js on bun with a FastAPI

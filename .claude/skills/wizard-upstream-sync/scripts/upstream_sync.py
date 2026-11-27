@@ -808,27 +808,77 @@ def predict_conflicts(repo, base, target):
         return {
             "clean": None,
             "files": [],
-            "deleted": [],
+            "reverted": [],
             "error": (proc.stderr or proc.stdout).strip(),
         }
     # The first line is the merged tree, written even when files conflict.
-    deleted = deleted_by_merge(repo, base, lines[0])
-    if proc.returncode == 0:
-        return {"clean": True, "files": [], "deleted": deleted}
-    return {"clean": False, "files": lines[1:], "deleted": deleted}
+    try:
+        reverted, reverted_error = reverted_by_merge(repo, base, target, lines[0]), None
+    except RuntimeError as exc:
+        reverted, reverted_error = [], str(exc)
+    result = {"files": lines[1:], "reverted": reverted, "reverted_error": reverted_error}
+    return {"clean": proc.returncode == 0, **result}
 
 
-def deleted_by_merge(repo, base, tree):
-    """Files the fork has that the merged tree drops. Upstream deleting a file the fork
-    did not change since the merge base removes it without a conflict; a delivery that
-    leaves fork-only files out (GITFLOW.md, the fork's CodeQL workflow) does exactly that."""
-    proc = run(
-        ["git", "-C", repo, "diff", "--name-only", "--diff-filter=D", base, tree],
-        check=False,
-    )
+def _git_out(repo, *args):
+    proc = run(["git", "-C", repo, *args], check=False)
     if proc.returncode != 0:
+        raise RuntimeError(f"git {args[0]} failed: {(proc.stderr or proc.stdout).strip()}")
+    return proc.stdout
+
+
+def _blobs(repo, rev):
+    out = {}
+    for entry in _git_out(repo, "ls-tree", "-r", "-z", rev).split("\0"):
+        if entry:
+            meta, path = entry.split("\t", 1)
+            out[path] = meta.split()[2]
+    return out
+
+
+def delivery_merge(repo, fork_point, target):
+    """The merge on upstream's first-parent line that brought the fork commit `fork_point`
+    in, or None when `fork_point` is on that line itself (no delivery since the last sync)."""
+    line = _git_out(repo, "rev-list", "--first-parent", "--reverse", f"{fork_point}..{target}")
+    after = set(_git_out(repo, "rev-list", "--ancestry-path", f"{fork_point}..{target}").split())
+    for commit in line.split():
+        if commit in after:
+            parents = _git_out(repo, "rev-list", "--parents", "-n", "1", commit).split()[1:]
+            first_has_it = run(
+                ["git", "-C", repo, "merge-base", "--is-ancestor", fork_point, parents[0]],
+                check=False,
+            )
+            return None if len(parents) < 2 or first_has_it.returncode == 0 else commit
+    return None
+
+
+def reverted_by_merge(repo, base, target, tree):
+    """Fork files the merge deletes or changes back without a conflict, because the
+    delivery that took the fork upstream kept upstream's version (GITFLOW.md, the fork's
+    CodeQL files and dependabot.yml, its VisionExtractor edit). Each item: (path, how)."""
+    fork_point = _git_out(repo, "merge-base", base, target).strip()
+    delivery = delivery_merge(repo, fork_point, target)
+    if delivery is None:
         return []
-    return [f for f in proc.stdout.splitlines() if f.strip() and not f.startswith("graphify-out/")]
+    # The delivery merged the fork (fork_point) into upstream (delivery^1) over this base.
+    delivery_base = _git_out(repo, "merge-base", fork_point, f"{delivery}^1").strip()
+    fork, merged = _blobs(repo, base), _blobs(repo, tree)
+    sent_all, base_all = _blobs(repo, fork_point), _blobs(repo, delivery_base)
+    taken_all, before_all = _blobs(repo, delivery), _blobs(repo, f"{delivery}^1")
+    out = []
+    for path, blob in sorted(fork.items()):
+        sent, taken = sent_all.get(path), taken_all.get(path)
+        if (
+            merged.get(path) == blob  # the merge leaves the fork's file as it is
+            or sent is None  # added to the fork after the delivery
+            or sent == base_all.get(path)  # the fork had not changed it
+            or taken == sent  # the delivery took the fork's version
+            or (taken is not None and taken != before_all.get(path))  # it combined both
+            or path.startswith("graphify-out/")
+        ):
+            continue
+        out.append((path, "deleted" if path not in merged else "changed"))
+    return out
 
 
 def recommend(plan):
@@ -1042,11 +1092,17 @@ def render_plan(plan):
             add("`git merge-tree`: conflicts in " + ", ".join(f"`{f}`" for f in c["files"]) + ".")
         else:
             add(f"`git merge-tree` failed: {c.get('error')}")
-        if c.get("deleted"):
+        if c.get("reverted"):
             add(
-                "The merge deletes from the fork, without a conflict: "
-                + ", ".join(f"`{f}`" for f in c["deleted"])
-                + ". Restore each file the fork keeps (references/conflicts.md)."
+                "The merge takes back, without a conflict, fork files the delivery did not "
+                "take: "
+                + ", ".join(f"`{f}` ({how})" for f, how in c["reverted"])
+                + ". Keep the fork's version of each it still wants (references/conflicts.md)."
+            )
+        if c.get("reverted_error"):
+            add(
+                f"Could not check for fork files the merge takes back: {c['reverted_error']}. "
+                "Compare the merge with `origin/develop` before committing it."
             )
         if plan["both_changed"]:
             add("Changed on both sides: " + ", ".join(f"`{f}`" for f in plan["both_changed"]) + ".")

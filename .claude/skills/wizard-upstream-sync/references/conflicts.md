@@ -27,14 +27,20 @@ and PoC-generation changes.
 
 A file one side deleted and the other changed: ask the user.
 
-A file upstream deleted and the fork left unchanged goes without a conflict; the plan's
-merge preview lists these. A delivery leaves the fork's own files out of upstream, so they
-come back as deletions: `GITFLOW.md`, `.github/workflows/codeql.yml` and
-`.github/codeql/codeql-config.yml` (upstream uses CodeQL's default setup), and
-`implementation_layer/unit_tests/test_vision_strict_schema.py` (the test of the fork's
-VisionExtractor edit). Restore each before committing the merge
-(`git checkout origin/develop -- <file>`) and name it in the "Conflicts:" paragraph. A
-deleted upstream file the fork never changed, such as a demo file, goes as upstream decided.
+A fork change the delivery did not take comes back from upstream without a conflict: the
+file is deleted or changed back. The plan's merge preview lists these files. For the sync
+after v0.12.0 they are `GITFLOW.md`, the fork's CodeQL workflow and config (upstream uses
+CodeQL's default setup), `.github/dependabot.yml` (the fork's updates to `develop`),
+`CLAUDE.md`, `README.md`, the fork's notes in `gaik_component_registry.json`, a test fix in
+`test_provider_scaffolding.py`, and the fork's VisionExtractor edit with its test
+(`vision_extractor.py`, `test_vision_strict_schema.py`).
+
+Keep the fork's version of each one unless upstream's now covers it. Restore it from the
+merge's first parent: `git checkout HEAD -- <file>` while the merge is paused. If `prepare`
+already committed a clean merge, run `git checkout HEAD^1 -- <file>`, then amend the merge
+commit before the pin bump. Name each file in the "Conflicts:" paragraph. The VisionExtractor
+pair is a gaik library change: ask the user first, and keep or drop the edit and its test
+together, since the test imports the edit's helpers.
 
 A fork PR whose commits upstream already carries (a delivery took it while it was open)
 merges into `develop` with a merge commit, not a squash: the commits then stay shared and
