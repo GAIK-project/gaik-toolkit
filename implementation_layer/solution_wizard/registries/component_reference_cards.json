@@ -1504,7 +1504,7 @@
     "import": "from gaik.software_modules.audio_to_structured_data import AudioToStructuredData",
     "construct": "pipeline = AudioToStructuredData(transcription_config=get_stage_config(config, 'transcription'), extraction_config=get_stage_config(config, 'extraction'))",
     "call": "result = pipeline.run(file_path=input_path, user_requirements=user_requirements, schema=schema, requirements=requirements)\n    extracted_fields = result.extracted_fields\n    source_text = result.transcription.enhanced_transcript or result.transcription.raw_transcript",
-    "returns": "PipelineResult(.transcription, .extracted_fields, .schema, .requirements); .requirements preserves ExtractionRequirements or CompositeExtractionRequirements",
+    "returns": "PipelineResult(.transcription, .extracted_fields, .schema, .requirements, .transcription_attempts, .empty_fields); .requirements preserves ExtractionRequirements or CompositeExtractionRequirements; .transcription_attempts counts the transcriptions made (failed retries included); .empty_fields lists the retry_when_empty fields still empty in the result returned, for the PoC to report as missing",
     "install_extra": "audio-to-structured-data",
     "subsumes": [
       "Transcriber",
@@ -1569,6 +1569,22 @@
         "effect": "The flat or parent-with-repeated-record requirements matching schema. Always pass both schema and requirements; load_schema preserves the CompositeExtractionRequirements discriminator for parent/child schemas.",
         "selection_relevant": true,
         "infer_from": "always pass alongside schema"
+      },
+      {
+        "name": "retry_when_empty",
+        "type": "list[str] | None",
+        "default": null,
+        "effect": "run() keyword: names of fields the audio is expected to state (e.g. ['reporter_name', 'asset_identifier']). When one comes back empty, the same audio is transcribed and extracted again with the same schema, because Azure transcription sometimes drops a passage (often the opening sentences) in a random call. The run with the fewest empty named fields is returned. For a parent with child collections the names are the parent's own fields; for a nested-list schema they are the items' fields, and a field counts as empty only when no item has it. A name the schema lacks raises ValueError before the audio is transcribed (a generated schema is generated first). None never retries. Each retry costs one more transcription and extraction call (and the enhancer's passes when enhanced_transcript is on).",
+        "selection_relevant": true,
+        "infer_from": "the facts a dropped passage would lose and the use case needs from every recording (who reports, which asset, where), taken from target_output_spec; not fields that are often empty for good reason"
+      },
+      {
+        "name": "transcription_retries",
+        "type": "int",
+        "default": 2,
+        "effect": "run() keyword: the most retries for retry_when_empty. A retry that fails on a rate limit, a timeout or a server error uses up that try and the next is made; any other error ends the retries; the best result so far is returned either way. 0 turns retrying off.",
+        "selection_relevant": false,
+        "infer_from": "keep the default 2 when retry_when_empty is set"
       },
       {
         "name": "transcription_config",
