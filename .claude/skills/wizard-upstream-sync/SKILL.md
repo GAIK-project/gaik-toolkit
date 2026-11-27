@@ -59,8 +59,9 @@ setuptools-scm in the fork needs those tags to give the in-repo gaik a version. 
   whether the gaik-sync audit is needed;
 - pins: the validated pin, both `ARG GAIK_VERSION`, the runner README, whether PyPI has the
   version, and `GAIK_EXTRAS` gaps;
-- a `git merge-tree` preview of conflicts, the files both sides changed and the fork files
-  the merge would take back without a conflict (fork changes the last delivery did not take);
+- a `git merge-tree` preview of conflicts, the files both sides changed, and the files where
+  the fork has its own version that the merge changes, deletes or adds back without a
+  conflict (fork changes a delivery did not take come back this way);
 - files the fork would inherit (code owners, templates, security policy, agent instructions);
 - the fork's own edits to upstream files, upstream commits not yet in a release, and open
   upstream PRs (with `gh`).
@@ -86,7 +87,8 @@ This creates a worktree on `chore/gaik-X.Y.Z` from `origin/develop` and merges t
 `--no-ff` as "Merge upstream gaik-toolkit vX.Y.Z into develop". The main checkout stays as
 it is, so work in progress there is not disturbed.
 
-On conflicts it stops with the merge in progress. Resolve each file as
+On conflicts, and when the merge changes fork files without a conflict (it lists them), it
+stops with the merge in progress. Resolve each file as
 [references/conflicts.md](references/conflicts.md) describes, then commit with a
 "Conflicts:" paragraph that names each file and the side kept. A conflict inside
 `implementation_layer/src/gaik/` changes the gaik library: describe it and ask first, since

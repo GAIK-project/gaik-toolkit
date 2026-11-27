@@ -27,25 +27,27 @@ and PoC-generation changes.
 
 A file one side deleted and the other changed: ask the user.
 
-A fork change the delivery did not take comes back from upstream without a conflict: the
-file is deleted or changed back. The plan's merge preview lists these files. For the sync
-after v0.12.0 they are `GITFLOW.md`, the fork's CodeQL workflow and config (upstream uses
-CodeQL's default setup), `.github/dependabot.yml` (the fork's updates to `develop`),
-`CLAUDE.md`, `README.md`, the fork's notes in `gaik_component_registry.json`, a test fix in
-`test_provider_scaffolding.py`, and the fork's VisionExtractor edit with its test
-(`vision_extractor.py`, `test_vision_strict_schema.py`).
+A clean merge can still undo fork work. When a delivery kept upstream's version of a fork
+change or left a fork file out, the next sync changes the fork's file back or deletes it
+without a conflict. The plan's merge preview lists every file where the fork has its own
+version (against the upstream commit it last took in) and the merge changes it, deletes it
+or adds it back without a conflict; `prepare` then stops before committing. For the sync
+after v0.12.0 the list includes `GITFLOW.md` and the fork's CodeQL workflow and config
+(deleted; upstream uses CodeQL's default setup), `.github/dependabot.yml` (the fork's
+updates to `develop`), `REVIEW.md` and the fork's VisionExtractor edit with its test.
 
-Keep the fork's version of each one unless upstream's now covers it. Restore it from the
-merge's first parent: `git checkout HEAD -- <file>` while the merge is paused. If `prepare`
-already committed a clean merge, run `git checkout HEAD^1 -- <file>`, then amend the merge
-commit before the pin bump. Name each file in the "Conflicts:" paragraph. The VisionExtractor
+Read each one's diff from the fork (`git diff HEAD -- <file>` in the paused merge) and keep
+the fork's lines it still wants; upstream's own changes in the same file stay. A file only
+the fork has can come back whole: `git checkout HEAD -- <file>`. In a file upstream also
+has, put back only the fork's change, for example `git diff <last-taken> HEAD -- <file> |
+git apply -3` with the upstream commit the preview names; a whole-file checkout would undo
+upstream's fixes there. Name each file in the "Conflicts:" paragraph. The VisionExtractor
 pair is a gaik library change: ask the user first, and keep or drop the edit and its test
 together, since the test imports the edit's helpers.
 
 A fork PR whose commits upstream already carries (a delivery took it while it was open)
-merges into `develop` with a merge commit, not a squash: the commits then stay shared and
-the sync has nothing to resolve there. For the sync after v0.12.0, `git merge-tree` found
-seven conflicting files with fork PRs 291 and 299 squashed, and two with merge commits.
+merges into `develop` with a merge commit, not a squash: the commits then stay shared, and
+the sync has less to resolve. Fork PRs 291 and 299 are such PRs after the v0.12.0 delivery.
 
 Write one line per file into the merge commit's "Conflicts:" paragraph: the file, the side
 kept and why. The 0.8.10 merge (fork commit 26a64db7) is the model:
