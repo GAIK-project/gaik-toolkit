@@ -27,6 +27,11 @@ and PoC-generation changes.
 
 A file one side deleted and the other changed: ask the user.
 
+A fork PR whose commits upstream already carries (a delivery took it while it was open)
+merges into `develop` with a merge commit, not a squash: the commits then stay shared and
+the sync has nothing to resolve there. For the sync after v0.12.0, `git merge-tree` found
+seven conflicting files with fork PRs 291 and 299 squashed, and two with merge commits.
+
 Write one line per file into the merge commit's "Conflicts:" paragraph: the file, the side
 kept and why. The 0.8.10 merge (fork commit 26a64db7) is the model:
 
