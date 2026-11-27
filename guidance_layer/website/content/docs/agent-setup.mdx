@@ -1,0 +1,172 @@
+---
+title: Set up GAIK with your coding agent
+description: Instructions a coding agent follows to add gaik to a project, connect the GAIK MCP server and install the GAIK agent skills
+---
+
+This page is written for an AI coding agent: Claude Code, Codex, Cursor, VS Code with GitHub Copilot, Gemini CLI or another. Give it to your agent with one line:
+
+```text
+Set up GAIK for me. Fetch https://gaik-project.github.io/gaik-toolkit/agent-setup.md and follow it.
+```
+
+GAIK is an open-source (MIT) toolkit for generative-AI knowledge work from the GAIK project at Haaga-Helia. The `gaik` Python package parses documents, transcribes recordings, fills fields from a text with the quote each value rests on, searches documents, classifies text and writes source-cited reports, with Azure OpenAI, OpenAI, Anthropic, Google Gemini, CSC Aitta and other model providers. Its MCP server gives an agent six of these operations as tools.
+
+## How to run this
+
+- Work in the user's current project folder. Run the steps yourself with your tools; give the user a command only when you cannot run it.
+- Before you change anything, tell the user in two or three lines what you will set up (sections 2 to 4) and ask one question: which model provider they use with GAIK (Azure OpenAI, OpenAI, Anthropic, Google Gemini, CSC Aitta or another). Then go ahead with all three sections unless they say otherwise.
+- Ask before you install anything outside the project, such as uv itself or a plugin for all projects, and accept your client's own approval prompts as they come.
+- Never ask for an API key in the chat. Never print, quote or commit the `.env` file: the user types the keys into it.
+- Set up only the agent you are running in, unless the user asks for others.
+- Do not use a gaik version from your training data: look it up in section 1.
+
+## 1. Check the machine and the version
+
+1. Python 3.11 or newer: `python --version` (or `python3 --version`).
+2. uv: `uv --version`. The MCP server runs through `uvx`, which comes with uv. If uv is missing, ask the user, then install it as [uv's installation guide](https://docs.astral.sh/uv/getting-started/installation/) says (Windows: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"`; macOS and Linux: `curl -LsSf https://astral.sh/uv/install.sh | sh`) and open a new shell.
+3. The current gaik version: fetch `https://pypi.org/pypi/gaik/json` and read `info.version`. Below, `VERSION` stands for that number.
+
+## 2. Add gaik to the project
+
+Do this when the user writes Python with gaik. Skip it when they only want the MCP server or the skills.
+
+- In a project with a `pyproject.toml` and no other tool's lockfile (such as `poetry.lock` or `pdm.lock`): `uv add "gaik[EXTRAS]"`. It records the dependency and creates the virtual environment and `uv.lock` when they are missing.
+- Otherwise use the project's own tool, or pip in the project's virtual environment, never the system Python: `pip install "gaik[EXTRAS]"`.
+- Then check that the installed version is `VERSION`: `python -c "import gaik; print(gaik.__version__)"`.
+
+Pick the extras the task needs, separated by commas, for example `gaik[extract,parser-cpu]`:
+
+| Task | Extra |
+| --- | --- |
+| Fill fields or a schema from text | `extract` |
+| Read PDF and Word files without OCR, a small install | `parser-cpu` |
+| Read PDF, Word and scanned files with Docling and OCR (large: brings torch) | `parser` |
+| Transcribe recordings | `transcriber` |
+| Hybrid search over documents in PostgreSQL (pgvector and full-text) | `pg-vector-store` |
+| Write source-cited reports from mixed files | `report-writer` |
+| One function per common task, as in the MCP server | `operations` |
+| Models from Anthropic, Google or through LiteLLM | `llm-anthropic`, `llm-google`, `llm-litellm` |
+| Everything without GPU libraries, or everything | `all-cpu`, `all` |
+
+The [software components](/toolkit/software-components) page lists every extra with its component.
+
+## 3. Connect the GAIK MCP server
+
+The server gives the agent six tools: `parse_document` (text of a PDF, DOCX, `.txt` or `.md` file), `transcribe_audio`, `generate_fields` (field definitions from a plain-language requirement), `extract_fields` (values with the quote each rests on and a verdict), `classify_text` and `fields_to_word` (a Word report). It reads and writes only inside the folder that `--root` names. Its [reference](/toolkit/operations-and-mcp) has the details.
+
+Every client runs the same command:
+
+```bash
+uvx --from "gaik[mcp]==VERSION" gaik-mcp --root . --env-file .env
+```
+
+- `--root` names the project folder. The server refuses the home folder and a whole drive. `.` works when the client starts the server in the project folder; otherwise give the absolute path, and the same for `--env-file`.
+- With Anthropic models use `gaik[mcp,llm-anthropic]`, with Google Gemini or Vertex AI `gaik[mcp,llm-google]`, through LiteLLM `gaik[mcp,llm-litellm]`. Azure OpenAI, OpenAI and CSC Aitta need nothing more.
+- Run the command once with `--help` in place of the other arguments before you register it: `uvx --from "gaik[mcp]==VERSION" gaik-mcp --help`. It must print the usage. The first run downloads the packages, so a client that starts the server later does not run out of time.
+
+### The credentials file
+
+1. Create `.env` in the project folder if it does not exist. The server does not start when `--env-file` names a missing file.
+2. Make sure `.gitignore` lists `.env`, and add the line if it does not.
+3. Add the variables of the user's provider that the file lacks, with empty values, without printing what is already there. Then tell the user to fill them in.
+
+| Provider | Variables |
+| --- | --- |
+| Azure OpenAI | `LLM_PROVIDER=azure`, `AZURE_API_KEY`, `AZURE_ENDPOINT`, `AZURE_DEPLOYMENT` (the name of the chat model's deployment) |
+| OpenAI | `LLM_PROVIDER=openai`, `OPENAI_API_KEY` |
+| Anthropic | `LLM_PROVIDER=anthropic`, `ANTHROPIC_API_KEY` |
+| Google Gemini | `LLM_PROVIDER=google`, `GOOGLE_API_KEY` |
+| CSC Aitta | `LLM_PROVIDER=aitta`, `AITTA_API_KEY` |
+| Others (Vertex AI, Microsoft Foundry, an OpenAI-compatible server, LiteLLM) | see [Multi-provider LLM](/toolkit/multi-provider-llm) |
+
+`parse_document` and `fields_to_word` call no model, so they work before the keys are in place. `transcribe_audio` works with OpenAI and Azure OpenAI only.
+
+### Register the server
+
+**Claude Code.** This writes `.mcp.json` in the project, which the team can share:
+
+```bash
+claude mcp add gaik --scope project -- uvx --from "gaik[mcp]==VERSION" gaik-mcp --root . --env-file .env
+```
+
+`claude mcp list` then shows `gaik` as pending approval: Claude Code asks the user to approve a project's servers when the next session starts, and the tools appear in that session.
+
+**Codex.** Add the server to `~/.codex/config.toml`, or to `.codex/config.toml` in a project the user trusts. Codex gives a server 10 seconds to start and 60 seconds per tool call by default; a long recording or a long document needs more:
+
+```toml
+[mcp_servers.gaik]
+command = "uvx"
+args = ["--from", "gaik[mcp]==VERSION", "gaik-mcp", "--root", "/absolute/path/to/project", "--env-file", "/absolute/path/to/project/.env"]
+startup_timeout_sec = 60
+tool_timeout_sec = 900
+```
+
+**Cursor.** `.cursor/mcp.json` in the project. Merge the entry into an existing file and keep the other servers:
+
+```json
+{
+  "mcpServers": {
+    "gaik": {
+      "command": "uvx",
+      "args": ["--from", "gaik[mcp]==VERSION", "gaik-mcp", "--root", "${workspaceFolder}", "--env-file", "${workspaceFolder}/.env"]
+    }
+  }
+}
+```
+
+**VS Code with GitHub Copilot.** `.vscode/mcp.json` in the project. The top-level key is `servers`:
+
+```json
+{
+  "servers": {
+    "gaik": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["--from", "gaik[mcp]==VERSION", "gaik-mcp", "--root", "${workspaceFolder}", "--env-file", "${workspaceFolder}/.env"]
+    }
+  }
+}
+```
+
+**Any other MCP client** (Gemini CLI, Windsurf, Claude Desktop and others): a stdio server with the command `uvx` and the arguments above. Use absolute paths when you do not know which folder the client starts the server in.
+
+### Check the server
+
+Once the tools are visible to you, call `parse_document` with the path of a small text or markdown file in the project, such as `{"path": "README.md"}`. It returns the file's text. When your client shows new servers only in a new session, say so in the report and tell the user how to run this check there.
+
+## 4. Add the GAIK agent skills
+
+One plugin, `gaik-toolkit`, holds every GAIK skill. For developers: choosing a document parser, extraction schemas with evidence, hybrid search, and source-cited reports with gaik. Ready-to-run use cases: a slide deck from a brief, an EU AI Act screening, a helpdesk over the user's own documents, and Claude Desktop skills for incident reports, construction site diaries, purchase orders and Word reports. The [no-code assets](/toolkit/no-code-assets) page describes them.
+
+The plugin installs for all of the user's projects, so ask before you install it, and check first whether it is there (`claude plugin list`, `codex plugin list`).
+
+| Agent | Commands |
+| --- | --- |
+| Claude Code | `claude plugin marketplace add GAIK-project/gaik-toolkit`, then `claude plugin install gaik-toolkit@gaik-toolkit` |
+| Codex | `codex plugin marketplace add GAIK-project/gaik-toolkit`, then `codex plugin add gaik-toolkit@gaik-toolkit` |
+| Copilot CLI | `copilot plugin marketplace add GAIK-project/gaik-toolkit`, then `copilot plugin install gaik-toolkit@gaik-toolkit` |
+| VS Code | add `GAIK-project/gaik-toolkit` to the `chat.plugins.marketplaces` setting, then install `gaik-toolkit` |
+| Claude Desktop, claude.ai | the user does it: **Customize → Plugins → Add → Add marketplace**, `GAIK-project/gaik-toolkit` |
+| Others | copy the folders under [`implementation_layer/no-code-assets/agent-skills/skills/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills) into the folder your agent reads skills from |
+
+Skills load in a new session. Ready-made prompts that need no install are on the demo's [prompts page](https://gaik-demo.2.rahtiapp.fi/prompts).
+
+## 5. Report to the user
+
+End with a short report of what you checked yourself, in this shape. Write "not checked" rather than guess:
+
+```text
+GAIK setup
+- gaik package: VERSION in <environment>, or skipped
+- MCP server: <client> (<configuration file>); check: <parse_document worked | waits for a new session>
+- Model provider: <provider>; keys in .env: <filled | waiting for the user>
+- Agent skills: gaik-toolkit <plugin version>, or skipped
+- Next: <for example: fill in .env, start a new session and approve the gaik server>
+```
+
+## Where to read next
+
+- [llms.txt](https://gaik-project.github.io/gaik-toolkit/llms.txt): every documentation page as markdown, for agents.
+- [Operations and MCP Server](/toolkit/operations-and-mcp): the tools, their limits and the HTTP transport.
+- [Examples](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples): runnable code for each component.
+- [Toolkit demo](https://gaik-demo.2.rahtiapp.fi/): every component and use case in the browser.

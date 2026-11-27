@@ -88,6 +88,8 @@ export GAIK_MCP_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(3
 gaik-mcp --transport http --port 8000
 ```
 
+`uvx --from "gaik[mcp]" gaik-mcp --root . --env-file .env` runs the same server from PyPI without installing it into a project. [Set up GAIK with your coding agent](/agent-setup) has one prompt that has Claude Code, Codex, Cursor or VS Code register the server, with the configuration for each.
+
 | Tool | Arguments | Returns |
 | --- | --- | --- |
 | `parse_document` | `path`, or `content_base64` with `filename`; `offset`, `max_chars` | `format`, `page_count`, `text` (a window), `total_chars`, `next_offset` |
