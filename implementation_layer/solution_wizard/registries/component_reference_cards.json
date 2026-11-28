@@ -557,7 +557,7 @@
     "import": "from gaik.software_components.parsers import VisionParser",
     "construct": "parser = VisionParser(openai_config=get_stage_config(config, 'parser'))",
     "call": "pages = parser.convert_pdf(str(input_path), clean_output=True)\n    parsed_text = '\\n\\n'.join(pages)",
-    "call_page_citations": "pages = parser.convert_pdf(str(input_path), clean_output=False)\n    # DO NOT join -- each list index is one page, needed for file_name|page_number citations\n    file_name = input_path.name\n    cited_pages = [(file_name, page_num, page_text) for page_num, page_text in enumerate(pages, start=1)]",
+    "call_page_citations": "pages = parser.convert_pdf(str(input_path), clean_output=False)\n    # DO NOT join -- each list index is one page, needed for file_name|page_number citations\n    file_name = input_path.name\n    cited_pages = [(file_name, page_num, page_text) for page_num, page_text in enumerate(pages, start=1)]\n    # for AnswerGenerator(citations=True): Document(page_content=text, metadata={'document_name': name, 'page_number': page}) per (name, page, text)",
     "returns": "list[str] (markdown pages). With clean_output=True and >1 page, this is a ONE-ELEMENT list containing the merged/cleaned markdown for the whole document -- NOT one element per page; if the cleanup reply stops at max_tokens, the per-page list is returned instead (a warning is logged), so do not assume one element. Page-level attribution requires clean_output=False.",
     "install_extra": "parser",
     "options": [
@@ -640,7 +640,7 @@
     "import": "from gaik.software_components.parsers import PyMuPDFParser",
     "construct": "parser = PyMuPDFParser()",
     "call": "res = parser.parse_document(str(input_path), use_markdown=True)\n    parsed_text = res['text_content']",
-    "call_page_citations": "res = parser.parse_document(str(input_path), use_markdown=False)\n    # text_content now contains '=== PAGE N ===' markers -- split on them to recover per-page text\n    import re\n    file_name = input_path.name\n    raw_pages = re.split(r'=== PAGE (\\d+) ===', res['text_content'])[1:]\n    cited_pages = [(file_name, int(raw_pages[i]), raw_pages[i + 1]) for i in range(0, len(raw_pages), 2)]",
+    "call_page_citations": "res = parser.parse_document(str(input_path), use_markdown=False)\n    # text_content now contains '=== PAGE N ===' markers -- split on them to recover per-page text\n    import re\n    file_name = input_path.name\n    raw_pages = re.split(r'=== PAGE (\\d+) ===', res['text_content'])[1:]\n    cited_pages = [(file_name, int(raw_pages[i]), raw_pages[i + 1]) for i in range(0, len(raw_pages), 2)]\n    # for AnswerGenerator(citations=True): Document(page_content=text, metadata={'document_name': name, 'page_number': page}) per (name, page, text)",
     "returns": "dict(.text_content, .word_count, .content_length). With use_markdown=True (default), .text_content is one flat string, pages concatenated with no marker -- no page-level provenance. With use_markdown=False, .text_content contains '=== PAGE N ===' markers per page plus per-line [x:,y:] bounding-box tags -- this is the only way this parser supports file_name|page_number citations, and it is opt-in, not the default.",
     "install_extra": "parser-cpu",
     "options": [
@@ -1071,7 +1071,7 @@
         "name": "citations",
         "type": "bool",
         "default": false,
-        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written. A string context has no chunks: the model is asked for [document_name, page X] citations and the answer is returned as written, with an empty citations list.",
+        "effect": "Include source citations in the answer, built from the retrieved chunks: each chunk gets a reference number, the model cites by it, and each numbered reference becomes [document_name, page X] from that chunk's metadata: the name is read from metadata['document_name'] and the page from metadata['page_number'], with no other keys tried. When building Documents by hand, store the document's name (file name or stem) under exactly 'document_name' and its 1-based page number under exactly 'page_number'. A page under any other key, such as 'page', gives a citation with the name only, [document_name]; a name under any other key, such as 'file_name' (what PyMuPDFParser returns), leaves the bare reference [N]. gaik's own RAG parsers already write these keys, and 'Unknown' as the page of a chunk that has none. The citations list (generate_with_citations() -> CitedAnswer.citations) holds only retrieved chunks; a [name, page X] no chunk has is removed. A number that is not a chunk's reference, code, and sources in other forms are left as written. A string context has no chunks: the model is asked for [document_name, page X] citations and the answer is returned as written, with an empty citations list.",
         "selection_relevant": true,
         "infer_from": "traceability / citation requirement"
       },
