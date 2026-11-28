@@ -1,0 +1,136 @@
+---
+title: Agent Plugin
+description: Install all GAIK agent skills in Claude, Claude Code, Codex, Copilot CLI, VS Code, or ChatGPT from one plugin marketplace
+---
+
+import { Callout } from 'fumadocs-ui/components/callout';
+import { Tab, Tabs } from 'fumadocs-ui/components/tabs';
+
+The GAIK Toolkit packages all of its agent skills as one portable [Agent Plugins v1](https://agent-plugins.org) plugin (`gaik-toolkit`). Adding this repository as a plugin marketplace installs both the ready-to-run use-case skills and the developer skills for building document pipelines with the `gaik` Python package.
+
+<Callout type="info">
+Want your coding agent to install the `gaik` Python package, connect the GAIK MCP server, and add this plugin from a single prompt? Follow [Set up GAIK with your coding agent](/agent-setup).
+</Callout>
+
+## Install
+
+This repository exposes both `.agents/plugins/marketplace.json` (Codex native) and `.claude-plugin/marketplace.json` (Claude and compatible clients) so one repository serves every supported client.
+
+<Tabs items={['Claude Desktop / claude.ai', 'Claude Code', 'Codex', 'Copilot CLI', 'VS Code', 'ChatGPT & others']}>
+  <Tab value="Claude Desktop / claude.ai">
+    1. Open **Plugins** in Claude's sidebar (formerly **Customize → Plugins**), select **Add marketplace**, and choose **Add from a repository**.
+    2. Enter `GAIK-project/gaik-toolkit` and select **Sync**. Leave **Sync automatically** on to receive skill updates as the repository changes.
+
+    ![Claude's Add marketplace dialog with GAIK-project/gaik-toolkit entered](/images/claude-plugin-add-marketplace.png)
+
+    3. On the **Discover** tab, select **Add** next to **GAIK Toolkit**.
+
+    Once enabled, Claude opens a skill automatically when a task calls for it, or you can invoke one directly by typing `/` in a chat.
+  </Tab>
+
+  <Tab value="Claude Code">
+    Run these commands inside Claude Code:
+
+    ```bash
+    /plugin marketplace add GAIK-project/gaik-toolkit
+    /plugin install gaik-toolkit@gaik-toolkit
+    ```
+
+    Or from a terminal:
+
+    ```bash
+    claude plugin marketplace add GAIK-project/gaik-toolkit
+    claude plugin install gaik-toolkit@gaik-toolkit
+    ```
+
+    To test a local checkout for one session without installing it:
+
+    ```bash
+    claude --plugin-dir ./implementation_layer/no-code-assets/agent-skills
+    ```
+  </Tab>
+
+  <Tab value="Codex">
+    Run these commands in a terminal:
+
+    ```bash
+    codex plugin marketplace add GAIK-project/gaik-toolkit
+    codex plugin add gaik-toolkit@gaik-toolkit
+    ```
+
+    Codex reads the repository's `.agents/plugins/marketplace.json` catalog and caches the plugin per version. Start a new session to load newly installed skills.
+  </Tab>
+
+  <Tab value="Copilot CLI">
+    Run these commands in a terminal:
+
+    ```bash
+    copilot plugin marketplace add GAIK-project/gaik-toolkit
+    copilot plugin install gaik-toolkit@gaik-toolkit
+    ```
+  </Tab>
+
+  <Tab value="VS Code">
+    Add `GAIK-project/gaik-toolkit` to your `chat.plugins.marketplaces` setting, or run **Chat: Install Plugin From Source** from the Command Palette and point it to `GAIK-project/gaik-toolkit`.
+  </Tab>
+
+  <Tab value="ChatGPT & others">
+    - **ChatGPT workspace:** an admin opens **Admin Console → Plugins → Add → Import marketplace** and enters `https://github.com/GAIK-project/gaik-toolkit`.
+    - **Other Agent Plugins v1 clients:** point the client at `implementation_layer/no-code-assets/agent-skills`.
+    - **Clients without plugin support:** copy the skill folders from [`implementation_layer/no-code-assets/agent-skills/skills/`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills) into your agent's skills directory.
+    - **Single skill as `.zip`:** download an individual skill from [gaik-demo.2.rahtiapp.fi/skills](https://gaik-demo.2.rahtiapp.fi/skills) and upload it in Claude under **Plugins → Upload a skill**.
+  </Tab>
+</Tabs>
+
+## What is included
+
+Every skill lives under `implementation_layer/no-code-assets/agent-skills/skills/` with a `SKILL.md` for the agent and a `README.md` for people.
+
+### For developers building with `gaik`
+
+These skills capture decisions and failure modes that are expensive to rediscover — such as which parser keeps table structure intact or why a hybrid search quietly fell back to vector-only.
+
+| Skill | Use it when |
+| --- | --- |
+| [`parsing-documents`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/parsing-documents) | Converting PDFs, scans, or Word files to text or markdown; tables break; parsing costs more than expected |
+| [`extracting-structured-data`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/extracting-structured-data) | Pulling fields or line items into a schema; fixing 400s or truncation; adding page/quote evidence; measuring accuracy |
+| [`searching-documents`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/searching-documents) | Building semantic or hybrid (`pgvector` + full-text) search; Finnish text; relevance gating and retrieval evaluation |
+| [`generate-structured-reports`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/generate-structured-reports) | Running the `gaik` report writer across mixed files so every statement traces to a verified quote, with gaps and conflicts shown |
+
+### Ready-to-run use cases
+
+No custom code needed. The first three run in any agent that can execute Python; the remaining four target Claude Desktop and include local MCP setup files.
+
+| Skill | What it does | Needs |
+| --- | --- | --- |
+| [`brief-to-slides`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/brief-to-slides) | Builds an editable PowerPoint deck with speaker notes, timing, and citations from a short brief | Python, bash; LibreOffice and poppler for previews |
+| [`ai-act-use-case-screening`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/ai-act-use-case-screening) | Screens any planned or active AI use case against the EU AI Act through short follow-up questions | Python standard library for the check script |
+| [`document-helpdesk-assistant`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/document-helpdesk-assistant) | Answers customer or staff questions strictly from your own documents with named sources and hand-off drafts | Python standard library; `pdftotext`, `pypdf`, or PyMuPDF for PDFs |
+| [`incident-report-writing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/incident-report-writing) | Turns a spoken incident or safety observation into a formatted Word report | Local `gaik-transcriber` MCP server |
+| [`construction-diary-creation`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/construction-diary-creation) | Turns a site manager's spoken day into a structured construction diary (*Työmaapäiväkirja*) | Local `gaik-transcriber` MCP server |
+| [`purchase-order-processing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/purchase-order-processing) | Matches a purchase order and BOMs against a price list and writes a priced sales order | Local Filesystem MCP server |
+| [`report-writing`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills/skills/report-writing) | Consolidates recordings, notes, and documents into one structured Word report in Claude Desktop | Local Filesystem and `gaik-transcriber` MCP servers |
+
+## Agent Plugin vs. GAIK MCP Server
+
+The plugin and the MCP server solve different halves of the workflow and complement each other:
+
+| | Agent Plugin (`gaik-toolkit`) | GAIK MCP Server (`gaik-mcp`) |
+| --- | --- | --- |
+| **Provides** | Instructions, playbooks, references, and helper scripts (`SKILL.md`) | Callable tools (`parse_document`, `transcribe_audio`, `generate_fields`, `extract_fields`, `classify_text`, `fields_to_word`) |
+| **Install requirement** | None beyond a supported client | Python 3.11+ (`pip install "gaik[mcp]"` or `uvx`) |
+| **Use it when** | You want ready-to-run skills or guidance for writing `gaik` pipelines | You want your agent to call GAIK operations directly on local files or text |
+
+See [Operations and MCP Server](/toolkit/operations-and-mcp) for tool schemas, path limits, and HTTP transport details.
+
+## Data, credentials, and updates
+
+- **No bundled secrets or background calls:** The plugin contains only instructions, reference markdown, helper scripts, and slide templates. It declares no MCP server or hook and sends nothing by itself.
+- **Your own provider keys:** Skills that run `gaik` read your existing environment variables (`OPENAI_API_KEY`, `AZURE_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `AITTA_API_KEY`, etc.) and send data only to the provider you configure. See the full per-skill data table in the [plugin README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills#data-services-and-credentials).
+- **Updates:** Claude syncs automatically when **Sync automatically** is enabled. In CLI clients, refresh the marketplace to pick up new plugin versions.
+
+---
+
+- **Try or download individual skills:** [Agent skills in the demo app](https://gaik-demo.2.rahtiapp.fi/skills)
+- **One-prompt coding-agent onboarding:** [Set up GAIK with your coding agent](/agent-setup)
+- **Plugin source:** [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)

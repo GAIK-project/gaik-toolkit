@@ -1,0 +1,20 @@
+{
+  "name": "gaik-toolkit",
+  "interface": {
+    "displayName": "GAIK Toolkit"
+  },
+  "plugins": [
+    {
+      "name": "gaik-toolkit",
+      "source": {
+        "source": "local",
+        "path": "./implementation_layer/no-code-assets/agent-skills"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

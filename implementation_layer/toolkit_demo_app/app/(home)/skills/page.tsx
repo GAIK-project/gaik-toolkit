@@ -46,7 +46,7 @@ export default function SkillsPage() {
             rel="noopener noreferrer"
             className="hover:text-foreground flex items-center gap-1.5 underline underline-offset-4"
           >
-            Steps for these and other clients
+            Full plugin install guide
             <ExternalLink className="size-3.5" aria-hidden="true" />
           </a>
         </AgentLogos>

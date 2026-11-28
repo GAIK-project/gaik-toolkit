@@ -22,6 +22,7 @@ yaml = pytest.importorskip("yaml")
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PLUGIN_DIR = REPO_ROOT / "implementation_layer" / "no-code-assets" / "agent-skills"
 MARKETPLACE = REPO_ROOT / ".claude-plugin" / "marketplace.json"
+CODEX_MARKETPLACE = REPO_ROOT / ".agents" / "plugins" / "marketplace.json"
 SKILL_DIRS = sorted(p.parent for p in (PLUGIN_DIR / "skills").glob("*/SKILL.md"))
 SKILL_FILES = sorted((PLUGIN_DIR / "skills").rglob("*.md"))
 
@@ -107,6 +108,31 @@ def test_every_marketplace_entry_resolves_to_a_plugin():
 def test_marketplace_lists_this_plugin():
     names = {entry["name"] for entry in json.loads(_read(MARKETPLACE))["plugins"]}
     assert _manifest()["name"] in names
+
+
+def test_codex_marketplace_agrees_with_claude_marketplace():
+    # OpenAI Codex prefers .agents/plugins/marketplace.json (with .claude-plugin/marketplace.json
+    # as a legacy fallback). Keep both catalogs listing the exact same plugins and paths.
+    claude = json.loads(_read(MARKETPLACE))
+    codex = json.loads(_read(CODEX_MARKETPLACE))
+
+    assert codex["name"] == claude["name"]
+    assert codex["interface"]["displayName"].strip()
+
+    codex_entries = {}
+    for entry in codex["plugins"]:
+        source = entry["source"]
+        assert source["source"] == "local"
+        path = source["path"]
+        assert path.startswith("./"), f"{entry['name']}: relative paths must start with ./"
+        plugin_dir = (REPO_ROOT / path).resolve()
+        manifest = json.loads(_read(plugin_dir / "plugin.json"))
+        assert manifest["name"] == entry["name"]
+        assert "version" not in entry
+        codex_entries[entry["name"]] = path
+
+    claude_entries = {entry["name"]: entry["source"] for entry in claude["plugins"]}
+    assert codex_entries == claude_entries
 
 
 # ── Skills ──────────────────────────────────────────────────────────

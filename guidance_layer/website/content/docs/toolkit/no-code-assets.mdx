@@ -72,6 +72,7 @@ flowchart LR
 
 **Available prompt packs:**
 - Construction diary creation
+- Document helpdesk assistant
 - Incident report writing
 - Purchase-order processing
 - Safety observation reporting
@@ -120,11 +121,13 @@ flowchart TD
 - Domain-adaptable by editing reference files and allowed values
 
 **Available skill packs:**
+- AI Act use-case screening
+- Brief to slides (presentation generation)
 - Construction diary creation
+- Document helpdesk assistant
 - Incident report writing
 - Purchase-order processing
 - Report writing
-- Brief to slides (presentation generation)
 
 Every skill is a folder under `agent-skills/skills/` with a `SKILL.md` that the agent follows and a `README.md` that explains what the skill does and how to set it up.
 
@@ -135,43 +138,15 @@ Every skill is a folder under `agent-skills/skills/` with a `SKILL.md` that the 
 - Structured report generation for management and compliance purposes
 - Rapid use-case delivery in organizations without dedicated AI development teams
 
-- **Use them**: [Agent skills in the demo app](https://gaik-demo.2.rahtiapp.fi/skills) — download a skill as a .zip and open a ready-made "try this" prompt in Claude
+- **Use them**: [Agent skills in the demo app](https://gaik-demo.2.rahtiapp.fi/skills) — install all skills as a plugin, or download a single skill as a `.zip`
 - **Assets path**: [implementation_layer/no-code-assets/agent-skills](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills)
 
-#### Skills for coding agents
+### Installing as an Agent Plugin
 
-The [`agent-skills`](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills) folder is also a plugin in the [Agent Plugins](https://agent-plugins.org) format, so one install brings every skill in it: the use-case skills above and four skills for developers building document pipelines with the `gaik` package: parsing documents, extracting structured data, searching documents and generating structured reports. The last one runs the `gaik` report writer from an agent that can run Python, so every statement in the report traces to a verified quote from the user's files. The developer skills carry the decisions and failure modes that are expensive to rediscover, such as which parser keeps a table's structure or why a hybrid search quietly became vector-only.
+The entire `agent-skills` folder is also published as one portable [Agent Plugins v1](https://agent-plugins.org) plugin (`gaik-toolkit`), bringing both the ready-to-run use-case skills above and the developer skills for building document pipelines with `gaik`.
 
-**Claude Desktop and claude.ai.** The repository is a plugin marketplace, so Claude installs it straight from GitHub:
-
-1. Open **Plugins** in Claude's sidebar (formerly **Customize → Plugins**), then **Add marketplace** and **Add from a repository**.
-2. Enter `GAIK-project/gaik-toolkit` and select **Sync**. Leave **Sync automatically** on to receive updates.
-
-   ![Claude's Add marketplace dialog with GAIK-project/gaik-toolkit entered](/images/claude-plugin-add-marketplace.png)
-
-3. On the **Discover** tab, select **Add** next to **Gaik toolkit**.
-
-The plugin then lists its skills. Claude uses them when a task calls for one, or you can start one by typing `/` in a chat.
-
-![The GAIK Toolkit plugin in Claude with its skills](/images/claude-plugin-installed.png)
-
-**Claude Code, Codex and Copilot CLI** add the same marketplace from the command line:
-
-```bash
-# Claude Code
-/plugin marketplace add GAIK-project/gaik-toolkit
-/plugin install gaik-toolkit@gaik-toolkit
-
-# Codex
-codex plugin marketplace add GAIK-project/gaik-toolkit
-codex plugin add gaik-toolkit@gaik-toolkit
-
-# Copilot CLI
-copilot plugin marketplace add GAIK-project/gaik-toolkit
-copilot plugin install gaik-toolkit@gaik-toolkit
-```
-
-The [plugin README](https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/no-code-assets/agent-skills#installing) covers VS Code, ChatGPT workspaces and clients without plugin support. A coding agent can also install the plugin, with the `gaik` package and the MCP server, from one prompt: see [Set up GAIK with your coding agent](/agent-setup).
+- **Step-by-step installation (Claude Desktop, Claude Code, Codex, Copilot CLI, VS Code, ChatGPT):** see the dedicated [Agent Plugin](/toolkit/agent-plugin) guide.
+- **One-prompt setup for coding agents** (`gaik` package + MCP server + plugin): see [Set up GAIK with your coding agent](/agent-setup).
 
 ---
 

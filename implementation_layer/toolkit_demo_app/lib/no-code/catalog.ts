@@ -82,17 +82,39 @@ export const chatApps = {
   claude: (prompt: string) => `https://claude.ai/new?q=${encode(prompt)}`,
 };
 
+export interface InstallTab {
+  id: string;
+  name: string;
+  lines: string[];
+  copyLabel: string;
+  note: string;
+  screenshot?: {
+    src: string;
+    alt: string;
+    label: string;
+    width: number;
+    height: number;
+  };
+}
+
 /**
  * How each client installs the plugin, from the Installing table in
  * no-code-assets/agent-skills/README.md. `lines` are copied one at a time.
  */
-export const installTabs = [
+export const installTabs: InstallTab[] = [
   {
     id: "claude-desktop",
     name: "Claude Desktop",
     lines: [plugin.marketplace],
     copyLabel: "Copy the repository name",
-    note: "Enter it under Plugins (formerly Customize) → Add marketplace → Add from a repository. Sync, then add Gaik toolkit from the Discover tab.",
+    note: "Enter it under Plugins (formerly Customize) → Add marketplace → Add from a repository. Sync, then add GAIK Toolkit from the Discover tab.",
+    screenshot: {
+      src: "/images/claude-plugin-add-marketplace.png",
+      alt: "Claude's Add marketplace dialog with GAIK-project/gaik-toolkit entered and Sync automatically turned on",
+      label: "Show Add marketplace dialog",
+      width: 721,
+      height: 359,
+    },
   },
   {
     id: "claude-code",
@@ -126,8 +148,9 @@ export const installTabs = [
   },
 ];
 
-/** The README's full client table: VS Code, ChatGPT workspace and the rest. */
-export const installGuideUrl = `${plugin.githubUrl}#installing`;
+/** Dedicated Agent Plugin guide covering VS Code, ChatGPT workspace, and other clients. */
+export const installGuideUrl =
+  "https://gaik-project.github.io/gaik-toolkit/toolkit/agent-plugin";
 
 export function formatBytes(bytes: number): string {
   return bytes < 1024 * 1024

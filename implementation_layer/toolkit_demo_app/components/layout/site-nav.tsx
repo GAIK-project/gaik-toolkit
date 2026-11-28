@@ -79,6 +79,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: LucideIcon;
+  description?: string;
   comingSoon?: boolean;
   /** Built but gated behind beta access (see `hasWizardAccess`). */
   beta?: boolean;
@@ -102,33 +103,49 @@ const navGroups: NavGroup[] = [
         label: "EU AI Act screening",
         href: "/ai-act-screening",
         icon: ShieldCheck,
+        description: "Classify an AI use case under the EU AI Act.",
       },
-      { label: "Incident reporting", href: "/incident-report", icon: ShieldAlert },
-      { label: "Construction diary", href: "/diary", icon: HardHat },
+      {
+        label: "Incident reporting",
+        href: "/incident-report",
+        icon: ShieldAlert,
+        description: "Turn spoken safety notes into an incident report.",
+      },
+      {
+        label: "Construction diary",
+        href: "/diary",
+        icon: HardHat,
+        description: "Create a daily site diary from voice recordings.",
+      },
       {
         label: "Video transcription and captioning",
         href: "/dental-transcription",
         icon: Mic,
+        description: "Transcribe videos with subtitles and translation.",
       },
       {
         label: "Semantic video search",
         href: "/video-search",
         icon: Video,
+        description: "Search moments across indexed video transcripts.",
       },
       {
         label: "Purchase order processing",
         href: "/luvata-order",
         icon: FileBarChart,
+        description: "Match POs and BOMs against a price list.",
       },
       {
         label: "Construction report writing",
         href: "/report-writer-v2?example=house_condition_assessment",
         icon: House,
+        description: "Draft a source-cited report from mixed files.",
       },
       {
         label: "Helpdesk chatbot",
         href: "/helpdesk-chatbot",
         icon: Headset,
+        description: "Answer questions strictly from uploaded documents.",
       },
       {
         label: "Solution Wizard",
@@ -146,79 +163,98 @@ const navGroups: NavGroup[] = [
         label: "Schema generator",
         href: "/schema-generator",
         icon: Braces,
+        description: "Generate a Pydantic extraction schema from text.",
         section: CAPTURE,
       },
       {
         label: "Extractor",
         href: "/extractor",
         icon: FileSearch,
+        description: "Extract typed fields from text into a schema.",
         section: CAPTURE,
       },
       {
         label: "Vision extractor",
         href: "/vision-extractor",
         icon: ScanEye,
+        description: "Extract structured data from PDFs and images.",
         section: CAPTURE,
       },
-      { label: "Parser", href: "/parser", icon: FileText, section: CAPTURE },
+      {
+        label: "Parser",
+        href: "/parser",
+        icon: FileText,
+        description: "Convert PDFs and Word files into clean markdown.",
+        section: CAPTURE,
+      },
       {
         label: "Classifier",
         href: "/classifier",
         icon: Tags,
+        description: "Sort documents into custom labels with confidence.",
         section: CAPTURE,
       },
       {
         label: "Transcriber",
         href: "/transcriber",
         icon: Mic,
+        description: "Transcribe audio and video with optional cleanup.",
         section: CAPTURE,
       },
       {
         label: "Source normalizer",
         href: "/source-normalizer",
         icon: FileStack,
+        description: "Normalize mixed documents and audio into markdown.",
         section: CAPTURE,
       },
       {
         label: "Web scraper",
         href: "/web-scraper",
         icon: Globe,
+        description: "Fetch and clean web pages for downstream pipelines.",
         section: CAPTURE,
       },
       {
         label: "Knowledge curator",
         href: "/knowledge-curator",
         icon: LibraryBig,
+        description: "Organize normalized sources into a knowledge base.",
         section: CAPTURE,
       },
       {
         label: "PostgreSQL agent",
         href: "/postgres-agent",
         icon: Database,
+        description: "Query a demo PostgreSQL database in natural language.",
         section: ACCESS,
       },
       {
         label: "Tabular agent",
         href: "/tabular-agent",
         icon: Table2,
+        description: "Analyze spreadsheets and CSVs with generated code.",
         section: ACCESS,
       },
       {
         label: "Text-to-speech",
         href: "/text-to-speech",
         icon: Volume2,
+        description: "Convert text into natural spoken audio.",
         section: SYNTHESIS,
       },
       {
         label: "LLM judge",
         href: "/llm-judge",
         icon: Scale,
+        description: "Score and compare outputs with an LLM judge panel.",
         section: SYNTHESIS,
       },
       {
         label: "Knowledge synthesizer",
         href: "/knowledge-synthesis",
         icon: NotebookPen,
+        description: "Synthesize cited reports from curated sources.",
         section: SYNTHESIS,
       },
     ],
@@ -231,21 +267,30 @@ const navGroups: NavGroup[] = [
         label: "Audio → structured",
         href: "/audio-structured",
         icon: AudioWaveform,
+        description: "Transcribe recordings and extract structured fields.",
         section: CAPTURE,
       },
       {
         label: "Document → structured",
         href: "/document-structured",
         icon: FileOutput,
+        description: "Parse documents and extract schema-validated data.",
         section: CAPTURE,
       },
-      { label: "RAG builder", href: "/rag", icon: Bot, section: ACCESS },
+      {
+        label: "RAG builder",
+        href: "/rag",
+        icon: Bot,
+        description: "Index documents and answer questions with citations.",
+        section: ACCESS,
+      },
       // Report writer v1 (/report-writer) is hidden, not removed: its page still
       // works by URL and v2 and the Knowledge demos import its components.
       {
         label: "Report writer v2",
         href: "/report-writer-v2",
         icon: FilePen,
+        description: "Normalize, curate, and synthesize source-cited reports.",
         section: SYNTHESIS,
       },
     ],
@@ -258,16 +303,19 @@ const navGroups: NavGroup[] = [
         label: "Prompts",
         href: "/prompts",
         icon: MessageSquare,
+        description: "Copy ready-made prompts for ChatGPT and Claude.",
       },
       {
         label: "Agent skills",
         href: "/skills",
         icon: Wand2,
+        description: "Install all skills as a plugin or download a .zip.",
       },
       {
         label: "Desktop app",
         href: "/desktop-app",
         icon: MonitorDown,
+        description: "Run GAIK locally on your own files and API key.",
       },
     ],
   },
@@ -428,7 +476,7 @@ function DesktopMenuItem({
             {item.label}
           </div>
           <p className="text-muted-foreground line-clamp-2 text-sm leading-snug">
-            Explore the {item.label} features.
+            {item.description ?? `Explore the ${item.label} features.`}
           </p>
         </Link>
       </NavigationMenuLink>
