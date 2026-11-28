@@ -349,6 +349,8 @@ class _BpmnBuilder:
         self._dataobj_ref_for_artifact: Dict[str, str] = {}
         # exception ids consumed by _enrich_approval (discard path); skipped by _enrich_exceptions
         self._consumed_exception_ids: set = set()
+        # integration target -> the id of the "Submit to …" task drawn for it
+        self._send_task_of: Dict[str, str] = {}
 
     # -- id allocators ----------------------------------------------------
 
@@ -367,6 +369,15 @@ class _BpmnBuilder:
     def _next_prop_id(self) -> str:
         self._prop_seq += 1
         return f"Property_{self._prop_seq}"
+
+    def _free_id(self, base: str) -> str:
+        """``base``, or ``base_2``, ``base_3`` … when a node already has it: a
+        generated task never takes the id of a step drawn as ``Activity_<id>``
+        (a step ``submit_erp`` beside a target ``erp``)."""
+        nid, n = base, 2
+        while nid in self.nodes:
+            nid, n = f"{base}_{n}", n + 1
+        return nid
 
     def _map(self, element_id: str, kind: str, blueprint_path: str) -> None:
         self.mapping[element_id] = {"kind": kind, "blueprint_path": blueprint_path}
@@ -891,7 +902,8 @@ class _BpmnBuilder:
             self.data_stores.append((ds_id, ds_label, target))
             self._map(ds_id, "data_store", f"technical_spec.integration_targets[{idx}]")
 
-            send_id = f"Activity_submit_{_safe(target)}"
+            send_id = self._free_id(f"Activity_submit_{_safe(target)}")
+            self._send_task_of[str(target)] = send_id
             send_node = _Node(
                 send_id,
                 "bpmn:sendTask",
@@ -957,7 +969,7 @@ class _BpmnBuilder:
             ):
                 return
 
-        pdf_id = "Activity_generate_pdf"
+        pdf_id = self._free_id("Activity_generate_pdf")
         pdf_node = _Node(
             pdf_id,
             "bpmn:serviceTask",
@@ -1347,7 +1359,7 @@ class _BpmnBuilder:
         w_ds, h_ds = SIZE["dataStore"]
         pool_bottom = POOL_Y + pool_height
         for ds_id, ds_name, target in self.data_stores:
-            send_id = f"Activity_submit_{_safe(target)}"
+            send_id = self._send_task_of.get(str(target), "")
             if send_id in self.bounds:
                 sx, sy, sw, sh = self.bounds[send_id]
                 cx = sx + sw / 2
