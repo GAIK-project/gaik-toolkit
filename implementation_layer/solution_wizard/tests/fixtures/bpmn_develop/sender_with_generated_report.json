@@ -1,0 +1,111 @@
+{
+ "blueprint_version": "1.0",
+ "use_case": {
+  "id": "uc",
+  "name": "Invoices",
+  "description": "x",
+  "domain": "t"
+ },
+ "business_spec": {
+  "intended_users": [
+   "clerk"
+  ],
+  "reviewers": [
+   "manager"
+  ]
+ },
+ "technical_spec": {
+  "input_types": [
+   "pdf"
+  ],
+  "output_types": [
+   "structured_json",
+   "pdf"
+  ],
+  "language": "en",
+  "integration_targets": [
+   "ERP system (approved invoice data)"
+  ]
+ },
+ "target_output_spec": {
+  "required_fields": [
+   "a"
+  ]
+ },
+ "components": {
+  "selected_modules": [],
+  "selected_building_blocks": [],
+  "custom_components": []
+ },
+ "artifacts": {
+  "invoice_pdf": {
+   "type": "pdf",
+   "source": "user_upload",
+   "optional": false
+  },
+  "record": {
+   "type": "structured_json",
+   "source": "generated",
+   "optional": false,
+   "produced_by": "extract",
+   "final_output": false
+  },
+  "send_erp_receipt": {
+   "type": "structured_json",
+   "source": "generated",
+   "optional": false,
+   "produced_by": "send_erp",
+   "final_output": false
+  }
+ },
+ "workflow": {
+  "steps": [
+   {
+    "id": "upload",
+    "name": "Upload",
+    "type": "user_task",
+    "inputs": [],
+    "outputs": [
+     "invoice_pdf"
+    ],
+    "depends_on": []
+   },
+   {
+    "id": "extract",
+    "name": "Extract",
+    "type": "automated_task",
+    "inputs": [
+     "invoice_pdf"
+    ],
+    "outputs": [
+     "record"
+    ],
+    "depends_on": [
+     "upload"
+    ],
+    "component": "custom"
+   },
+   {
+    "id": "send_erp",
+    "name": "Send erp",
+    "type": "automated_task",
+    "inputs": [
+     "record"
+    ],
+    "outputs": [
+     "send_erp_receipt"
+    ],
+    "depends_on": [
+     "extract"
+    ],
+    "parameters": {
+     "integration_target": "ERP system (approved invoice data)"
+    },
+    "component": "custom"
+   }
+  ]
+ },
+ "business_process": {
+  "decision_points": []
+ }
+}

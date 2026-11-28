@@ -1,0 +1,255 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:omgdc="http://www.omg.org/spec/DD/20100524/DC" xmlns:omgdi="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="http://gaik.solutionwizard/bpmn">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_main" name="Invoices" processRef="Process_1" />
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Lane_users" name="Clerk">
+        <bpmn:flowNodeRef>Activity_upload</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>StartEvent_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_gaik_ai" name="GenAI">
+        <bpmn:flowNodeRef>Activity_extract</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_send_erp</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_generate_pdf</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Activity_submit_ERP_system__approved_invoice_data_</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Lane_reviewers" name="Manager">
+        <bpmn:flowNodeRef>Activity_review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_success</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Gateway_approve_review</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>EndEvent_rejected_review</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:userTask id="Activity_upload" name="Upload">
+      <bpmn:incoming>Flow_1</bpmn:incoming>
+      <bpmn:outgoing>Flow_2</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Association_2">
+        <bpmn:targetRef>DataObjectRef_invoice_pdf</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:userTask>
+    <bpmn:serviceTask id="Activity_extract" name="[C] Extract">
+      <bpmn:incoming>Flow_2</bpmn:incoming>
+      <bpmn:outgoing>Flow_3</bpmn:outgoing>
+      <bpmn:property id="Property_1" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_4">
+        <bpmn:sourceRef>DataObjectRef_invoice_pdf</bpmn:sourceRef>
+        <bpmn:targetRef>Property_1</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_3">
+        <bpmn:targetRef>DataObjectRef_record</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:serviceTask id="Activity_send_erp" name="[C] Send erp">
+      <bpmn:incoming>Flow_3</bpmn:incoming>
+      <bpmn:outgoing>Flow_4</bpmn:outgoing>
+      <bpmn:property id="Property_2" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_6">
+        <bpmn:sourceRef>DataObjectRef_record</bpmn:sourceRef>
+        <bpmn:targetRef>Property_2</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+      <bpmn:dataOutputAssociation id="Association_5">
+        <bpmn:targetRef>DataObjectRef_send_erp_receipt</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:serviceTask>
+    <bpmn:userTask id="Activity_review" name="Review">
+      <bpmn:incoming>Flow_4</bpmn:incoming>
+      <bpmn:outgoing>Flow_6</bpmn:outgoing>
+      <bpmn:property id="Property_3" name="__targetRef_placeholder" />
+      <bpmn:dataInputAssociation id="Association_7">
+        <bpmn:sourceRef>DataObjectRef_record</bpmn:sourceRef>
+        <bpmn:targetRef>Property_3</bpmn:targetRef>
+      </bpmn:dataInputAssociation>
+    </bpmn:userTask>
+    <bpmn:startEvent id="StartEvent_1" name="Started Invoices">
+      <bpmn:outgoing>Flow_1</bpmn:outgoing>
+    </bpmn:startEvent>
+    <bpmn:endEvent id="EndEvent_success" name="Invoices completed">
+      <bpmn:incoming>Flow_9</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:exclusiveGateway id="Gateway_approve_review" name="Approved?">
+      <bpmn:incoming>Flow_6</bpmn:incoming>
+      <bpmn:outgoing>Flow_5</bpmn:outgoing>
+      <bpmn:outgoing>Flow_7</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+    <bpmn:endEvent id="EndEvent_rejected_review" name="Rejected">
+      <bpmn:incoming>Flow_7</bpmn:incoming>
+    </bpmn:endEvent>
+    <bpmn:serviceTask id="Activity_generate_pdf" name="Generate PDF report">
+      <bpmn:incoming>Flow_5</bpmn:incoming>
+      <bpmn:outgoing>Flow_8</bpmn:outgoing>
+    </bpmn:serviceTask>
+    <bpmn:sendTask id="Activity_submit_ERP_system__approved_invoice_data_" name="Submit to Erp System (approved Invoice Data)">
+      <bpmn:incoming>Flow_8</bpmn:incoming>
+      <bpmn:outgoing>Flow_9</bpmn:outgoing>
+      <bpmn:dataOutputAssociation id="Association_1">
+        <bpmn:targetRef>DataStore_ERP_system__approved_invoice_data_</bpmn:targetRef>
+      </bpmn:dataOutputAssociation>
+    </bpmn:sendTask>
+    <bpmn:dataObjectReference id="DataObjectRef_invoice_pdf" name="Invoice Pdf" dataObjectRef="DataObject_invoice_pdf" />
+    <bpmn:dataObject id="DataObject_invoice_pdf" />
+    <bpmn:dataObjectReference id="DataObjectRef_record" name="Record" dataObjectRef="DataObject_record" />
+    <bpmn:dataObject id="DataObject_record" />
+    <bpmn:dataObjectReference id="DataObjectRef_send_erp_receipt" name="Send Erp Receipt" dataObjectRef="DataObject_send_erp_receipt" />
+    <bpmn:dataObject id="DataObject_send_erp_receipt" />
+    <bpmn:dataStoreReference id="DataStore_ERP_system__approved_invoice_data_" name="Erp System (approved Invoice Data) Repository" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="StartEvent_1" targetRef="Activity_upload" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Activity_upload" targetRef="Activity_extract" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Activity_extract" targetRef="Activity_send_erp" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Activity_send_erp" targetRef="Activity_review" />
+    <bpmn:sequenceFlow id="Flow_5" name="Yes" sourceRef="Gateway_approve_review" targetRef="Activity_generate_pdf" />
+    <bpmn:sequenceFlow id="Flow_6" sourceRef="Activity_review" targetRef="Gateway_approve_review" />
+    <bpmn:sequenceFlow id="Flow_7" name="No" sourceRef="Gateway_approve_review" targetRef="EndEvent_rejected_review" />
+    <bpmn:sequenceFlow id="Flow_8" sourceRef="Activity_generate_pdf" targetRef="Activity_submit_ERP_system__approved_invoice_data_" />
+    <bpmn:sequenceFlow id="Flow_9" sourceRef="Activity_submit_ERP_system__approved_invoice_data_" targetRef="EndEvent_success" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_main_di" bpmnElement="Participant_main" isHorizontal="true">
+        <omgdc:Bounds x="160" y="90" width="1950" height="900" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_users_di" bpmnElement="Lane_users" isHorizontal="true">
+        <omgdc:Bounds x="190" y="90" width="1920" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_gaik_ai_di" bpmnElement="Lane_gaik_ai" isHorizontal="true">
+        <omgdc:Bounds x="190" y="390" width="1920" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Lane_reviewers_di" bpmnElement="Lane_reviewers" isHorizontal="true">
+        <omgdc:Bounds x="190" y="690" width="1920" height="300" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_upload_di" bpmnElement="Activity_upload">
+        <omgdc:Bounds x="435" y="251" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_extract_di" bpmnElement="Activity_extract">
+        <omgdc:Bounds x="635" y="551" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_send_erp_di" bpmnElement="Activity_send_erp">
+        <omgdc:Bounds x="835" y="551" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_review_di" bpmnElement="Activity_review">
+        <omgdc:Bounds x="1035" y="851" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="StartEvent_1_di" bpmnElement="StartEvent_1">
+        <omgdc:Bounds x="282" y="273" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="272" y="313" width="56" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_success_di" bpmnElement="EndEvent_success">
+        <omgdc:Bounds x="1882" y="873" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1872" y="913" width="56" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Gateway_approve_review_di" bpmnElement="Gateway_approve_review" isMarkerVisible="true">
+        <omgdc:Bounds x="1275" y="866" width="50" height="50" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1265" y="920" width="70" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="EndEvent_rejected_review_di" bpmnElement="EndEvent_rejected_review">
+        <omgdc:Bounds x="1482" y="873" width="36" height="36" />
+        <bpmndi:BPMNLabel>
+          <omgdc:Bounds x="1472" y="913" width="56" height="20" />
+        </bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_generate_pdf_di" bpmnElement="Activity_generate_pdf">
+        <omgdc:Bounds x="1435" y="551" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Activity_submit_ERP_system__approved_invoice_data__di" bpmnElement="Activity_submit_ERP_system__approved_invoice_data_">
+        <omgdc:Bounds x="1635" y="551" width="130" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_invoice_pdf_di" bpmnElement="DataObjectRef_invoice_pdf">
+        <omgdc:Bounds x="482" y="120" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_record_di" bpmnElement="DataObjectRef_record">
+        <omgdc:Bounds x="682" y="420" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataObjectRef_send_erp_receipt_di" bpmnElement="DataObjectRef_send_erp_receipt">
+        <omgdc:Bounds x="882" y="420" width="36" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="DataStore_ERP_system__approved_invoice_data__di" bpmnElement="DataStore_ERP_system__approved_invoice_data_">
+        <omgdc:Bounds x="1675" y="1020" width="50" height="50" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1">
+        <omgdi:waypoint x="318" y="291" />
+        <omgdi:waypoint x="435" y="291" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2">
+        <omgdi:waypoint x="565" y="291" />
+        <omgdi:waypoint x="600" y="291" />
+        <omgdi:waypoint x="600" y="591" />
+        <omgdi:waypoint x="635" y="591" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3">
+        <omgdi:waypoint x="765" y="591" />
+        <omgdi:waypoint x="835" y="591" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4">
+        <omgdi:waypoint x="965" y="591" />
+        <omgdi:waypoint x="1000" y="591" />
+        <omgdi:waypoint x="1000" y="891" />
+        <omgdi:waypoint x="1035" y="891" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_5_di" bpmnElement="Flow_5">
+        <omgdi:waypoint x="1325" y="891" />
+        <omgdi:waypoint x="1380" y="891" />
+        <omgdi:waypoint x="1380" y="591" />
+        <omgdi:waypoint x="1435" y="591" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_6_di" bpmnElement="Flow_6">
+        <omgdi:waypoint x="1165" y="891" />
+        <omgdi:waypoint x="1275" y="891" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_7_di" bpmnElement="Flow_7">
+        <omgdi:waypoint x="1325" y="891" />
+        <omgdi:waypoint x="1482" y="891" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_8_di" bpmnElement="Flow_8">
+        <omgdi:waypoint x="1565" y="591" />
+        <omgdi:waypoint x="1635" y="591" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_9_di" bpmnElement="Flow_9">
+        <omgdi:waypoint x="1765" y="591" />
+        <omgdi:waypoint x="1823" y="591" />
+        <omgdi:waypoint x="1823" y="891" />
+        <omgdi:waypoint x="1882" y="891" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_2_di" bpmnElement="Association_2">
+        <omgdi:waypoint x="500" y="251" />
+        <omgdi:waypoint x="500" y="170" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_4_di" bpmnElement="Association_4">
+        <omgdi:waypoint x="518" y="145" />
+        <omgdi:waypoint x="576" y="145" />
+        <omgdi:waypoint x="576" y="591" />
+        <omgdi:waypoint x="635" y="591" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_3_di" bpmnElement="Association_3">
+        <omgdi:waypoint x="700" y="551" />
+        <omgdi:waypoint x="700" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_6_di" bpmnElement="Association_6">
+        <omgdi:waypoint x="718" y="445" />
+        <omgdi:waypoint x="776" y="445" />
+        <omgdi:waypoint x="776" y="591" />
+        <omgdi:waypoint x="835" y="591" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_5_di" bpmnElement="Association_5">
+        <omgdi:waypoint x="900" y="551" />
+        <omgdi:waypoint x="900" y="470" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_7_di" bpmnElement="Association_7">
+        <omgdi:waypoint x="718" y="445" />
+        <omgdi:waypoint x="876" y="445" />
+        <omgdi:waypoint x="876" y="891" />
+        <omgdi:waypoint x="1035" y="891" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Association_1_di" bpmnElement="Association_1">
+        <omgdi:waypoint x="1700" y="631" />
+        <omgdi:waypoint x="1700" y="1020" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>
