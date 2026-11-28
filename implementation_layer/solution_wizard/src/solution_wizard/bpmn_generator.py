@@ -344,6 +344,8 @@ class _BpmnBuilder:
         self._prop_seq = 0
         # placement helper used by integration splice
         self._approval_gateways: List[str] = []
+        # review step id -> (its approval gateway, the approval's "Yes" flows)
+        self._approval_of: Dict[str, Tuple[str, List[_Flow]]] = {}
         self._dataobj_ref_for_artifact: Dict[str, str] = {}
         # exception ids consumed by _enrich_approval (discard path); skipped by _enrich_exceptions
         self._consumed_exception_ids: set = set()
@@ -588,9 +590,13 @@ class _BpmnBuilder:
             self._add_flow("StartEvent_1", manual_node_of[ms.id])
 
         # 3. main edges with parallel fork/join enrichment
-        # forks: a step with >=2 dependents
+        # forks: a step with >=2 dependents. Not after a step of type "decision":
+        # it is drawn as an exclusive gateway, and its dependents are the ways it
+        # chooses between, not steps that all run.
         fork_of: Dict[str, str] = {}
         for sid in list(all_node_of):
+            if self.nodes[all_node_of[sid]].tag == "bpmn:exclusiveGateway":
+                continue
             if outdeg.get(sid, 0) >= 2:
                 pf = f"Gateway_fork_{_safe(sid)}"
                 self.nodes[pf] = _Node(
@@ -668,6 +674,8 @@ class _BpmnBuilder:
                 if not f.name:
                     f.name = "Yes"
             self._add_flow(hid, xg)
+            # A decision after the review follows these (see _enrich_decision_points).
+            self._approval_of[s.id] = (xg, [f for f in outgoing if not f.is_loop])
 
             # Determine the "No" path from the available exceptions and the blueprint's
             # explicit intent. Priority order:
@@ -979,16 +987,23 @@ class _BpmnBuilder:
             after_node = self._lookup_node_for_step(dp.after)
             if not after_node:
                 continue
-            xg = f"Gateway_decision_{_safe(dp.id)}"
-            self.nodes[xg] = _Node(
-                xg, "bpmn:exclusiveGateway", dp.name, self.nodes[after_node].lane, "gateway"
-            )
-            self._map(xg, "decision_point", f"business_process.decision_points[{i}]")
-            # reroute the after_node's forward (non-loop) edges through the gateway
-            outgoing = [f for f in self.flows if f.src == after_node and not f.is_loop]
-            for f in outgoing:
-                f.src = xg
-            self._add_flow(after_node, xg)
+            if dp.after in self._approval_of:
+                # After a review: the decision comes after the approval, on its
+                # "Yes"; the "No" and any rework path stay with the approval.
+                approval, yes_flows = self._approval_of[dp.after]
+                xg = self._new_decision_gateway(i, dp, approval)
+                outgoing = [f for f in yes_flows if f in self.flows and f.src == approval]
+                for f in outgoing:
+                    f.src = xg
+                self._add_flow(approval, xg, name="Yes")
+                after_node = approval
+            else:
+                xg = self._new_decision_gateway(i, dp, after_node)
+                # reroute the after_node's forward (non-loop) edges through the gateway
+                outgoing = [f for f in self.flows if f.src == after_node and not f.is_loop]
+                for f in outgoing:
+                    f.src = xg
+                self._add_flow(after_node, xg)
             # Each branch's step, and the nodes a flow into it can lead to: the
             # step itself, or the join before it when it depends on several.
             targets = [
@@ -1015,6 +1030,15 @@ class _BpmnBuilder:
                     moved.name = br.condition or moved.name
                 else:
                     self._add_flow(xg, tgt, name=br.condition)
+
+    def _new_decision_gateway(self, i: int, dp, beside: str) -> str:
+        """The exclusive gateway a decision point is drawn as, in the lane of ``beside``."""
+        xg = f"Gateway_decision_{_safe(dp.id)}"
+        self.nodes[xg] = _Node(
+            xg, "bpmn:exclusiveGateway", dp.name, self.nodes[beside].lane, "gateway"
+        )
+        self._map(xg, "decision_point", f"business_process.decision_points[{i}]")
+        return xg
 
     def _entries_of(self, step_id: str, node: Optional[str]) -> set:
         """The nodes a flow into ``step_id`` (drawn as ``node``) can lead to: the
