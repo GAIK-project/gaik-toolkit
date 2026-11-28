@@ -1,0 +1,183 @@
+{
+ "blueprint_version": "1.0",
+ "use_case": {
+  "id": "uc",
+  "name": "Invoices",
+  "description": "x",
+  "domain": "t"
+ },
+ "business_spec": {
+  "intended_users": [
+   "clerk"
+  ],
+  "reviewers": [
+   "manager"
+  ]
+ },
+ "technical_spec": {
+  "input_types": [
+   "pdf"
+  ],
+  "output_types": [
+   "structured_json",
+   "pdf"
+  ],
+  "language": "en",
+  "integration_targets": [
+   "ERP system (approved invoice data)"
+  ]
+ },
+ "target_output_spec": {
+  "required_fields": [
+   "a"
+  ]
+ },
+ "components": {
+  "selected_modules": [],
+  "selected_building_blocks": [],
+  "custom_components": []
+ },
+ "artifacts": {
+  "invoice_pdf": {
+   "type": "pdf",
+   "source": "user_upload",
+   "optional": false
+  },
+  "record": {
+   "type": "structured_json",
+   "source": "generated",
+   "optional": false,
+   "produced_by": "extract",
+   "final_output": false
+  },
+  "make_doc_pdf": {
+   "type": "pdf",
+   "source": "generated",
+   "optional": false,
+   "produced_by": "make_doc",
+   "final_output": true
+  },
+  "deliver_receipt": {
+   "type": "structured_json",
+   "source": "generated",
+   "optional": false,
+   "produced_by": "deliver",
+   "final_output": false
+  }
+ },
+ "workflow": {
+  "steps": [
+   {
+    "id": "upload",
+    "name": "Upload",
+    "type": "user_task",
+    "inputs": [],
+    "outputs": [
+     "invoice_pdf"
+    ],
+    "depends_on": []
+   },
+   {
+    "id": "extract",
+    "name": "Extract",
+    "type": "automated_task",
+    "inputs": [
+     "invoice_pdf"
+    ],
+    "outputs": [
+     "record"
+    ],
+    "depends_on": [
+     "upload"
+    ],
+    "component": "custom"
+   },
+   {
+    "id": "make_doc",
+    "name": "Make doc",
+    "type": "automated_task",
+    "inputs": [
+     "record"
+    ],
+    "outputs": [
+     "make_doc_pdf"
+    ],
+    "depends_on": [
+     "upload"
+    ],
+    "component": "custom"
+   },
+   {
+    "id": "review",
+    "name": "Review",
+    "type": "human_review",
+    "inputs": [
+     "record"
+    ],
+    "outputs": [],
+    "depends_on": [
+     "extract"
+    ]
+   },
+   {
+    "id": "deliver",
+    "name": "Deliver",
+    "type": "automated_task",
+    "inputs": [
+     "record"
+    ],
+    "outputs": [
+     "deliver_receipt"
+    ],
+    "depends_on": [
+     "review"
+    ],
+    "parameters": {
+     "integration_target": "ERP system (approved invoice data)"
+    },
+    "component": "custom"
+   },
+   {
+    "id": "screen",
+    "name": "Screen",
+    "type": "automated_task",
+    "inputs": [],
+    "outputs": [],
+    "depends_on": [
+     "upload"
+    ],
+    "component": "custom"
+   },
+   {
+    "id": "flag",
+    "name": "Flag",
+    "type": "automated_task",
+    "inputs": [],
+    "outputs": [],
+    "depends_on": [
+     "screen"
+    ],
+    "component": "custom"
+   }
+  ]
+ },
+ "business_process": {
+  "decision_points": [
+   {
+    "id": "s",
+    "name": "s",
+    "after": "screen",
+    "branches": [
+     {
+      "condition": "clean",
+      "target": "end"
+     },
+     {
+      "condition": "odd",
+      "target": "flag"
+     }
+    ]
+   }
+  ]
+ }
+}

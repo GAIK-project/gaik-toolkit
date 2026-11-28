@@ -27,6 +27,7 @@ Public API mirrors ``visualizer.py``:
 from __future__ import annotations
 
 import re
+from collections.abc import Set
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -244,6 +245,82 @@ def _safe(token: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# The generated report and submission boxes: when the diagram adds them.
+# Plain dicts (a blueprint's JSON, or a draft that does not validate), so that
+# wizard_api's draft note reads a marker as the drawing does.
+# ---------------------------------------------------------------------------
+
+
+def _as_list(value: Any) -> list:
+    return value if isinstance(value, list) else []
+
+
+def _as_dict(value: Any) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _true(value: Any) -> bool:
+    """A boolean as the blueprint model reads it (pydantic's lax mode)."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value == 1
+    return isinstance(value, str) and value.strip().lower() in ("true", "1", "yes", "on", "t", "y")
+
+
+def wants_report(output_types: Any) -> bool:
+    """``technical_spec.output_types`` asks for a PDF report."""
+    out = [output_types] if isinstance(output_types, str) else _as_list(output_types)
+    return any(str(o).lower() in ("pdf", "report") for o in out)
+
+
+def final_report_step_ids(steps: Any, artifacts: Any) -> List[str]:
+    """The steps that write the final report themselves: each outputs a
+    generated artifact of type pdf or report, with ``final_output: true``, that
+    it produces. An upload's PDF, an intermediate PDF the process goes on to
+    use, or a step of type "decision" (drawn as a gateway) is not the report."""
+    artifacts = _as_dict(artifacts)
+    out = []
+    for step in _as_list(steps):
+        step = _as_dict(step)
+        if step.get("type") == "decision":  # drawn as a gateway: it writes nothing
+            continue
+        for art_id in _as_list(step.get("outputs")):
+            art = _as_dict(artifacts.get(art_id)) if isinstance(art_id, str) else {}
+            source = art.get("source")
+            if (
+                str(art.get("type")).lower() in ("pdf", "report")
+                and str(getattr(source, "value", source)).lower() == "generated"
+                and _true(art.get("final_output"))
+                and art.get("produced_by") == step.get("id")
+            ):
+                out.append(step.get("id"))
+                break
+    return out
+
+
+def named_report_step(steps: Any) -> bool:
+    """The older rule: a step whose id or component names a PDF or report
+    generator ("pdf" or "report_gen" in it) is taken for the report."""
+    for step in _as_list(steps):
+        step = _as_dict(step)
+        ident = f"{step.get('id') or ''} {step.get('component') or ''}".lower()
+        if "pdf" in ident or "report_gen" in ident:
+            return True
+    return False
+
+
+def integration_marker(step: Any) -> Optional[str]:
+    """The step's ``parameters.integration_target``, when it is a string and the
+    step is not of type "decision"."""
+    step = _as_dict(step)
+    if step.get("type") == "decision":  # drawn as a gateway: it sends nothing
+        return None
+    marker = _as_dict(step.get("parameters")).get("integration_target")
+    return marker if isinstance(marker, str) and marker else None
+
+
+# ---------------------------------------------------------------------------
 # Internal model objects
 # ---------------------------------------------------------------------------
 
@@ -344,9 +421,16 @@ class _BpmnBuilder:
         self._prop_seq = 0
         # placement helper used by integration splice
         self._approval_gateways: List[str] = []
+        # review step id -> (its approval gateway, the approval's "Yes" flows)
+        self._approval_of: Dict[str, Tuple[str, List[_Flow]]] = {}
         self._dataobj_ref_for_artifact: Dict[str, str] = {}
         # exception ids consumed by _enrich_approval (discard path); skipped by _enrich_exceptions
         self._consumed_exception_ids: set = set()
+        # Data store -> actual sender node used to position it.
+        self._store_anchor_of: dict[str, str] = {}
+        self._own_delivery_nodes: list[set[str]] = []
+        # set when the "Generate PDF report" task is added
+        self._generated_pdf = False
 
     # -- id allocators ----------------------------------------------------
 
@@ -365,6 +449,13 @@ class _BpmnBuilder:
     def _next_prop_id(self) -> str:
         self._prop_seq += 1
         return f"Property_{self._prop_seq}"
+
+    def _free_id(self, base: str) -> str:
+        """Keep the usual id unless a drawn element already uses it."""
+        nid, n = base, 2
+        while nid in self.nodes or nid in self.mapping:
+            nid, n = f"{base}_{n}", n + 1
+        return nid
 
     def _map(self, element_id: str, kind: str, blueprint_path: str) -> None:
         self.mapping[element_id] = {"kind": kind, "blueprint_path": blueprint_path}
@@ -588,9 +679,13 @@ class _BpmnBuilder:
             self._add_flow("StartEvent_1", manual_node_of[ms.id])
 
         # 3. main edges with parallel fork/join enrichment
-        # forks: a step with >=2 dependents
+        # forks: a step with >=2 dependents. Not after a step of type "decision":
+        # it is drawn as an exclusive gateway, and its dependents are the ways it
+        # chooses between, not steps that all run.
         fork_of: Dict[str, str] = {}
         for sid in list(all_node_of):
+            if self.nodes[all_node_of[sid]].tag == "bpmn:exclusiveGateway":
+                continue
             if outdeg.get(sid, 0) >= 2:
                 pf = f"Gateway_fork_{_safe(sid)}"
                 self.nodes[pf] = _Node(
@@ -668,6 +763,8 @@ class _BpmnBuilder:
                 if not f.name:
                     f.name = "Yes"
             self._add_flow(hid, xg)
+            # A decision after the review follows these (see _enrich_decision_points).
+            self._approval_of[s.id] = (xg, [f for f in outgoing if not f.is_loop])
 
             # Determine the "No" path from the available exceptions and the blueprint's
             # explicit intent. Priority order:
@@ -764,15 +861,155 @@ class _BpmnBuilder:
             return self._step_node_id(prior_auto[-1])
         return None
 
+    # -- one way into the success end, for the boxes every success passes --
+
+    def _reaching(self, into: List[_Flow]) -> Dict[str, set]:
+        """For each flow, the ids of the flows in ``into`` it leads to, itself
+        included, up to the first of them on each path; loops are left out.
+
+        Walked back once from each of ``into``, not forward again from every way
+        out of every gateway: that took 27 s for a blueprint of 200 steps.
+        """
+        ids = {f.id for f in into}
+        by_tgt: Dict[str, List[_Flow]] = {}
+        for f in self.flows:
+            if not f.is_loop:
+                by_tgt.setdefault(f.tgt, []).append(f)
+        reaching: Dict[str, set] = {}
+        for last in into:
+            seen, todo = {last.id}, [last]
+            while todo:
+                f = todo.pop()
+                reaching.setdefault(f.id, set()).add(last.id)
+                for prev in by_tgt.get(f.src, ()):
+                    if prev.id not in seen and prev.id not in ids:
+                        seen.add(prev.id)
+                        todo.append(prev)
+        return reaching
+
+    def _meeting_kind(self, into: List[_Flow]) -> str:
+        """The gateway where the flows ``into`` meet.
+
+        Only a split with at least two ways out that lead to different ones of
+        these flows counts: a review's "No" to a rejection end, or a path that
+        ends without success, is no choice between them, and neither are ways
+        that all lead to the same flows (a decision whose branches meet again
+        before them, or one that sends a case back to an earlier step). When an
+        exclusive split counts, one of the flows runs (an exclusive gateway);
+        when only parallel ones (or none), all do (a parallel join). Both at
+        once (a decision's ending beside steps that all run) would be an
+        inclusive gateway, which the diagram's readers do not know yet: it is
+        drawn exclusive.
+        """
+        reaching = self._reaching(into)
+        ways_of: Dict[str, List[_Flow]] = {}
+        for f in self.flows:
+            if not f.is_loop:
+                ways_of.setdefault(f.src, []).append(f)
+        kinds = set()
+        for node in self.nodes.values():
+            if node.tag not in ("bpmn:exclusiveGateway", "bpmn:parallelGateway"):
+                continue
+            reached = {
+                frozenset(reaching[f.id]) for f in ways_of.get(node.id, ()) if f.id in reaching
+            }
+            if len(reached) >= 2:
+                kinds.add(node.tag)
+        if "bpmn:exclusiveGateway" in kinds:
+            return "bpmn:exclusiveGateway"
+        return "bpmn:parallelGateway"
+
+    def _settle_joins(self) -> None:
+        """A join before a step that depends on several steps waits for all of
+        them; after a decision, they can be alternatives, and the join would wait
+        for ever. Each join becomes the gateway its incoming flows meet at."""
+        for node in list(self.nodes.values()):
+            # Known by its mapping, not its id: a workflow step of type "decision"
+            # with an id like join_check is drawn as Gateway_join_check too.
+            if self.mapping.get(node.id, {}).get("kind") != "parallel_join":
+                continue
+            into = [f for f in self.flows if f.tgt == node.id and not f.is_loop]
+            if len(into) > 1:
+                node.tag = self._meeting_kind(into)
+
+    def _success_entry(self) -> Optional[_Flow]:
+        """The one flow into the success end that a PDF task or a send task is
+        spliced onto, so that every successful path passes it.
+
+        Before, each box was spliced onto one of the flows into the end, so with
+        an auto-approval beside a review (two ways to finish) the report and the
+        submission landed on different paths. Several flows into the end now meet
+        first, at the gateway `_meeting_kind` picks: exclusive when only one of
+        them runs (a decision), parallel when they all do.
+        """
+        into_end = [f for f in self.flows if f.tgt == "EndEvent_success" and not f.is_loop]
+        if not into_end:
+            return None
+        if len(into_end) == 1:
+            return into_end[0]
+        # A workflow step of type "decision" is drawn as Gateway_<its id>: one
+        # with the id merge_success keeps that element, and the merge takes a
+        # free id.
+        merge_id, n = "Gateway_merge_success", 2
+        while merge_id in self.nodes:
+            merge_id, n = f"Gateway_merge_success_{n}", n + 1
+        kind = self._meeting_kind(into_end)
+        self.nodes[merge_id] = _Node(
+            merge_id, kind, "", self.nodes["EndEvent_success"].lane, "gateway"
+        )
+        self._map(merge_id, "merge_gateway", "derived:merge_before_end")
+        for f in into_end:
+            f.tgt = merge_id
+        return self._add_flow(merge_id, "EndEvent_success")
+
     # -- enrichment: integration target -> data store + send task ---------
 
-    def _enrich_integration(self) -> None:
+    def _step_dicts(self) -> List[dict]:
+        """The workflow steps as the shared rules above read them."""
+        return [
+            {
+                "id": s.id,
+                "type": str(getattr(s.type, "value", s.type)),
+                "component": s.component,
+                "outputs": list(s.outputs or []),
+                "parameters": s.parameters,
+            }
+            for s in self.bp.workflow.steps
+        ]
+
+    def _own_report_steps(self) -> List[str]:
+        """The workflow steps that write the final report themselves
+        (`final_report_step_ids`)."""
+        artifacts = {k: a.model_dump(mode="json") for k, a in self.bp.artifacts.items()}
+        return final_report_step_ids(self._step_dicts(), artifacts)
+
+    def _own_submission_steps(self, target: Optional[str] = None) -> List[str]:
+        """The workflow steps that send to an integration target themselves: their
+        ``parameters.integration_target`` is the target's exact name (any target
+        when ``target`` is None)."""
+        spec = self.bp.technical_spec if isinstance(self.bp.technical_spec, dict) else {}
+        known = [str(t) for t in _as_list(spec.get("integration_targets"))]
+        out = []
+        for step in self._step_dicts():
+            marked = integration_marker(step)
+            if marked in known and (target is None or marked == target):
+                out.append(step["id"])
+        return out
+
+    def _enrich_integration(self, reports: set[str]) -> None:
         spec = self.bp.technical_spec if isinstance(self.bp.technical_spec, dict) else {}
         targets = spec.get("integration_targets") or []
         if not targets:
             return
+        approvals = set(self._approval_gateways)
+        requirements = reports | approvals
+        before_report = self._reachable("StartEvent_1", without=reports) if reports else set()
+        after_rejection: set[str] = set()
+        for flow in self.flows:
+            if flow.src in approvals and flow.is_loop:
+                after_rejection.update(self._reachable(flow.tgt, skip_approval=True))
         for idx, target in enumerate(targets):
-            ds_id = f"DataStore_{_safe(target)}"
+            ds_id = self._free_id(f"DataStore_{_safe(target)}")
             ds_name = _humanize_token(target)
             # Persistent repositories use clean names (e.g. "Incident Reporting Database").
             if not ds_name.lower().endswith(("database", "repository", "system", "store")):
@@ -782,7 +1019,24 @@ class _BpmnBuilder:
             self.data_stores.append((ds_id, ds_label, target))
             self._map(ds_id, "data_store", f"technical_spec.integration_targets[{idx}]")
 
-            send_id = f"Activity_submit_{_safe(target)}"
+            own_nodes = self._step_nodes(self._own_submission_steps(str(target)))
+            # An auto-approved path can bypass a review. A sender can stand in
+            # for the fallback only after any required report, and once no review
+            # follows it and no rejected path reaches it without a new approval.
+            after_requirements = {
+                node
+                for node in own_nodes - before_report - after_rejection
+                if not requirements or not self._reachable(node) & requirements
+            }
+            if not self._generated_pdf and self._passes_every_way(after_requirements):
+                self._own_delivery_nodes.append(after_requirements)
+                self._store_anchor_of[ds_id] = min(after_requirements)
+                for node in sorted(after_requirements):
+                    self.nodes[node].data_out.append((self._next_assoc_id(), ds_id))
+                continue
+
+            send_id = self._free_id(f"Activity_submit_{_safe(target)}")
+            self._store_anchor_of[ds_id] = send_id
             send_node = _Node(
                 send_id,
                 "bpmn:sendTask",
@@ -794,16 +1048,10 @@ class _BpmnBuilder:
             self._map(send_id, "send_task", f"derived:submit:{target}")
             send_node.data_out.append((self._next_assoc_id(), ds_id))
 
-            # splice the send task onto the primary success edge into the end event
-            success_edges = [f for f in self.flows if f.tgt == "EndEvent_success" and not f.is_loop]
-            # prefer an edge that originates at an approval gateway (the "Yes" path)
-            chosen = None
-            for f in success_edges:
-                if f.src in self._approval_gateways:
-                    chosen = f
-                    break
-            if chosen is None and success_edges:
-                chosen = success_edges[0]
+            # Splice the send task onto the one way into the success end, so every
+            # successful path submits (after the PDF report, which is spliced
+            # first); a further target is spliced after the previous send task.
+            chosen = self._success_entry()
             if chosen is not None:
                 # src -> send_task -> end (keep the original edge name on src->send)
                 end_target = chosen.tgt
@@ -812,57 +1060,44 @@ class _BpmnBuilder:
             else:
                 # no end edge yet (unusual) -- attach send task after the last terminal
                 self._add_flow(send_id, "EndEvent_success")
-            # only the first integration target is spliced inline; further
-            # targets get their own send task after the first one
-            if idx == 0:
-                prev_send = send_id
-            else:
-                # chain subsequent submissions after the previous send task
-                # (rare; keeps the graph connected)
-                pass
 
     # -- enrichment: PDF generation service task --------------------------
 
-    def _enrich_pdf_generation(self) -> None:
+    def _enrich_pdf_generation(self, reports: set[str]) -> None:
         """When `output_types` includes 'pdf' and no explicit PDF-generation step
         exists in the workflow, inject a synthetic service task in the GAIK AI lane
         labelled 'Generate PDF report'.
 
         Placement (generic across use cases): the PDF report is the rendering of
         the *approved final output*, so it is spliced onto the success path as
-        late as possible while still being a system action --
-          1. the approved ("Yes") edge from the last approval gateway into the
-             end event, when a human_review exists -- so the reviewer approves the
-             content *before* the PDF is rendered; otherwise
-          2. the edge into the success end event, when there is no review.
+        late as possible, on the one way into the success end
+        (`_success_entry()`): the approved ("Yes") edge when a review is the only
+        way to finish, so the reviewer approves the content *before* the PDF is
+        rendered; the point where all the ways to finish meet when there are
+        several (an auto-approval beside a review), so every one renders it.
         This runs before `_enrich_integration()`, so a subsequent Send Task is
         spliced *after* the PDF -- the natural "generate the report, then submit
         it" order.
 
-        Nothing is added when the workflow already contains an explicit step whose
-        id or component names a PDF/report generator (case-insensitive), so
-        intentionally modelled blueprints are never double-counted.
+        Nothing is added when every way to the success end passes a step that
+        writes the final report itself (`_own_report_steps`: a generated
+        pdf/report artifact with final_output that it produces), or, as before,
+        when a step's id or component names a PDF/report generator
+        (case-insensitive). When a way skips the agent's report steps (a
+        decision's branch to "end" past them, say), the task is added as
+        before, at the end, so every successful path still renders a report;
+        the path through the agent's step then shows two. Nothing is rewired.
         """
         spec = self.bp.technical_spec if isinstance(self.bp.technical_spec, dict) else {}
-        out = spec.get("output_types") or []
-        if isinstance(out, str):
-            out = [out]
-        if not any(str(o).lower() in ("pdf", "report") for o in out):
+        if not wants_report(spec.get("output_types")):
             return
+        if named_report_step(self._step_dicts()):
+            return
+        if self._passes_every_way(reports):
+            return
+        self._generated_pdf = True
 
-        # Skip if an explicit PDF generation step is already in the workflow.
-        for s in self.bp.workflow.steps:
-            sid_low = s.id.lower()
-            comp_low = (s.component or "").lower()
-            if (
-                "pdf" in sid_low
-                or "pdf" in comp_low
-                or "report_gen" in sid_low
-                or "report_gen" in comp_low
-            ):
-                return
-
-        pdf_id = "Activity_generate_pdf"
+        pdf_id = self._free_id("Activity_generate_pdf")
         pdf_node = _Node(
             pdf_id,
             "bpmn:serviceTask",
@@ -873,21 +1108,10 @@ class _BpmnBuilder:
         self.nodes[pdf_id] = pdf_node
         self._map(pdf_id, "pdf_generation", "derived:pdf_output")
 
-        # Find the best splice point.
-        splice_edge = None
-        # 1. Prefer the approved ("Yes") edge from an approval gateway into the
-        #    end event -- this is the final approval, after which the report is
-        #    rendered. (With nested reviews, only the last gateway leads to end.)
-        for f in self.flows:
-            if f.src in self._approval_gateways and f.tgt == "EndEvent_success" and not f.is_loop:
-                splice_edge = f
-                break
-        # 2. Fallback: any non-loop edge into the success end event.
-        if splice_edge is None:
-            for f in self.flows:
-                if f.tgt == "EndEvent_success" and not f.is_loop:
-                    splice_edge = f
-                    break
+        # The one way into the success end: the approved ("Yes") flow when a review
+        # is the only way to finish, else the point where all the ways meet, so
+        # every successful path renders the report.
+        splice_edge = self._success_entry()
 
         if splice_edge is not None:
             original_tgt = splice_edge.tgt
@@ -903,24 +1127,172 @@ class _BpmnBuilder:
             after_node = self._lookup_node_for_step(dp.after)
             if not after_node:
                 continue
-            xg = f"Gateway_decision_{_safe(dp.id)}"
-            self.nodes[xg] = _Node(
-                xg, "bpmn:exclusiveGateway", dp.name, self.nodes[after_node].lane, "gateway"
-            )
-            self._map(xg, "decision_point", f"business_process.decision_points[{i}]")
-            # reroute the after_node's forward (non-loop) edges through the gateway
-            outgoing = [f for f in self.flows if f.src == after_node and not f.is_loop]
-            for f in outgoing:
-                f.src = xg
-            self._add_flow(after_node, xg)
-            for br in dp.branches:
-                tgt = (
-                    "EndEvent_success"
-                    if br.target in ("end", "")
-                    else self._lookup_node_for_step(br.target)
-                )
-                if tgt:
+            if dp.after in self._approval_of:
+                # After a review: the decision comes after the approval, on its
+                # "Yes"; the "No" and any rework path stay with the approval.
+                approval, yes_flows = self._approval_of[dp.after]
+                xg = self._new_decision_gateway(i, dp, approval)
+                outgoing = [f for f in yes_flows if f in self.flows and f.src == approval]
+                for f in outgoing:
+                    f.src = xg
+                self._add_flow(approval, xg, name="Yes")
+                after_node = approval
+            else:
+                xg = self._new_decision_gateway(i, dp, after_node)
+                # reroute the after_node's forward (non-loop) edges through the gateway
+                outgoing = [f for f in self.flows if f.src == after_node and not f.is_loop]
+                for f in outgoing:
+                    f.src = xg
+                self._add_flow(after_node, xg)
+            # Each branch's step, and the nodes a flow into it can lead to: the
+            # step itself, or the join before it when it depends on several.
+            targets = [
+                "EndEvent_success"
+                if br.target in ("end", "")
+                else self._lookup_node_for_step(br.target)
+                for br in dp.branches
+            ]
+            entries = [self._entries_of(br.target, tgt) for br, tgt in zip(dp.branches, targets)]
+            outgoing = self._dissolve_fork(after_node, xg, outgoing, set().union(*entries))
+            for br, tgt, entry in zip(dp.branches, targets, entries):
+                if not tgt:
+                    continue
+                # A branch to where the step already led (the step it is after
+                # depends_on: the usual way a decision is written) is that flow,
+                # now from the gateway, also when it goes through the join before
+                # the step: name it, rather than drawing it twice. Any other
+                # branch goes to the step itself: into a join the decision does
+                # not feed, it would make the join wait for a token that comes
+                # only when this branch is taken.
+                moved = next((f for f in outgoing if f.tgt in entry), None)
+                if moved is not None:
+                    outgoing.remove(moved)
+                    moved.name = br.condition or moved.name
+                else:
                     self._add_flow(xg, tgt, name=br.condition)
+
+    # -- the agent's own report and send steps: on every way to the end? --
+
+    def _step_nodes(self, step_ids: list[str]) -> set[str]:
+        return {node for node in map(self._lookup_node_for_step, step_ids) if node}
+
+    def _reachable(
+        self,
+        start: str,
+        *,
+        without: Set[str] = frozenset(),
+        skip_approval: bool = False,
+    ) -> set[str]:
+        """All nodes reachable over the drawn flows, including rework."""
+        successors: dict[str, list[str]] = {}
+        for flow in self.flows:
+            if skip_approval and flow.src in self._approval_gateways and flow.name == "Yes":
+                continue
+            successors.setdefault(flow.src, []).append(flow.tgt)
+        seen, todo = set(), [start]
+        while todo:
+            node = todo.pop()
+            if node in seen or node in without:
+                continue
+            seen.add(node)
+            todo.extend(successors.get(node, []))
+        return seen
+
+    def _passes_every_way(self, nodes: set[str]) -> bool:
+        """Every way from the start to the success end passes one of ``nodes``:
+        with them taken out, the success end cannot be reached over the drawn
+        flows (all of them, loops and rework ways too; a visited set handles the
+        cycles). A way that skips them all, such as a decision's branch to "end"
+        past them, another branch of a fork, or a choice that reaches the rest of
+        the process past them, makes this false."""
+        return bool(nodes) and "EndEvent_success" not in self._reachable(
+            "StartEvent_1", without=nodes
+        )
+
+    def _map_done_choices(self, reports: set[str]) -> None:
+        """Tell the canvas what the agent's own finishing steps already cover.
+
+        An edit can add a direct path to success. Only promise an action is
+        complete if every path to this anchor passes it, including the anchor
+        itself. Otherwise the dialog describes the fallback conditionally.
+        """
+        spec = self.bp.technical_spec if isinstance(self.bp.technical_spec, dict) else {}
+        skipped_by_action: dict[str, set[str]] = {}
+        if wants_report(spec.get("output_types")) and self._passes_every_way(reports):
+            skipped_by_action["done_report"] = self._reachable("StartEvent_1", without=reports)
+        if self._own_delivery_nodes:
+            skipped_by_action["done_delivery"] = set().union(
+                *(
+                    self._reachable("StartEvent_1", without=nodes)
+                    for nodes in self._own_delivery_nodes
+                )
+            )
+        if not skipped_by_action:
+            return
+        reachable = self._reachable("StartEvent_1")
+        for node, entry in self.mapping.items():
+            if node in reachable and (
+                entry["blueprint_path"].startswith("workflow.steps[")
+                or entry["kind"] == "decision_point"
+            ):
+                entry.update(
+                    (key, "conditional" if node in skipped else "complete")
+                    for key, skipped in skipped_by_action.items()
+                )
+
+    def _new_decision_gateway(self, i: int, dp, beside: str) -> str:
+        """The exclusive gateway a decision point is drawn as, in the lane of ``beside``."""
+        xg = f"Gateway_decision_{_safe(dp.id)}"
+        self.nodes[xg] = _Node(
+            xg, "bpmn:exclusiveGateway", dp.name, self.nodes[beside].lane, "gateway"
+        )
+        self._map(xg, "decision_point", f"business_process.decision_points[{i}]")
+        return xg
+
+    def _entries_of(self, step_id: str, node: Optional[str]) -> set:
+        """The nodes a flow into ``step_id`` (drawn as ``node``) can lead to: the
+        step, and the join before it when it depends on several steps."""
+        if not node:
+            return set()
+        join = f"Gateway_join_{_safe(step_id)}"
+        return {node, join} if join in self.nodes else {node}
+
+    def _dissolve_fork(
+        self, step_node: str, gateway: str, outgoing: List[_Flow], targets: set
+    ) -> List[_Flow]:
+        """A decision after a step with several dependents chooses between them.
+
+        The base edges give such a step a parallel fork, as if all its
+        dependents ran. The dependents a branch of the decision leads to are
+        alternatives: their flows leave from the decision gateway instead. When
+        the decision chooses between all of them, the fork goes; when some are
+        not chosen between, they still always run, so the fork stays after the
+        step, with the decision as one of its ways. Returns the gateway's
+        outgoing flows after that.
+        """
+        # Only the fork after the step: a join it feeds (another step waits for it
+        # and others) chooses nothing, and removing it would leave the flows of
+        # those others going nowhere.
+        forks = [f for f in outgoing if self.mapping.get(f.tgt, {}).get("kind") == "parallel_fork"]
+        for into_fork in forks:
+            fork = into_fork.tgt
+            out_of_fork = [f for f in self.flows if f.src == fork and not f.is_loop]
+            chosen = [f for f in out_of_fork if f.tgt in targets]
+            if not chosen:
+                continue
+            for f in chosen:
+                f.src = gateway
+            outgoing = [f for f in outgoing if f is not into_fork] + chosen
+            if len(chosen) == len(out_of_fork):
+                self.flows.remove(into_fork)
+                del self.nodes[fork]
+                self.mapping.pop(fork, None)
+                continue
+            # step -> fork -> (the steps that always run, and the decision)
+            into_fork.src = step_node
+            self.flows = [f for f in self.flows if not (f.src == step_node and f.tgt == gateway)]
+            self._add_flow(fork, gateway)
+        return outgoing
 
     # -- enrichment: exception flows --------------------------------------
 
@@ -944,7 +1316,8 @@ class _BpmnBuilder:
                     f.name = "OK"
             self._add_flow(attached, xg)
             if ex.outcome.startswith("loop_to:"):
-                tgt = self._lookup_node_for_step(ex.outcome.split(":", 1)[1])
+                # Stripped like the approval's loop_to (and the draft check's).
+                tgt = self._lookup_node_for_step(ex.outcome.split(":", 1)[1].strip())
                 if tgt:
                     self._add_flow(xg, tgt, name=ex.condition or "exception", is_loop=True)
             else:  # outcome == "end"
@@ -1179,17 +1552,21 @@ class _BpmnBuilder:
                         h_obj,
                     )
 
-        # data stores: directly below their send task, beneath the pool
+        # Data stores: below their sender and the pool, stacking when senders
+        # for different destinations share the same column.
         w_ds, h_ds = SIZE["dataStore"]
         pool_bottom = POOL_Y + pool_height
-        for ds_id, ds_name, target in self.data_stores:
-            send_id = f"Activity_submit_{_safe(target)}"
+        store_rows: dict[float, int] = {}
+        for ds_id, _, _ in self.data_stores:
+            send_id = self._store_anchor_of.get(ds_id, "")
             if send_id in self.bounds:
                 sx, sy, sw, sh = self.bounds[send_id]
                 cx = sx + sw / 2
             else:
                 cx = CONTENT_X0 + w_ds
-            self.bounds[ds_id] = (cx - w_ds / 2, pool_bottom + 30, w_ds, h_ds)
+            row = store_rows.get(cx, 0)
+            store_rows[cx] = row + 1
+            self.bounds[ds_id] = (cx - w_ds / 2, pool_bottom + 30 + row * (h_ds + 12), w_ds, h_ds)
 
         # annotations: a notes column just to the right of the pool
         w_an, h_an = SIZE["annotation"]
@@ -1221,11 +1598,14 @@ class _BpmnBuilder:
         self._enrich_approval()
         self._enrich_decision_points()
         self._enrich_exceptions()
+        self._settle_joins()
         # PDF generation is placed on the approved path *before* integration so
         # the order reads "generate the report -> submit it", and so a human
         # review approves the output before the PDF is rendered.
-        self._enrich_pdf_generation()
-        self._enrich_integration()
+        reports = self._step_nodes(self._own_report_steps())
+        self._enrich_pdf_generation(reports)
+        self._enrich_integration(reports)
+        self._map_done_choices(reports)
         if self.include_data_objects:
             self._build_data_objects()
         self._build_external_parties()
