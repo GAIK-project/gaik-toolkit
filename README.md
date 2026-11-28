@@ -28,8 +28,7 @@
   <a href="https://gaik-demo.2.rahtiapp.fi/">Live demo</a> ·
   <a href="https://gaik-project.github.io/gaik-toolkit/">Documentation</a> ·
   <a href="https://github.com/GAIK-project/gaik-toolkit/tree/main/implementation_layer/examples">Examples</a> ·
-  <a href="https://github.com/GAIK-project/gaik-toolkit#-solution-configuration-wizard">Solution Wizard</a> ·
-  <a href="https://github.com/GAIK-project/gaik-toolkit-desktop">Desktop app</a>
+  <a href="https://github.com/GAIK-project/gaik-toolkit#-solution-configuration-wizard">Solution Wizard</a>
 </p>
 
 ## 🚀 Get started
